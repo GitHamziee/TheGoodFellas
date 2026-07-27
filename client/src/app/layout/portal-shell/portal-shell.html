@@ -1,0 +1,23 @@
+<div class="shell" [class.shell--dark]="isAdmin()">
+  <aside class="sidebar">
+    <div class="brand">The Good Fellas</div>
+
+    <nav class="nav">
+      @for (item of navItems(); track item.path) {
+        <a class="nav-link" [routerLink]="item.path" routerLinkActive="nav-link--active">{{ item.label }}</a>
+      }
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-name">{{ user()?.name }}</div>
+        <div class="user-role">{{ roleLabel() }}</div>
+      </div>
+      <button class="logout-btn" type="button" (click)="logout()">Log out</button>
+    </div>
+  </aside>
+
+  <div class="content">
+    <router-outlet />
+  </div>
+</div>

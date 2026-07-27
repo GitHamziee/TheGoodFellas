@@ -1,0 +1,142 @@
+<div class="page">
+  <h1>New Lead</h1>
+
+  <form class="card" (ngSubmit)="submit()">
+    @if (error()) {
+      <div class="error">{{ error() }}</div>
+    }
+
+    <div class="form-grid">
+      <label class="full">
+        Closer
+        <select name="closerId" [(ngModel)]="form.closerId" required>
+          <option value="" disabled selected>Select a closer</option>
+          @for (closer of closers(); track closer.id) {
+            <option [value]="closer.id">{{ closer.name }} ({{ closer.email }})</option>
+          }
+        </select>
+      </label>
+
+      <label>
+        Customer's Name
+        <input type="text" name="customerName" [(ngModel)]="form.customerName" required />
+      </label>
+
+      <label>
+        Marital Status
+        <select name="maritalStatus" [(ngModel)]="form.maritalStatus">
+          <option value="" disabled selected>Select</option>
+          @for (m of maritalStatusOptions; track m) {
+            <option [value]="m">{{ m }}</option>
+          }
+        </select>
+      </label>
+
+      <label>
+        Phone Number
+        <input type="tel" name="phone" [(ngModel)]="form.phone" required />
+      </label>
+
+      <label>
+        State
+        <input type="text" name="state" [(ngModel)]="form.state" required />
+      </label>
+
+      <label>
+        Zipcode
+        <input type="text" name="zipcode" [(ngModel)]="form.zipcode" />
+      </label>
+
+      <label>
+        Birth State
+        <input type="text" name="birthState" [(ngModel)]="form.birthState" />
+      </label>
+
+      <label>
+        Smoker
+        <select name="smoker" [(ngModel)]="form.smoker">
+          <option [ngValue]="undefined" disabled selected>Select</option>
+          <option [ngValue]="true">Yes</option>
+          <option [ngValue]="false">No</option>
+        </select>
+      </label>
+
+      <label>
+        DOB
+        <input type="date" name="dob" [(ngModel)]="form.dob" />
+      </label>
+
+      <label>
+        Age
+        <input type="number" name="age" [(ngModel)]="form.age" min="0" />
+      </label>
+
+      <label>
+        Height
+        <input type="text" name="height" placeholder="e.g. 5'10&quot;" [(ngModel)]="form.height" />
+      </label>
+
+      <label>
+        Weight (lbs)
+        <input type="number" name="weight" [(ngModel)]="form.weight" min="0" />
+      </label>
+
+      <label>
+        Need
+        <select name="need" [(ngModel)]="form.need">
+          <option value="" disabled selected>Select</option>
+          @for (n of needOptions; track n.value) {
+            <option [value]="n.value">{{ n.label }}</option>
+          }
+        </select>
+      </label>
+
+      <label>
+        Source of Income
+        <select name="incomeSource" [(ngModel)]="form.incomeSource">
+          <option value="" disabled selected>Select</option>
+          @for (s of incomeSourceOptions; track s.value) {
+            <option [value]="s.value">{{ s.label }}</option>
+          }
+        </select>
+      </label>
+
+      @if (form.incomeSource === 'RETIRED') {
+        <label>
+          Retired Income Type
+          <select name="retiredIncomeType" [(ngModel)]="form.retiredIncomeType">
+            <option value="" disabled selected>Select</option>
+            @for (r of retiredIncomeOptions; track r.value) {
+              <option [value]="r.value">{{ r.label }}</option>
+            }
+          </select>
+        </label>
+      }
+
+      @if (form.retiredIncomeType === 'SSDI') {
+        <label>
+          Nature of Disability
+          <input type="text" name="natureOfDisability" [(ngModel)]="form.natureOfDisability" />
+        </label>
+      }
+
+      <label>
+        Annual Income
+        <input type="number" name="annualIncome" [(ngModel)]="form.annualIncome" min="0" />
+      </label>
+
+      <label class="full">
+        Health Conditions
+        <textarea name="healthConditions" rows="2" [(ngModel)]="form.healthConditions"></textarea>
+      </label>
+
+      <label class="full">
+        Notes
+        <textarea name="juniorNotes" rows="3" [(ngModel)]="form.juniorNotes"></textarea>
+      </label>
+    </div>
+
+    <br />
+    <button class="btn" type="submit" [disabled]="submitting()">{{ submitting() ? 'Submitting...' : 'Submit lead' }}</button>
+  </form>
+</div>

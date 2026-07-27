@@ -1,0 +1,10 @@
+<div class="page">
+  <h1>Client Dashboard</h1>
+
+  <div class="stats-row">
+    <div class="stat"><div class="value">{{ pending() }}</div><div class="label">Awaiting your response</div></div>
+    <div class="stat"><div class="value">{{ accepted() }}</div><div class="label">Accepted</div></div>
+  </div>
+
+  <a class="btn" routerLink="/client/new-leads">View new leads</a>
+</div>

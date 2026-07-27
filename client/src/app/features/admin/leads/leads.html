@@ -1,0 +1,52 @@
+<div class="page">
+  <h1>All Leads</h1>
+
+  <div class="card">
+    @if (loading()) {
+      <p class="empty">Loading...</p>
+    } @else if (leads().length === 0) {
+      <p class="empty">No leads yet.</p>
+    } @else {
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Junior</th>
+            <th>Closer</th>
+            <th>Client</th>
+            <th>Status</th>
+            <th>Payment</th>
+            <th>Created</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (lead of leads(); track lead.id) {
+            <tr>
+              <td>{{ lead.customerName }}</td>
+              <td>{{ lead.juniorCloser.name }}</td>
+              <td>{{ lead.closer.name }}</td>
+              <td>{{ lead.client?.name || '—' }}</td>
+              <td><span [class]="statusBadgeClass(lead.status)">{{ lead.status }}</span></td>
+              <td>
+                @if (lead.status === 'ACCEPTED') {
+                  <button
+                    class="btn"
+                    [class.btn--muted]="lead.paymentStatus === 'UNPAID'"
+                    type="button"
+                    [disabled]="busyId() === lead.id"
+                    (click)="togglePayment(lead)"
+                  >
+                    {{ lead.paymentStatus === 'PAID' ? 'Paid — Closed' : 'Mark paid' }}
+                  </button>
+                } @else {
+                  <span class="empty">—</span>
+                }
+              </td>
+              <td>{{ lead.createdAt | date: 'short' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+  </div>
+</div>

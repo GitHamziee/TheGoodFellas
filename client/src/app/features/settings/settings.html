@@ -1,0 +1,37 @@
+<div class="page">
+  <h1>Settings</h1>
+
+  <div class="card">
+    <h2 style="font-size:0.95rem; margin:0 0 0.75rem;">Account</h2>
+    <p class="empty">{{ user()?.name }} · {{ user()?.email }}</p>
+  </div>
+
+  <form class="card" (ngSubmit)="submit()">
+    <h2 style="font-size:0.95rem; margin:0 0 0.75rem;">Change Password</h2>
+
+    @if (error()) {
+      <div class="error">{{ error() }}</div>
+    }
+    @if (success()) {
+      <div class="success">Password changed. Signing you out...</div>
+    }
+
+    <div class="form-grid">
+      <label class="full">
+        Current password
+        <input type="password" name="currentPassword" [(ngModel)]="currentPassword" required autocomplete="current-password" />
+      </label>
+      <label>
+        New password
+        <input type="password" name="newPassword" [(ngModel)]="newPassword" required autocomplete="new-password" />
+      </label>
+      <label>
+        Confirm new password
+        <input type="password" name="confirmPassword" [(ngModel)]="confirmPassword" required autocomplete="new-password" />
+      </label>
+    </div>
+
+    <br />
+    <button class="btn" type="submit" [disabled]="submitting()">{{ submitting() ? 'Updating...' : 'Update password' }}</button>
+  </form>
+</div>

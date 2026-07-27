@@ -1,0 +1,45 @@
+<div class="page">
+  <h1>Overall Analytics</h1>
+
+  @if (loading()) {
+    <p class="empty">Loading...</p>
+  } @else if (overall(); as o) {
+    <div class="stats-row">
+      <div class="stat"><div class="value">{{ o.totalLeads }}</div><div class="label">Total leads</div></div>
+      <div class="stat"><div class="value">{{ o.statusCounts.ACCEPTED || 0 }}</div><div class="label">Accepted</div></div>
+      <div class="stat"><div class="value">{{ o.unpaidAcceptedCount }}</div><div class="label">Accepted, unpaid</div></div>
+      <div class="stat"><div class="value">{{ o.closedCount }}</div><div class="label">Closed (paid)</div></div>
+    </div>
+
+    <div class="card">
+      <h2 style="font-size:0.95rem; margin:0 0 0.75rem;">Leads by status</h2>
+      <table>
+        <thead>
+          <tr><th>Status</th><th>Count</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>New</td><td>{{ o.statusCounts.NEW || 0 }}</td></tr>
+          <tr><td>Submitted</td><td>{{ o.statusCounts.SUBMITTED || 0 }}</td></tr>
+          <tr><td>Assigned</td><td>{{ o.statusCounts.ASSIGNED || 0 }}</td></tr>
+          <tr><td>Accepted</td><td>{{ o.statusCounts.ACCEPTED || 0 }}</td></tr>
+          <tr><td>Rejected</td><td>{{ o.statusCounts.REJECTED || 0 }}</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2 style="font-size:0.95rem; margin:0 0 0.75rem;">Staff & clients</h2>
+      <table>
+        <thead>
+          <tr><th>Role</th><th>Count</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Junior Closers</td><td>{{ o.roleCounts['JUNIOR_CLOSER'] || 0 }}</td></tr>
+          <tr><td>Closers</td><td>{{ o.roleCounts['CLOSER'] || 0 }}</td></tr>
+          <tr><td>Admins</td><td>{{ o.roleCounts['ADMIN'] || 0 }}</td></tr>
+          <tr><td>Clients</td><td>{{ o.roleCounts['CLIENT'] || 0 }}</td></tr>
+        </tbody>
+      </table>
+    </div>
+  }
+</div>

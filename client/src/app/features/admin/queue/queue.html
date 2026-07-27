@@ -1,0 +1,57 @@
+<div class="page">
+  <h1>Queue</h1>
+  <p class="empty" style="margin-top: -0.75rem;">Newly submitted leads and leads a client rejected.</p>
+
+  @if (error()) {
+    <div class="error">{{ error() }}</div>
+  }
+
+  @if (loading()) {
+    <p class="empty">Loading...</p>
+  } @else if (leads().length === 0) {
+    <p class="empty">Nothing needs your attention right now.</p>
+  } @else {
+    @for (lead of leads(); track lead.id) {
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <strong>{{ lead.customerName }}</strong>
+          <span [class]="statusBadgeClass(lead.status)">{{ lead.status }}</span>
+        </div>
+        <p class="empty" style="margin: 0.4rem 0;">
+          Junior: {{ lead.juniorCloser.name }} · Closer: {{ lead.closer.name }}<br />
+          Closer notes: {{ lead.closerNotes || '—' }}
+          @if (lead.status === 'REJECTED') {
+            <br />Rejection reason: {{ lead.rejectionReason || '—' }}
+          }
+        </p>
+
+        @if (lead.status === 'REJECTED') {
+          <div class="form-grid">
+            <label>
+              Name
+              <input type="text" [(ngModel)]="draftFor(lead).customerName" [ngModelOptions]="{ standalone: true }" />
+            </label>
+            <label>
+              Phone
+              <input type="text" [(ngModel)]="draftFor(lead).phone" [ngModelOptions]="{ standalone: true }" />
+            </label>
+          </div>
+          <br />
+          <button class="btn btn--muted" type="button" [disabled]="busyId() === lead.id" (click)="saveEdit(lead)">Save edits</button>
+        }
+
+        <div style="margin-top: 0.75rem; display:flex; gap:0.5rem; align-items:center;">
+          <select [(ngModel)]="clientChoice[lead.id]" [ngModelOptions]="{ standalone: true }">
+            <option value="" disabled selected>Select a client</option>
+            @for (client of clients(); track client.id) {
+              <option [value]="client.id">{{ client.name }} ({{ client.email }})</option>
+            }
+          </select>
+          <button class="btn" type="button" [disabled]="busyId() === lead.id" (click)="assign(lead)">
+            {{ busyId() === lead.id ? 'Assigning...' : 'Assign to client' }}
+          </button>
+        </div>
+      </div>
+    }
+  }
+</div>

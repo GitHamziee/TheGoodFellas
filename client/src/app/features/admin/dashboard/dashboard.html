@@ -1,0 +1,12 @@
+<div class="page">
+  <h1>Admin Dashboard</h1>
+
+  <div class="stats-row">
+    <div class="stat"><div class="value">{{ leads().length }}</div><div class="label">Total leads</div></div>
+    <div class="stat"><div class="value">{{ queueCount() }}</div><div class="label">Needs action</div></div>
+    <div class="stat"><div class="value">{{ assignedCount() }}</div><div class="label">With client</div></div>
+    <div class="stat"><div class="value">{{ acceptedCount() }}</div><div class="label">Accepted</div></div>
+  </div>
+
+  <a class="btn" routerLink="/admin/queue">Go to queue</a>
+</div>

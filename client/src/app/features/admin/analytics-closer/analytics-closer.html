@@ -1,0 +1,32 @@
+<div class="page">
+  <h1>Analytics — Closers</h1>
+
+  <div class="card">
+    @if (loading()) {
+      <p class="empty">Loading...</p>
+    } @else if (rows().length === 0) {
+      <p class="empty">No closers yet.</p>
+    } @else {
+      <table>
+        <thead>
+          <tr>
+            <th>Closer</th>
+            <th>Total Leads</th>
+            <th>Accepted</th>
+            <th>Rejected</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of rows(); track row.id) {
+            <tr>
+              <td>{{ row.name }} <span class="empty">({{ row.email }})</span></td>
+              <td>{{ row.total }}</td>
+              <td>{{ row.accepted }}</td>
+              <td>{{ row.rejected }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+  </div>
+</div>

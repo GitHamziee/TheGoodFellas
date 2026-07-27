@@ -1,0 +1,65 @@
+<div class="page">
+  <h1>Users</h1>
+
+  <form class="card" (ngSubmit)="createUser()">
+    <h2 style="font-size:0.95rem; margin:0 0 0.75rem;">Create staff / client account</h2>
+    @if (error()) {
+      <div class="error">{{ error() }}</div>
+    }
+    <div class="form-grid">
+      <label>
+        Name
+        <input type="text" name="name" [(ngModel)]="name" required />
+      </label>
+      <label>
+        Email
+        <input type="email" name="email" [(ngModel)]="email" required />
+      </label>
+      <label>
+        Password
+        <input type="password" name="password" [(ngModel)]="password" required />
+      </label>
+      <label>
+        Role
+        <select name="role" [(ngModel)]="role">
+          @for (r of roles; track r) {
+            <option [value]="r">{{ r }}</option>
+          }
+        </select>
+      </label>
+    </div>
+    <br />
+    <button class="btn" type="submit" [disabled]="creating()">{{ creating() ? 'Creating...' : 'Create user' }}</button>
+  </form>
+
+  <div class="card">
+    @if (loading()) {
+      <p class="empty">Loading...</p>
+    } @else {
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Role</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (user of users(); track user.id) {
+            <tr>
+              <td>{{ user.name }}</td>
+              <td>{{ user.email }}</td>
+              <td>
+                <select [ngModel]="user.role" (ngModelChange)="changeRole(user, $event)" [ngModelOptions]="{ standalone: true }">
+                  @for (r of roles; track r) {
+                    <option [value]="r">{{ r }}</option>
+                  }
+                </select>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+  </div>
+</div>

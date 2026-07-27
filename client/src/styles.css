@@ -1,0 +1,138 @@
+/* ============================================================
+   The Good Fellas — design tokens
+   Theme: Gold / Black. Dark ink shells + gold accents across all
+   four portals (not just admin), light content surfaces for
+   data-density readability.
+   ============================================================ */
+:root {
+  /* Brand — gold */
+  --gold-50: #fdf8ec;
+  --gold-100: #faf0d4;
+  --gold-200: #f3dfa3;
+  --gold-300: #ecc96b;
+  --gold-400: #e0b34c;
+  --gold-500: #d4af37; /* primary gold */
+  --gold-600: #b8952c;
+  --gold-700: #967623;
+  --gold-800: #6b551a;
+  --gold-900: #4a3a12;
+
+  /* Ink — near-black, used for shells, primary text, dark surfaces */
+  --ink-950: #000000;
+  --ink-900: #0a0a0a;
+  --ink-800: #141414;
+  --ink-700: #1f1f1f;
+  --ink-600: #2b2b2b;
+  --ink-500: #3d3d3d;
+
+  /* Neutral grays — warm-neutral, pairs with gold better than blue-slate */
+  --gray-50: #fafafa;
+  --gray-100: #f4f4f5;
+  --gray-200: #e4e4e7;
+  --gray-300: #d4d4d8;
+  --gray-400: #a1a1aa;
+  --gray-500: #71717a;
+  --gray-600: #52525b;
+  --gray-700: #3f3f46;
+  --gray-800: #27272a;
+  --gray-900: #18181b;
+
+  /* Semantic */
+  --success-50: #f0fdf4;
+  --success-600: #16a34a;
+  --success-700: #15803d;
+  --danger-50: #fef2f2;
+  --danger-600: #dc2626;
+  --danger-700: #b91c1c;
+  --warning-50: #fffbeb;
+  --warning-600: #d97706;
+  --warning-700: #92400e;
+  --info-50: #eff6ff;
+  --info-600: #0369a1;
+
+  /* Surfaces */
+  --surface: #ffffff;
+  --surface-muted: var(--gray-50);
+  --border: var(--gray-200);
+  --text: var(--ink-900);
+  --text-muted: var(--gray-500);
+
+  /* Scale */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.07), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.05);
+  --shadow-gold: 0 8px 24px rgba(212, 175, 55, 0.25);
+
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  color: var(--text);
+  background: var(--surface-muted);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-sans);
+  letter-spacing: -0.01em;
+}
+
+a {
+  color: inherit;
+}
+
+/* Consistent focus ring across native controls, matches brand */
+:focus-visible {
+  outline: 2px solid var(--gold-500);
+  outline-offset: 2px;
+}
+
+button {
+  font-family: var(--font-sans);
+}
+
+/* Thin, unobtrusive scrollbars — webkit */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--gray-300);
+  border-radius: 999px;
+  border: 2px solid var(--surface-muted);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--gray-400);
+}
+
+/* Gold gradient text — reads best on dark surfaces (sidebar wordmark) */
+.brand-gradient-text {
+  background: linear-gradient(135deg, var(--gold-300) 0%, var(--gold-500) 50%, var(--gold-300) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

@@ -1,0 +1,41 @@
+<div class="auth-page">
+  <div>
+    <div class="auth-brand">
+      <div class="mark">GF</div>
+      <h1 class="brand-gradient-text">The Good Fellas</h1>
+    </div>
+
+    <form class="auth-card" (ngSubmit)="submit()">
+      <h1>Create client account</h1>
+      <p class="subtitle">Self-registration creates a Client account. Staff accounts are created by an admin.</p>
+
+      @if (error()) {
+        <div class="error">{{ error() }}</div>
+      }
+
+      <label>
+        Full name
+        <input type="text" name="name" [(ngModel)]="name" required />
+      </label>
+
+      <label>
+        Email
+        <input type="email" name="email" [(ngModel)]="email" required autocomplete="email" />
+      </label>
+
+      <label>
+        Phone (optional)
+        <input type="tel" name="phone" [(ngModel)]="phone" />
+      </label>
+
+      <label>
+        Password
+        <input type="password" name="password" [(ngModel)]="password" required autocomplete="new-password" />
+      </label>
+
+      <button type="submit" [disabled]="loading()">{{ loading() ? 'Creating...' : 'Create account' }}</button>
+
+      <p class="switch">Already have an account? <a routerLink="/login">Sign in</a></p>
+    </form>
+  </div>
+</div>

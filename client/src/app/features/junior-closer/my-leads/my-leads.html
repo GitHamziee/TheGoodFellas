@@ -1,0 +1,35 @@
+<div class="page">
+  <h1>My Lead History</h1>
+  <p class="empty" style="margin-top: -0.75rem;">Only customer name and phone are shown here.</p>
+
+  <div class="card">
+    @if (loading()) {
+      <p class="empty">Loading...</p>
+    } @else if (leads().length === 0) {
+      <p class="empty">You haven't submitted any leads yet.</p>
+    } @else {
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Phone</th>
+            <th>Closer</th>
+            <th>Status</th>
+            <th>Submitted</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (lead of leads(); track lead.id) {
+            <tr>
+              <td>{{ lead.customerName }}</td>
+              <td>{{ lead.phone }}</td>
+              <td>{{ lead.closer?.name }}</td>
+              <td><span [class]="statusBadgeClass(lead.status)">{{ lead.status }}</span></td>
+              <td>{{ lead.createdAt | date: 'short' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+  </div>
+</div>

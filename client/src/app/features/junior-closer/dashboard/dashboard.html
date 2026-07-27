@@ -1,0 +1,12 @@
+<div class="page">
+  <h1>Junior Closer Dashboard</h1>
+
+  <div class="stats-row">
+    <div class="stat"><div class="value">{{ total() }}</div><div class="label">Total submitted</div></div>
+    <div class="stat"><div class="value">{{ awaitingCloser() }}</div><div class="label">With closer</div></div>
+    <div class="stat"><div class="value">{{ inAdminQueue() }}</div><div class="label">With admin</div></div>
+    <div class="stat"><div class="value">{{ resolved() }}</div><div class="label">Assigned / accepted</div></div>
+  </div>
+
+  <a class="btn" routerLink="/junior/submit-lead">Submit a new lead</a>
+</div>

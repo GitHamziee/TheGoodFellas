@@ -1,0 +1,167 @@
+// Prisma schema for TheGoodFellas
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  JUNIOR_CLOSER
+  CLOSER
+  ADMIN
+  CLIENT
+}
+
+// NEW       — submitted by junior closer, sitting with the chosen closer
+// SUBMITTED — closer added info and submitted, waiting for admin to assign
+// ASSIGNED  — admin assigned to a client, waiting for accept/reject
+// ACCEPTED  — client accepted (payment tracked separately via paymentStatus)
+// REJECTED  — client rejected, back with admin to edit/reassign
+enum LeadStatus {
+  NEW
+  SUBMITTED
+  ASSIGNED
+  ACCEPTED
+  REJECTED
+}
+
+// Secondary flag admin toggles on an ACCEPTED lead to mark it closed out.
+// Independent of LeadStatus — does not gate any workflow transition.
+enum PaymentStatus {
+  UNPAID
+  PAID
+}
+
+enum LeadNeed {
+  BURIAL
+  CREMATION
+  LEAVE_MONEY
+}
+
+enum IncomeSource {
+  EMPLOYED
+  SELF_EMPLOYED
+  RETIRED
+}
+
+enum RetiredIncomeType {
+  SSI
+  SSDI
+}
+
+enum AccountType {
+  CHECKING
+  SAVINGS
+}
+
+enum PayerType {
+  SELF
+  SOMEONE_ELSE
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  password     String
+  phone        String?
+  role         Role
+  tokenVersion Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  submittedLeads Lead[] @relation("JuniorCloserLeads")
+  closerLeads    Lead[] @relation("CloserLeads")
+  clientLeads    Lead[] @relation("ClientLeads")
+
+  @@index([role])
+}
+
+model Lead {
+  id             String @id @default(cuid())
+  juniorCloserId String
+  closerId       String
+  clientId       String?
+
+  // ─── Shared personal info — set by Junior Closer at intake, editable by Closer during enrichment ───
+  customerName    String
+  maritalStatus   String?
+  phone           String
+  state           String
+  zipcode         String?
+  birthState      String?
+  smoker          Boolean?
+  dob             DateTime?
+  age             Int?
+  height          String?
+  weight          Int?
+  healthConditions String?
+
+  // ─── Junior Closer intake only ───
+  need               LeadNeed?
+  incomeSource       IncomeSource?
+  retiredIncomeType  RetiredIncomeType?
+  natureOfDisability String?
+  annualIncome       Int?
+  juniorNotes        String?
+
+  // ─── Closer enrichment — contact & identity ───
+  mailingAddress String?
+  email          String?
+  yearlyIncome   Int?
+  ssn            String?
+  dlStateId      String?
+  doctorName     String?
+
+  // ─── Closer enrichment — beneficiary ───
+  beneficiaryRelation String?
+  beneficiaryName     String?
+  beneficiaryDob      DateTime?
+
+  // ─── Closer enrichment — health ───
+  medications String?
+
+  // ─── Closer enrichment — policy ───
+  carrierName     String?
+  planType        String?
+  coverageAmount  Int?
+  monthlyPremiums Int?
+
+  // ─── Closer enrichment — billing ───
+  initialDraftDate DateTime?
+  futureDraftDate  DateTime?
+  payer            PayerType?
+  bankName         String? // Payer = SELF
+  accountTitle     String? // both
+  payerSocial      String? // Payer = SOMEONE_ELSE
+  accountType      AccountType?
+  routingNumber    String?
+  accountNumber    String?
+
+  closerNotes String?
+
+  // ─── Admin ───
+  rejectionReason String?
+  paymentStatus   PaymentStatus @default(UNPAID)
+  // Set when admin marks an ACCEPTED lead PAID — the lead is then considered closed.
+  // Cleared if admin flips it back to UNPAID.
+  closedAt        DateTime?
+
+  status    LeadStatus @default(NEW)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  juniorCloser User  @relation("JuniorCloserLeads", fields: [juniorCloserId], references: [id], onDelete: Cascade)
+  closer       User  @relation("CloserLeads", fields: [closerId], references: [id], onDelete: Cascade)
+  client       User? @relation("ClientLeads", fields: [clientId], references: [id], onDelete: SetNull)
+
+  @@index([juniorCloserId])
+  @@index([closerId])
+  @@index([clientId])
+  @@index([status])
+  @@index([createdAt])
+}

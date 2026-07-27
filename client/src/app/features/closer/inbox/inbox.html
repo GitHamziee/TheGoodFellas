@@ -1,0 +1,26 @@
+<div class="page">
+  <h1>Assigned Leads</h1>
+
+  @if (loading()) {
+    <p class="empty">Loading...</p>
+  } @else if (leads().length === 0) {
+    <p class="empty">No leads waiting on you.</p>
+  } @else {
+    @for (lead of leads(); track lead.id) {
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <strong>{{ lead.customerName }}</strong> — {{ lead.phone }}
+          <a class="btn" [routerLink]="['/closer/leads', lead.id]">Work this lead</a>
+        </div>
+        <p class="empty" style="margin: 0.4rem 0 0;">
+          From {{ lead.juniorCloser.name }}
+          @if (lead.state) { · {{ lead.state }} }
+          @if (lead.need) { · {{ lead.need }} }
+        </p>
+        @if (lead.juniorNotes) {
+          <p class="empty" style="margin: 0.2rem 0 0;">Notes: {{ lead.juniorNotes }}</p>
+        }
+      </div>
+    }
+  }
+</div>
