@@ -131,6 +131,22 @@ button {
   display: none;
 }
 
+/* Brand logo lockup (public/logo.png).
+   Already gold, so unlike the old square "GF" placeholder it sits directly on
+   the surface rather than inside a gold tile. Sized by height; the 1.55:1 aspect
+   follows from width:auto.
+
+   It carries the wordmark itself, so it stands alone — there is no adjacent text
+   and alt therefore names the company rather than being empty. It's a stacked
+   emblem (hat + headphones + wordmark + tagline), so it needs noticeably more
+   height than a horizontal wordmark would to stay legible. */
+.brand-logo {
+  display: block;
+  height: 3.5rem;
+  width: auto;
+  flex-shrink: 0;
+}
+
 /* Gold gradient text — reads best on dark surfaces (sidebar wordmark) */
 .brand-gradient-text {
   background: linear-gradient(135deg, var(--gold-300) 0%, var(--gold-500) 50%, var(--gold-300) 100%);
