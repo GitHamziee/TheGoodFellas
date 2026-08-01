@@ -63,6 +63,13 @@ enum PayerType {
   SOMEONE_ELSE
 }
 
+// The two team channels. Membership is derived from Role, never stored per-user
+// and never sent by the client — see server/src/lib/chat-rooms.ts.
+enum ChatRoom {
+  CLOSERS
+  JUNIOR_CLOSERS
+}
+
 model User {
   id           String   @id @default(cuid())
   name         String
@@ -74,31 +81,33 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  submittedLeads Lead[] @relation("JuniorCloserLeads")
-  closerLeads    Lead[] @relation("CloserLeads")
-  clientLeads    Lead[] @relation("ClientLeads")
+  submittedLeads Lead[]        @relation("JuniorCloserLeads")
+  closerLeads    Lead[]        @relation("CloserLeads")
+  clientLeads    Lead[]        @relation("ClientLeads")
+  chatMessages   ChatMessage[]
+  chatReads      ChatRead[]
 
   @@index([role])
 }
 
 model Lead {
-  id             String @id @default(cuid())
+  id             String  @id @default(cuid())
   juniorCloserId String
   closerId       String
   clientId       String?
 
   // ─── Shared personal info — set by Junior Closer at intake, editable by Closer during enrichment ───
-  customerName    String
-  maritalStatus   String?
-  phone           String
-  state           String
-  zipcode         String?
-  birthState      String?
-  smoker          Boolean?
-  dob             DateTime?
-  age             Int?
-  height          String?
-  weight          Int?
+  customerName     String
+  maritalStatus    String?
+  phone            String
+  state            String
+  zipcode          String?
+  birthState       String?
+  smoker           Boolean?
+  dob              DateTime?
+  age              Int?
+  height           String?
+  weight           Int?
   healthConditions String?
 
   // ─── Junior Closer intake only ───
@@ -164,4 +173,33 @@ model Lead {
   @@index([clientId])
   @@index([status])
   @@index([createdAt])
+}
+
+// One row per message in a team channel. Soft-deleted (deletedAt) rather than removed so
+// the timeline keeps its shape for anyone with the thread already open.
+model ChatMessage {
+  id        String    @id @default(cuid())
+  room      ChatRoom
+  senderId  String
+  body      String
+  editedAt  DateTime?
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  sender User @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  // Serves the room timeline query (room + newest-first) directly.
+  @@index([room, createdAt])
+  @@index([senderId])
+}
+
+// Read cursor per person per room — drives the unread badge in the sidebar.
+model ChatRead {
+  userId     String
+  room       ChatRoom
+  lastReadAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, room])
 }

@@ -1,35 +1,155 @@
 <div class="page">
-  <h1>My Lead History</h1>
-  <p class="empty" style="margin-top: -0.75rem;">Only customer name and phone are shown here.</p>
+  <div class="page-head">
+    <div>
+      <h1>My Lead History</h1>
+      <p class="sub">Every lead you've submitted, and where it got to.</p>
+    </div>
+    <div class="page-head-actions">
+      <a class="btn" routerLink="/junior/submit-lead"><svg lucideSend></svg> New lead</a>
+    </div>
+  </div>
 
-  <div class="card">
+  <div class="stats-row">
+    <app-stat-tile [value]="stats().total" label="Leads submitted" tone="tone-gold">
+      <svg lucideSend></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().thisMonth" label="This month" tone="tone-c">
+      <svg lucideClock></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().today" label="Today" tone="tone-d">
+      <svg lucideClock></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().accepted" label="Accepted" tone="tone-success">
+      <svg lucideCircleCheck></svg>
+    </app-stat-tile>
+    <app-stat-tile
+      [value]="stats().acceptRate === null ? '—' : stats().acceptRate + '%'"
+      label="Accept rate"
+      tone="tone-a"
+    >
+      <svg lucideTarget></svg>
+    </app-stat-tile>
+  </div>
+
+  @if (error()) {
+    <div class="error">{{ error() }}</div>
+  }
+
+  <div class="locked">
+    <svg lucideLock></svg>
+    <span>
+      For customer-data protection, your history shows the customer's name and phone only — the rest of each
+      record stays with the closer and admin team.
+    </span>
+  </div>
+
+  <div class="toolbar">
+    <app-search-box
+      [value]="view.search()"
+      placeholder="Search by name or phone…"
+      (valueChange)="view.setSearch($event)"
+    />
+    <div class="pills">
+      @for (filter of statusFilters; track filter.value) {
+        <button
+          type="button"
+          class="pill"
+          [class.active]="view.status() === filter.value"
+          (click)="view.setStatus(filter.value)"
+        >
+          {{ filter.label }}
+          <span class="n">{{ statusCounts()[filter.value] }}</span>
+        </button>
+      }
+    </div>
+  </div>
+
+  <div class="card card--flush">
     @if (loading()) {
-      <p class="empty">Loading...</p>
-    } @else if (leads().length === 0) {
-      <p class="empty">You haven't submitted any leads yet.</p>
+      <app-skeleton-rows [count]="5" />
+    } @else if (view.total() === 0) {
+      @if (view.isFiltered()) {
+        <app-empty-state title="No leads match" hint="Try a different search term or clear the filters.">
+          <svg lucideSend></svg>
+        </app-empty-state>
+      } @else {
+        <app-empty-state title="No leads yet" hint="Submit your first lead and it'll show up here with its progress.">
+          <svg lucideSend></svg>
+        </app-empty-state>
+      }
     } @else {
-      <table>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Phone</th>
-            <th>Closer</th>
-            <th>Status</th>
-            <th>Submitted</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (lead of leads(); track lead.id) {
+      <div class="table-wrap">
+        <table>
+          <thead>
             <tr>
-              <td>{{ lead.customerName }}</td>
-              <td>{{ lead.phone }}</td>
-              <td>{{ lead.closer?.name }}</td>
-              <td><span [class]="statusBadgeClass(lead.status)">{{ lead.status }}</span></td>
-              <td>{{ lead.createdAt | date: 'short' }}</td>
+              <th class="sortable" (click)="view.toggleSort('customerName')">
+                Customer <span class="arrow">{{ sortArrow('customerName') }}</span>
+              </th>
+              <th class="hide-sm">Phone</th>
+              <th class="hide-md">Routed to</th>
+              <th class="sortable" (click)="view.toggleSort('status')">
+                Progress <span class="arrow">{{ sortArrow('status') }}</span>
+              </th>
+              <th class="sortable right hide-sm" (click)="view.toggleSort('createdAt')">
+                Submitted <span class="arrow">{{ sortArrow('createdAt') }}</span>
+              </th>
             </tr>
-          }
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            @for (lead of view.rows(); track lead.id) {
+              <tr class="clickable" (click)="selected.set(lead)">
+                <td><span class="cell-main">{{ lead.customerName }}</span></td>
+                <td class="hide-sm">{{ formatPhone(lead.phone) }}</td>
+                <td class="hide-md">
+                  @if (lead.closer) {
+                    <div class="person">
+                      <span class="avatar-sm" [class]="getAvatarTone(lead.closer.id)">
+                        {{ getInitials(lead.closer.name) }}
+                      </span>
+                      <span class="nm">{{ lead.closer.name }}</span>
+                    </div>
+                  } @else {
+                    <span class="empty">—</span>
+                  }
+                </td>
+                <td><app-status-badge [status]="lead.status" /></td>
+                <td class="right hide-sm">
+                  <span class="chip"><svg lucideClock></svg>{{ timeAgo(lead.createdAt) }}</span>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <app-pagination
+        [page]="view.page()"
+        [totalPages]="view.totalPages()"
+        [total]="view.total()"
+        (pageChange)="view.page.set($event)"
+      />
     }
   </div>
 </div>
+
+@if (selected(); as lead) {
+  <app-modal title="Lead" [subtitle]="lead.customerName" (close)="selected.set(null)">
+    <div class="locked">
+      <svg lucideLock></svg>
+      <span>Restricted view — name, phone and progress only.</span>
+    </div>
+
+    <div class="detail-grid stack-top">
+      <app-detail label="Customer" [value]="lead.customerName" />
+      <app-detail label="Phone" [value]="formatPhone(lead.phone)" />
+      <app-detail label="Routed to closer" [value]="lead.closer?.name" />
+      <app-detail label="Submitted" [value]="formatDateTime(lead.createdAt)" />
+      <div class="detail">
+        <div>
+          <div class="k">Progress</div>
+          <div class="v"><app-status-badge [status]="lead.status" /></div>
+        </div>
+      </div>
+    </div>
+  </app-modal>
+}

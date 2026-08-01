@@ -1,12 +1,219 @@
 <div class="page">
-  <h1>Admin Dashboard</h1>
+  @if (loading()) {
+    <div class="card"><app-skeleton-rows [count]="6" /></div>
+  } @else {
+    <!-- ---------- Command bar: the only three things an admin can clear ---------- -->
+    <section class="command" [class.command--clear]="actions().total === 0">
+      <div class="command__glow"></div>
 
-  <div class="stats-row">
-    <div class="stat"><div class="value">{{ leads().length }}</div><div class="label">Total leads</div></div>
-    <div class="stat"><div class="value">{{ queueCount() }}</div><div class="label">Needs action</div></div>
-    <div class="stat"><div class="value">{{ assignedCount() }}</div><div class="label">With client</div></div>
-    <div class="stat"><div class="value">{{ acceptedCount() }}</div><div class="label">Accepted</div></div>
-  </div>
+      <div class="command__lead">
+        <p class="command__greeting">Welcome back{{ firstName() ? ', ' + firstName() : '' }}</p>
+        @if (actions().total === 0) {
+          <h1 class="command__headline">
+            <svg lucideCircleCheck></svg>
+            You're all caught up
+          </h1>
+          <p class="command__sub">Nothing is waiting on you. New submissions will land in the queue.</p>
+        } @else {
+          <h1 class="command__headline">
+            <span class="command__count">{{ actions().total }}</span>
+            {{ actions().total === 1 ? 'lead needs you' : 'leads need you' }}
+          </h1>
+          @if (actions().stalled > 0) {
+            <p class="command__sub command__sub--warn">
+              <svg lucideTriangleAlert></svg>
+              {{ actions().stalled }} waiting more than {{ staleAfterDays }} days — assign these first
+            </p>
+          } @else {
+            <p class="command__sub">Clear these and the pipeline keeps moving.</p>
+          }
+        }
+      </div>
 
-  <a class="btn" routerLink="/admin/queue">Go to queue</a>
+      @if (actions().total > 0) {
+        <div class="command__actions">
+          @if (actions().toAssign > 0) {
+            <a class="act act--primary" routerLink="/admin/queue">
+              <span class="act__n">{{ actions().toAssign }}</span>
+              <span class="act__body">
+                <span class="act__t">To assign</span>
+                <span class="act__h">Reviewed, ready for a client</span>
+              </span>
+              <svg lucideArrowRight></svg>
+            </a>
+          }
+          @if (actions().toFix > 0) {
+            <a class="act act--danger" routerLink="/admin/queue">
+              <span class="act__n">{{ actions().toFix }}</span>
+              <span class="act__body">
+                <span class="act__t">To fix</span>
+                <span class="act__h">Rejected — edit and reassign</span>
+              </span>
+              <svg lucideArrowRight></svg>
+            </a>
+          }
+          @if (actions().toCollect > 0) {
+            <a class="act" routerLink="/admin/leads">
+              <span class="act__n">{{ actions().toCollect }}</span>
+              <span class="act__body">
+                <span class="act__t">To collect</span>
+                <span class="act__h">{{ formatMoney(actions().outstanding) }} outstanding</span>
+              </span>
+              <svg lucideArrowRight></svg>
+            </a>
+          }
+        </div>
+      }
+    </section>
+
+    @if (money().total === 0) {
+      <div class="card">
+        <app-empty-state
+          title="No leads in the pipeline yet"
+          hint="Once junior closers start submitting, everything you need to act on shows up here."
+        >
+          <svg lucideInbox></svg>
+        </app-empty-state>
+      </div>
+    } @else {
+      <!-- ---------- The journey, left to right ---------- -->
+      <section class="card flow-card">
+        <div class="inline-head">
+          <h2>Where the work sits</h2>
+          <a class="count" routerLink="/admin/leads">All leads</a>
+        </div>
+
+        <div class="flow">
+          @for (stage of flow(); track stage.status; let last = $last) {
+            <div class="flow-stage" [class.flow-stage--mine]="stage.mine">
+              <div class="flow-stage__bar">
+                <span class="flow-stage__fill" [style.height.%]="stage.pct"></span>
+              </div>
+              <div class="flow-stage__n">{{ stage.count }}</div>
+              <div class="flow-stage__label">{{ stage.label }}</div>
+              <div class="flow-stage__owner">{{ stage.owner }}</div>
+            </div>
+            @if (!last) {
+              <div class="flow-arrow"><svg lucideArrowRight></svg></div>
+            }
+          }
+        </div>
+
+        @if (rejectedCount() > 0) {
+          <a class="flow-branch" routerLink="/admin/queue">
+            <svg lucideCircleX></svg>
+            <span><strong>{{ rejectedCount() }}</strong> rejected and sent back to you</span>
+            <svg class="flow-branch__go" lucideArrowRight></svg>
+          </a>
+        }
+      </section>
+
+      <div class="split">
+        <!-- ---------- Money ---------- -->
+        <section class="card">
+          <div class="inline-head">
+            <h2>Book value</h2>
+            <span class="count">{{ money().thisMonth }} new this month</span>
+          </div>
+
+          <div class="money">
+            <div class="money__main">
+              <span class="money__label">Coverage written</span>
+              <span class="money__value">{{ formatMoney(money().written) }}</span>
+            </div>
+
+            <div class="money__meter">
+              <span class="money__meter-fill" [style.width.%]="money().collectedPct"></span>
+            </div>
+            <div class="money__legend">
+              <span><i class="dot dot--paid"></i> {{ formatMoney(money().collected) }} collected</span>
+              <span class="money__pct">{{ money().collectedPct }}%</span>
+            </div>
+          </div>
+
+          <div class="mini-stats">
+            <div class="mini">
+              <span class="mini__ico tone-success"><svg lucideTrendingUp></svg></span>
+              <span>
+                <span class="mini__v">{{ money().acceptRate === null ? '—' : money().acceptRate + '%' }}</span>
+                <span class="mini__l">Accept rate</span>
+              </span>
+            </div>
+            <div class="mini">
+              <span class="mini__ico tone-gold"><svg lucideWallet></svg></span>
+              <span>
+                <span class="mini__v">{{ formatMoney(actions().outstanding) }}</span>
+                <span class="mini__l">Outstanding</span>
+              </span>
+            </div>
+            <div class="mini">
+              <span class="mini__ico tone-neutral"><svg lucideBanknote></svg></span>
+              <span>
+                <span class="mini__v">{{ money().total }}</span>
+                <span class="mini__l">Total leads</span>
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <!-- ---------- Who's converting ---------- -->
+        <section class="card">
+          <div class="inline-head">
+            <h2>Top closers</h2>
+            <a class="count" routerLink="/admin/analytics/closers">Full breakdown</a>
+          </div>
+
+          @if (leaderboard().length === 0) {
+            <app-empty-state title="No closer activity yet">
+              <svg lucideUserCheck></svg>
+            </app-empty-state>
+          } @else {
+            <div class="board">
+              @for (row of leaderboard(); track row.id; let i = $index) {
+                <div class="board-row">
+                  <span class="board-rank" [class.board-rank--top]="i === 0">{{ i + 1 }}</span>
+                  <span class="avatar-sm" [class]="getAvatarTone(row.id)">{{ getInitials(row.name) }}</span>
+                  <span class="board-who">
+                    <span class="nm">{{ row.name }}</span>
+                    <span class="mt">{{ row.accepted }} of {{ row.total }} accepted</span>
+                  </span>
+                  <span class="board-rate">{{ row.rate }}%</span>
+                </div>
+              }
+            </div>
+          }
+        </section>
+      </div>
+
+      <!-- ---------- Latest movement ---------- -->
+      <section class="card">
+        <div class="inline-head">
+          <h2>Latest movement</h2>
+          <a class="count" routerLink="/admin/leads">View all</a>
+        </div>
+
+        <div class="feed">
+          @for (lead of recent(); track lead.id) {
+            <div class="feed-row">
+              <span class="avatar-sm" [class]="getAvatarTone(lead.id)">
+                {{ getInitials(lead.customerName) }}
+              </span>
+              <span class="who">
+                <span class="nm">{{ lead.customerName }}</span>
+                <span class="mt">
+                  {{ lead.closer.name }}
+                  @if (lead.client) { → {{ lead.client.name }} }
+                  · {{ timeAgo(lead.updatedAt) }}
+                </span>
+              </span>
+              @if (lead.status === 'ACCEPTED' && lead.paymentStatus === 'UNPAID') {
+                <span class="badge badge--unpaid">Unpaid</span>
+              }
+              <app-status-badge [status]="lead.status" />
+            </div>
+          }
+        </div>
+      </section>
+    }
+  }
 </div>

@@ -1,26 +1,148 @@
 <div class="page">
-  <h1>Assigned Leads</h1>
+  <div class="page-head">
+    <div>
+      <h1>Assigned Leads</h1>
+      <p class="sub">Leads junior closers routed to you. Add the full detail, then submit to the admin team.</p>
+    </div>
+  </div>
 
-  @if (loading()) {
-    <p class="empty">Loading...</p>
-  } @else if (leads().length === 0) {
-    <p class="empty">No leads waiting on you.</p>
-  } @else {
-    @for (lead of leads(); track lead.id) {
-      <div class="card">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <strong>{{ lead.customerName }}</strong> — {{ lead.phone }}
-          <a class="btn" [routerLink]="['/closer/leads', lead.id]">Work this lead</a>
-        </div>
-        <p class="empty" style="margin: 0.4rem 0 0;">
-          From {{ lead.juniorCloser.name }}
-          @if (lead.state) { · {{ lead.state }} }
-          @if (lead.need) { · {{ lead.need }} }
-        </p>
-        @if (lead.juniorNotes) {
-          <p class="empty" style="margin: 0.2rem 0 0;">Notes: {{ lead.juniorNotes }}</p>
-        }
+  <div class="stats-row">
+    <app-stat-tile [value]="stats().total" label="Waiting on you" tone="tone-gold">
+      <svg lucideInbox></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().today" label="Arrived today" tone="tone-c">
+      <svg lucideClock></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().stale" label="Ageing (3+ days)" tone="tone-warning">
+      <svg lucideTriangleAlert></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().states" label="States covered" tone="tone-f">
+      <svg lucideMapPin></svg>
+    </app-stat-tile>
+  </div>
+
+  @if (error()) {
+    <div class="error">{{ error() }}</div>
+  }
+
+  <div class="toolbar">
+    <app-search-box
+      [value]="view.search()"
+      placeholder="Search by name, phone, state, or junior closer…"
+      (valueChange)="view.setSearch($event)"
+    />
+  </div>
+
+  <div class="card card--flush">
+    @if (loading()) {
+      <app-skeleton-rows [count]="4" />
+    } @else if (view.total() === 0) {
+      @if (view.isFiltered()) {
+        <app-empty-state title="No leads match" hint="Try a different search term.">
+          <svg lucideInbox></svg>
+        </app-empty-state>
+      } @else {
+        <app-empty-state title="Inbox is clear" hint="When a junior closer routes a lead to you, it lands here.">
+          <svg lucideInbox></svg>
+        </app-empty-state>
+      }
+    } @else {
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="sortable" (click)="view.toggleSort('customerName')">
+                Customer <span class="arrow">{{ sortArrow('customerName') }}</span>
+              </th>
+              <th class="hide-sm">Need</th>
+              <th class="hide-md">From</th>
+              <th class="sortable hide-sm" (click)="view.toggleSort('createdAt')">
+                Waiting <span class="arrow">{{ sortArrow('createdAt') }}</span>
+              </th>
+              <th class="right">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (lead of view.rows(); track lead.id) {
+              <tr class="clickable" (click)="selected.set(lead)">
+                <td>
+                  <div class="cell-main">{{ lead.customerName }}</div>
+                  <div class="cell-sub">
+                    {{ formatPhone(lead.phone) }} · {{ lead.state }}
+                    @if (lead.age) { · {{ lead.age }} yrs }
+                  </div>
+                </td>
+                <td class="hide-sm">
+                  @if (lead.need) {
+                    <span class="chip">{{ humanizeEnum(lead.need) }}</span>
+                  } @else {
+                    <span class="empty">—</span>
+                  }
+                </td>
+                <td class="hide-md">
+                  <div class="person">
+                    <span class="avatar-sm" [class]="getAvatarTone(lead.juniorCloser.id)">
+                      {{ getInitials(lead.juniorCloser.name) }}
+                    </span>
+                    <span class="nm">{{ lead.juniorCloser.name }}</span>
+                  </div>
+                </td>
+                <td class="hide-sm">
+                  @if (isStale(lead)) {
+                    <span class="badge badge--submitted">
+                      <svg lucideTriangleAlert></svg>{{ timeAgo(lead.createdAt) }}
+                    </span>
+                  } @else {
+                    <span class="chip"><svg lucideClock></svg>{{ timeAgo(lead.createdAt) }}</span>
+                  }
+                </td>
+                <td>
+                  <div class="row-actions">
+                    <a
+                      class="btn btn--sm"
+                      [routerLink]="['/closer/leads', lead.id]"
+                      (click)="$event.stopPropagation()"
+                    >
+                      <svg lucideSquarePen></svg> Work this lead
+                    </a>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <app-pagination
+        [page]="view.page()"
+        [totalPages]="view.totalPages()"
+        [total]="view.total()"
+        (pageChange)="view.page.set($event)"
+      />
+    }
+  </div>
+</div>
+
+@if (selected(); as lead) {
+  <app-modal
+    title="Lead intake"
+    [subtitle]="'Submitted by ' + lead.juniorCloser.name"
+    [wide]="true"
+    (close)="selected.set(null)"
+  >
+    @if (lead.juniorNotes) {
+      <div class="locked" style="border-style: solid;">
+        <svg lucideNotebookPen></svg>
+        <span><strong>Junior closer's notes:</strong> {{ lead.juniorNotes }}</span>
       </div>
     }
-  }
-</div>
+
+    <app-lead-detail [lead]="lead" />
+
+    <div footer>
+      <a class="btn" [routerLink]="['/closer/leads', lead.id]" (click)="selected.set(null)">
+        <svg lucideArrowRight></svg> Work this lead
+      </a>
+    </div>
+  </app-modal>
+}

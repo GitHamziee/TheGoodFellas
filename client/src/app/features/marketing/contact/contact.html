@@ -1,0 +1,215 @@
+<section class="page-header">
+  <div class="blob blob--gold" style="width: 460px; height: 460px; top: -220px; right: -120px"></div>
+  <div class="blob blob--accent" style="width: 400px; height: 400px; top: -190px; left: -100px"></div>
+  <div class="mkt-container">
+    <span class="badge-pill">Get in touch</span>
+    <h1 class="mkt-h1">Let's talk about <span class="gradient-text-hero">live transfers</span></h1>
+    <p class="mkt-subtitle">
+      Tell us your vertical, the states you're licensed in and the volume you can staff. We'll come back with
+      what's available.
+    </p>
+  </div>
+</section>
+
+<section class="mkt-section" appReveal>
+  <div class="mkt-container contact-grid">
+    <div class="console contact-aside">
+      <div class="console__bar">
+        <span class="console__title">Contact</span>
+      </div>
+
+      <a class="contact-row" href="mailto:thegoodfellasbpo&#64;gmail.com">
+        <div class="icon-chip"><svg lucideMail></svg></div>
+        <span>
+          <span class="contact-row__label">Email</span>
+          <span class="contact-row__value">thegoodfellasbpo&#64;gmail.com</span>
+        </span>
+      </a>
+
+      <div class="contact-row">
+        <div class="icon-chip"><svg lucideMapPin></svg></div>
+        <span>
+          <span class="contact-row__label">Where we are</span>
+          <span class="contact-row__value">Rawalpindi, Pakistan</span>
+          <span class="contact-row__note">Running US campaigns across all four verticals</span>
+        </span>
+      </div>
+
+      <div class="ai-divider"></div>
+
+      <div class="console__feed-head">Verticals we run</div>
+      <div class="tag-row" style="margin-top: 0.5rem; padding-top: 0">
+        <span class="tag">Final Expense</span>
+        <span class="tag">Medicare</span>
+        <span class="tag">Health Insurance</span>
+        <span class="tag">Auto Insurance</span>
+      </div>
+
+      <div class="ai-divider"></div>
+
+      <ul class="mkt-checklist" style="margin-top: 0">
+        <li>
+          <svg lucideCheck></svg>
+          <span>Exclusive — never resold or reshared</span>
+        </li>
+        <li>
+          <svg lucideCheck></svg>
+          <span>AI-verified, then confirmed by a human</span>
+        </li>
+        <li>
+          <svg lucideCheck></svg>
+          <span>Warm transfer on the same call</span>
+        </li>
+      </ul>
+    </div>
+
+    <div class="console contact-form-card">
+      @if (submitted()) {
+        <div class="contact-success">
+          <div class="icon-chip"><svg lucideCheck></svg></div>
+          <h3 class="card-title">Message sent</h3>
+          <p class="card-desc">
+            Thanks — we've got your details and we'll come back to you about volume in your states.
+          </p>
+        </div>
+      } @else {
+        <form class="contact-form" (ngSubmit)="submit()">
+          <div class="contact-form__row">
+            <label class="contact-field">
+              Your name
+              <input type="text" name="name" [(ngModel)]="name" required placeholder="Jordan Ellis" />
+            </label>
+            <label class="contact-field">
+              Agency
+              <input type="text" name="company" [(ngModel)]="company" placeholder="Ellis Insurance Group" />
+            </label>
+          </div>
+
+          <div class="contact-form__row">
+            <label class="contact-field">
+              Email
+              <input type="email" name="email" [(ngModel)]="email" required placeholder="you@agency.com" />
+            </label>
+            <label class="contact-field">
+              <span>Phone <span class="field-opt">(optional)</span></span>
+              <input type="tel" name="phone" [(ngModel)]="phone" placeholder="(555) 010-0100" />
+            </label>
+          </div>
+
+          <div class="contact-form__row">
+            <label class="contact-field">
+              Vertical
+              <select name="vertical" [(ngModel)]="vertical" required>
+                <option value="" disabled selected>Select a vertical</option>
+                @for (v of verticals; track v) {
+                  <option [value]="v">{{ v }}</option>
+                }
+              </select>
+            </label>
+            <label class="contact-field">
+              Transfers you can take
+              <select name="volume" [(ngModel)]="volume">
+                <option value="" disabled selected>Select a volume</option>
+                @for (v of volumes; track v) {
+                  <option [value]="v">{{ v }}</option>
+                }
+              </select>
+            </label>
+          </div>
+
+          <label class="contact-field">
+            Licensed states
+            <input type="text" name="states" [(ngModel)]="states" placeholder="TX, FL, OH, AZ" />
+          </label>
+
+          <label class="contact-field">
+            <span>Anything else <span class="field-opt">(optional)</span></span>
+            <textarea
+              name="message"
+              rows="4"
+              [(ngModel)]="message"
+              placeholder="Current lead sources, carriers you write, transfer hours…"
+            ></textarea>
+          </label>
+
+          <button class="btn-hero" type="submit" style="align-self: flex-start">
+            Send message
+            <svg lucideSend></svg>
+          </button>
+
+          <p class="contact-legal">
+            We'll only use these details to reply about live transfer volume — no lists, no resale.
+          </p>
+        </form>
+      }
+    </div>
+  </div>
+</section>
+
+<section class="mkt-section mkt-section--muted" appReveal>
+  <div class="mkt-container">
+    <div class="mkt-section-head">
+      <span class="badge-pill">After you send it</span>
+      <h2 class="mkt-h2">What happens <span class="gradient-text-hero">next</span></h2>
+    </div>
+
+    <div class="mkt-grid-3">
+      @for (step of nextSteps; track step.title; let i = $index) {
+        <div class="feature-card">
+          <div class="icon-chip">
+            @switch (step.icon) {
+              @case ('message') {
+                <svg lucideMessageSquare></svg>
+              }
+              @case ('sparkles') {
+                <svg lucideSparkles></svg>
+              }
+              @case ('transfer') {
+                <svg lucidePhoneForwarded></svg>
+              }
+            }
+          </div>
+          <span class="step-eyebrow">Step {{ i + 1 }}</span>
+          <h3 class="card-title">{{ step.title }}</h3>
+          <p class="card-desc">{{ step.desc }}</p>
+        </div>
+      }
+    </div>
+  </div>
+</section>
+
+<section class="mkt-section" appReveal>
+  <div class="mkt-container">
+    <div class="mkt-section-head">
+      <span class="badge-pill">Common questions</span>
+      <h2 class="mkt-h2">Before you <span class="gradient-text-hero">get in touch</span></h2>
+    </div>
+
+    <div class="faq-grid">
+      @for (faq of faqs; track faq.q) {
+        <details class="faq">
+          <summary>
+            <span>{{ faq.q }}</span>
+            <span class="faq__sign" aria-hidden="true"></span>
+          </summary>
+          <p>{{ faq.a }}</p>
+        </details>
+      }
+    </div>
+  </div>
+</section>
+
+<section class="mkt-section mkt-section--tight" appReveal>
+  <div class="mkt-container">
+    <div class="cta-band grid-pattern">
+      <h2 class="mkt-h2">Already a client?</h2>
+      <p class="mkt-subtitle">Sign in to review the leads waiting on you and track them through to close.</p>
+      <div class="cta-actions">
+        <a class="btn-hero" routerLink="/login">
+          Client Portal
+          <svg lucideArrowRight></svg>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>

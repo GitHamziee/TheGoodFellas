@@ -1,0 +1,270 @@
+<section class="mkt-hero">
+  <div class="blob blob--gold" style="width: 420px; height: 420px; top: -120px; left: -100px"></div>
+  <div class="blob blob--accent" style="width: 400px; height: 400px; top: 60px; right: -110px"></div>
+
+  <div class="mkt-container mkt-hero-grid">
+    <div>
+      <span class="badge-pill">
+        <svg lucidePhoneIncoming></svg>
+        Inbound leads · AI-verified · Live transferred
+      </span>
+      <h1 class="mkt-h1">We generate the call, verify the caller, and <span class="gradient-text-hero">close the policy</span>.</h1>
+      <p class="mkt-subtitle">
+        The Good Fellas runs its own inbound campaigns across Final Expense, Medicare, Health and Auto Insurance.
+        Every call is AI-verified, confirmed by a live Verifier, then live-transferred to a licensed Closer who
+        writes the policy.
+      </p>
+      <div class="hero-actions" style="margin-top: 2rem">
+        <a class="btn-hero" routerLink="/contact">
+          Partner With Us
+          <svg lucideArrowRight></svg>
+        </a>
+        <a class="btn-hero btn-hero--outline" routerLink="/login">Client Portal</a>
+      </div>
+    </div>
+
+    <div class="console" appReveal>
+      <div class="console__bar">
+        <span class="console__title">Transfer floor</span>
+        <span class="console__live"><span class="pipeline-dot"></span> Live</span>
+      </div>
+
+      <div class="console__hero">
+        <span class="console__hero-value">{{ console.headline.value }}</span>
+        <span class="console__hero-label">{{ console.headline.label }}</span>
+      </div>
+
+      <div class="console__meter">
+        <div class="console__meter-head">
+          <span>{{ console.meter.label }}</span>
+          <span class="console__meter-value">{{ console.meter.display }}</span>
+        </div>
+        <div class="console__meter-track">
+          <div class="console__meter-fill" [style.width.%]="console.meter.pct"></div>
+        </div>
+      </div>
+
+      <div class="console__kpis">
+        @for (kpi of console.kpis; track kpi.label) {
+          <div class="console__kpi">
+            <span class="console__kpi-value">{{ kpi.value }}</span>
+            <span class="console__kpi-label">{{ kpi.label }}</span>
+          </div>
+        }
+      </div>
+
+      <div class="console__feed">
+        <div class="console__feed-head">Live now</div>
+        @for (row of console.feed; track row.vertical) {
+          <div class="console__row">
+            <span class="console__row-dot is-{{ row.tone }}"></span>
+            <span class="console__row-name">{{ row.vertical }}</span>
+            <span class="console__row-state">{{ row.state }}</span>
+            <span class="console__row-status is-{{ row.tone }}">{{ row.status }}</span>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="mkt-section" appReveal>
+  <div class="mkt-container">
+    <div class="mkt-section-head">
+      <span class="badge-pill">Live transfers</span>
+      <h2 class="mkt-h2">Four verticals, <span class="gradient-text-hero">one verified pipeline</span></h2>
+      <p class="mkt-subtitle">
+        We run inbound campaigns in the lines where a warm transfer actually converts — and qualify each one
+        against the criteria that matter to that product.
+      </p>
+    </div>
+
+    <div class="mkt-grid-4">
+      @for (vertical of verticals; track vertical.name) {
+        <div class="feature-card feature-card--tagged">
+          <div class="icon-chip">
+            @switch (vertical.icon) {
+              @case ('shieldCheck') {
+                <svg lucideShieldCheck></svg>
+              }
+              @case ('stethoscope') {
+                <svg lucideStethoscope></svg>
+              }
+              @case ('heartPulse') {
+                <svg lucideHeartPulse></svg>
+              }
+              @case ('carFront') {
+                <svg lucideCarFront></svg>
+              }
+            }
+          </div>
+          <h3 class="card-title">{{ vertical.name }}</h3>
+          <p class="card-desc">{{ vertical.desc }}</p>
+          <div class="tag-row">
+            @for (tag of vertical.tags; track tag) {
+              <span class="tag">{{ tag }}</span>
+            }
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+</section>
+
+<section class="mkt-section mkt-section--muted" appReveal>
+  <div class="mkt-container">
+    <div class="mkt-section-head">
+      <span class="badge-pill">How it works</span>
+      <h2 class="mkt-h2">From inbound call to <span class="gradient-text-hero">written policy</span></h2>
+      <p class="mkt-subtitle">
+        Five stages, every call, every time — with a named owner and a live status at each one.
+      </p>
+    </div>
+
+    <div class="process-rail">
+      @for (step of steps; track step.title; let i = $index) {
+        <div class="process-node">
+          <div class="process-node__num">{{ i + 1 }}</div>
+          <h3 class="card-title">{{ step.title }}</h3>
+          <p class="card-desc">{{ step.desc }}</p>
+        </div>
+      }
+    </div>
+  </div>
+</section>
+
+<section class="mkt-section" appReveal>
+  <div class="mkt-container mkt-grid-2">
+    <div>
+      <span class="badge-pill">
+        <svg lucideSparkles></svg>
+        AI verification
+      </span>
+      <h2 class="mkt-h2" style="margin-top: 1rem">Screened by AI <span class="gradient-text-hero">before a human says hello</span></h2>
+      <div class="prose">
+        <p>
+          Every inbound call runs through real-time AI verification while the caller is still on the line. It
+          listens for genuine coverage intent, checks eligibility against the product they called about,
+          validates their contact details, and flags anything that looks recycled or non-compliant.
+        </p>
+      </div>
+      <ul class="mkt-checklist">
+        @for (point of aiPoints; track point) {
+          <li>
+            <svg lucideCheck></svg>
+            <span>{{ point }}</span>
+          </li>
+        }
+      </ul>
+    </div>
+
+    <div class="console">
+      <div class="console__bar">
+        <span class="console__title">AI verification · Call #4821</span>
+        <span class="console__live"><span class="pipeline-dot"></span> Live</span>
+      </div>
+
+      <div class="ai-score">
+        <span class="ai-score__value">94</span>
+        <span class="ai-score__meta">
+          <span class="ai-score__label">Verification score</span>
+          <span class="ai-score__verdict">Cleared for live transfer</span>
+        </span>
+      </div>
+
+      <div class="ai-divider"></div>
+
+      @for (check of aiChecks; track check.label) {
+        <div class="ai-check">
+          <svg lucideCheck></svg>
+          <span class="ai-check__label">{{ check.label }}</span>
+          <span class="ai-check__value">{{ check.value }}</span>
+        </div>
+      }
+    </div>
+  </div>
+</section>
+
+<section class="mkt-section mkt-section--dark" appReveal>
+  <div class="mkt-container">
+    <div class="mkt-section-head">
+      <span class="badge-pill badge-pill--dark">Our floor</span>
+      <h2 class="mkt-h2">The people — and the machine — <span class="gradient-text-hero--on-dark">behind every transfer</span></h2>
+      <p class="mkt-subtitle">
+        AI does the screening at volume. Verifiers and Closers do the part that still needs a human on the phone.
+      </p>
+    </div>
+
+    <div class="mkt-grid-4">
+      @for (role of roles; track role.name) {
+        <div class="feature-card feature-card--on-dark">
+          <div class="icon-chip icon-chip--dark">
+            @switch (role.icon) {
+              @case ('sparkles') {
+                <svg lucideSparkles></svg>
+              }
+              @case ('userCheck') {
+                <svg lucideUserCheck></svg>
+              }
+              @case ('handshake') {
+                <svg lucideHandshake></svg>
+              }
+              @case ('phoneForwarded') {
+                <svg lucidePhoneForwarded></svg>
+              }
+            }
+          </div>
+          <h3 class="card-title">{{ role.name }}</h3>
+          <p class="card-desc">{{ role.desc }}</p>
+        </div>
+      }
+    </div>
+  </div>
+</section>
+
+<section class="mkt-section" appReveal>
+  <div class="mkt-container">
+    <div class="mkt-section-head">
+      <span class="badge-pill">Why clients trust us</span>
+      <h2 class="mkt-h2">Accountability built into <span class="gradient-text-hero">every handoff</span></h2>
+    </div>
+
+    <div class="mkt-grid-3">
+      @for (feature of features; track feature.title) {
+        <div class="feature-card">
+          <div class="icon-chip icon-chip--dark">
+            @switch (feature.icon) {
+              @case ('shield') {
+                <svg lucideShield></svg>
+              }
+              @case ('message') {
+                <svg lucideMessageSquare></svg>
+              }
+              @case ('clock') {
+                <svg lucideClock></svg>
+              }
+            }
+          </div>
+          <h3 class="card-title">{{ feature.title }}</h3>
+          <p class="card-desc">{{ feature.desc }}</p>
+        </div>
+      }
+    </div>
+  </div>
+</section>
+
+<section class="mkt-section mkt-section--tight" appReveal>
+  <div class="mkt-container">
+    <div class="cta-band grid-pattern">
+      <h2 class="mkt-h2">Ready for live transfers <span class="gradient-text-hero--on-dark">that actually close?</span></h2>
+      <p class="mkt-subtitle">Tell us your vertical, your states and your daily volume — we'll put a team on it.</p>
+      <div class="cta-actions">
+        <a class="btn-hero" routerLink="/contact">
+          Partner With Us
+          <svg lucideArrowRight></svg>
+        </a>
+        <a class="btn-hero btn-hero--on-dark" routerLink="/login">Client Portal</a>
+      </div>
+    </div>
+  </div>
+</section>

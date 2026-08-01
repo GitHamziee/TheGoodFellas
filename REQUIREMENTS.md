@@ -170,3 +170,81 @@ Everything above is now built — schema, API, and Angular forms. Notes on judgm
 - **DOB / Beneficiary DOB / Draft Dates** are stored as real `DateTime` values (not raw `mm/dd/yy` strings) and formatted for display — safer than free-text dates, same information.
 - **SSN and Payer's Social** accept `123-00-1234` or 9 raw digits and are normalized to the dashed format; **Routing Number** must be exactly 9 digits. These are shape checks (format only), not fraud/validity checks.
 - **Admin can edit any field** (not just name/phone) on a REJECTED lead before reassigning, since "edit" in the original ask wasn't scoped to specific fields.
+
+---
+
+## UI Pass — per-page functionality (added after the first build)
+
+The first pass built every page but left them as bare tables. This pass brought each page up to the level of
+functionality R4Referral's equivalents have. None of it changed the API or the masking rules.
+
+**Shared behaviour on every list page** — free-text search, status filter pills that double as a count
+breakdown, sortable columns, pagination, loading skeletons, distinct "no data" vs "no match" empty states,
+and a click-through detail modal. All derived **client-side** from the existing endpoints via
+`core/list-view.ts` (see CLAUDE.md) — no new query params, no new routes.
+
+| Page | Functionality added |
+|---|---|
+| Admin → Leads | 6 stat tiles, search, filter by closer, status pills, sort by name/status/date, detail modal, inline Paid/Unpaid toggle that patches in place instead of refetching |
+| Admin → Queue | Stats, search, Submitted/Rejected pills, **assign modal** with client search + selectable list, **edit modal** for rejected leads (name, phone, state, zip, marital, health, notes) surfacing the client's rejection reason, detail modal |
+| Admin → Clients & Staff | Role stat tiles, search, role filter pills, sortable, **create-account modal**, **account detail modal with role switcher + explicit confirmation** warning that the person gets signed out; changing your own role is blocked |
+| Admin → Analytics (Junior/Closer) | Now one shared `OutcomeAnalytics` component: team totals, accept-rate metric, accepted-vs-rejected bar chart of the busiest 8, searchable + sortable table with a per-person accept/reject split meter |
+| Admin → Analytics (Overall) | Metric cards incl. **accept rate** and **collection rate**, status bar chart, status table with plain-English explanations and share-of-total, account breakdown |
+| Closer → Assigned Leads | Stats incl. an **ageing count** (3+ days waiting), search, per-row stale flag, intake preview modal showing the junior closer's notes |
+| Closer → Lead History | Stats incl. accept rate, search, status pills, masked detail modal that states *why* the view is restricted |
+| Closer → Complete Lead | Sectioned form (Personal / Health / Beneficiary / Policy / Billing / Notes), intake recap header, **live completeness meter**, conditional Self vs Someone-Else bank section, inline required-field validation, sticky submit bar |
+| Junior → New Lead | Sectioned form, **closer picked from avatar cards** rather than a bare `<select>`, inline validation with a "still needed" list, sticky submit bar |
+| Junior → My Lead History | Stats incl. accept rate, search, status pills, masked detail modal |
+| Client → New Leads | Stats, search, explicit locked-preview banner, preview modal, **reject modal that collects a reason** (previously an untitled inline text box) |
+| Client → Lead History | Stats incl. total coverage, search, Open/Closed pills, sortable by coverage, full detail modal |
+| All four dashboards | Greeting, 5–6 stat tiles, **pipeline funnel**, recent-activity feed, quick-action tiles. Closer's shows oldest-waiting leads first; Client's shows offers awaiting a decision |
+| Settings | Account card, **live password-requirement checklist**, mismatch validation, explicit warning that changing the password signs you out |
+
+**PII display masking** — `app-lead-detail` masks SSN, payer SSN, routing and account numbers behind a
+"Reveal" toggle wherever a full lead is shown. This is presentation only; the API-level masking in
+`lead.service.ts` is still the real access-control boundary.
+
+**Not added, deliberately:** a profile-edit tab in Settings. R4Referral has one, but this spec scopes
+Settings to "password reset only", so name/email stay admin-managed.
+
+---
+
+## Team Chat (added after the UI pass)
+
+As specified by the user: two groups, **Closers** and **Junior Closers**. Admin interacts with both;
+a Junior Closer sees only the Junior Closer chat; a Closer sees only theirs; each group reaches Admin
+through its own group channel.
+
+| Channel | Who is in it |
+|---|---|
+| Closers | every CLOSER + every ADMIN |
+| Junior Closers | every JUNIOR_CLOSER + every ADMIN |
+
+The two groups cannot see each other. Only Admin holds both, and Admin gets a channel switcher; the
+single-channel roles get no switcher at all.
+
+Confirmed in scope for v1: live send/receive, scrollback history, **unread badge** in the sidebar,
+**typing indicator**, and **edit/delete your own message**. File and image attachments were considered
+and left out — no file storage exists in this project yet.
+
+### Judgment calls made (not specified, easy to revisit)
+
+- **CLIENT has no chat.** The user described chat for Closers, Junior Closers and Admin only. Clients
+  are external to the org, so they get no nav item, an empty room list, and the websocket refuses their
+  connection. Flag if clients were meant to have a support channel with admin.
+- **Channels are group chats, not DMs.** "Both can interact with admin via their Group" was read as
+  literally one shared room per group — every Closer sees every other Closer's messages to Admin. If
+  the intent was private Closer↔Admin threads, that's a different (larger) model: per-pair conversations
+  rather than two rooms.
+- **Membership is derived from role, not stored.** Promote a Junior Closer to Closer and their channel
+  changes on next login — there is no per-user membership to migrate. Their old messages stay in the
+  Junior Closers channel, attributed to them.
+- **Admin can delete anyone's message but cannot edit anyone's.** Moderation without being able to put
+  words in someone's mouth. Deletes are soft — the row is tombstoned and shows as "This message was
+  deleted" rather than vanishing from the timeline.
+- **No message retention limit or export.** Messages persist indefinitely. Given the PII sensitivity
+  noted elsewhere in this file, a retention policy is probably worth deciding on — nothing stops staff
+  pasting a customer's SSN into a channel, and there is no audit log of who read what.
+- **History is unrestricted within a channel.** Unlike leads, chat has no masking rule — a new Closer
+  can scroll back through everything said in the Closers channel before they joined. Say so if that
+  should be capped to messages sent after their account was created.

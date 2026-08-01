@@ -1,36 +1,122 @@
 <div class="page">
-  <h1>Lead History</h1>
+  <div class="page-head">
+    <div>
+      <h1>Lead History</h1>
+      <p class="sub">Every lead you've accepted, with full contact, policy and billing detail.</p>
+    </div>
+  </div>
 
-  <div class="card">
+  <div class="stats-row">
+    <app-stat-tile [value]="stats().total" label="Accepted leads" tone="tone-gold">
+      <svg lucideFileText></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().thisMonth" label="This month" tone="tone-c">
+      <svg lucideClock></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().closed" label="Closed & paid" tone="tone-success">
+      <svg lucideCircleCheck></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="formatMoney(stats().coverage)" label="Total coverage" tone="tone-a">
+      <svg lucideBanknote></svg>
+    </app-stat-tile>
+  </div>
+
+  @if (error()) {
+    <div class="error">{{ error() }}</div>
+  }
+
+  <div class="toolbar">
+    <app-search-box
+      [value]="view.search()"
+      placeholder="Search name, phone, email, address, carrier…"
+      (valueChange)="view.setSearch($event)"
+    />
+    <div class="pills">
+      @for (filter of paymentFilters; track filter.value) {
+        <button
+          type="button"
+          class="pill"
+          [class.active]="view.status() === filter.value"
+          (click)="view.setStatus(filter.value)"
+        >
+          {{ filter.label }}
+          <span class="n">{{ paymentCounts()[filter.value] }}</span>
+        </button>
+      }
+    </div>
+  </div>
+
+  <div class="card card--flush">
     @if (loading()) {
-      <p class="empty">Loading...</p>
-    } @else if (leads().length === 0) {
-      <p class="empty">No accepted leads yet.</p>
+      <app-skeleton-rows [count]="5" />
+    } @else if (view.total() === 0) {
+      @if (view.isFiltered()) {
+        <app-empty-state title="No leads match" hint="Try a different search term or clear the filters.">
+          <svg lucideFileText></svg>
+        </app-empty-state>
+      } @else {
+        <app-empty-state title="No accepted leads yet" hint="Leads you accept from the New Leads page appear here with their full details.">
+          <svg lucideFileText></svg>
+        </app-empty-state>
+      }
     } @else {
-      <table>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Phone</th>
-            <th>Email</th>
-            <th>Address</th>
-            <th>Status</th>
-            <th>Accepted</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (lead of leads(); track lead.id) {
+      <div class="table-wrap">
+        <table>
+          <thead>
             <tr>
-              <td>{{ lead.customerName }}</td>
-              <td>{{ lead.phone }}</td>
-              <td>{{ lead.email || '—' }}</td>
-              <td>{{ lead.mailingAddress || '—' }}</td>
-              <td>{{ lead.paymentStatus === 'PAID' ? 'Closed' : 'Accepted' }}</td>
-              <td>{{ lead.createdAt | date: 'short' }}</td>
+              <th class="sortable" (click)="view.toggleSort('customerName')">
+                Customer <span class="arrow">{{ sortArrow('customerName') }}</span>
+              </th>
+              <th class="hide-sm">Contact</th>
+              <th class="hide-md">Carrier</th>
+              <th class="sortable right hide-md" (click)="view.toggleSort('coverageAmount')">
+                Coverage <span class="arrow">{{ sortArrow('coverageAmount') }}</span>
+              </th>
+              <th>Status</th>
+              <th class="sortable right hide-md" (click)="view.toggleSort('createdAt')">
+                Received <span class="arrow">{{ sortArrow('createdAt') }}</span>
+              </th>
             </tr>
-          }
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            @for (lead of view.rows(); track lead.id) {
+              <tr class="clickable" (click)="selected.set(lead)">
+                <td>
+                  <div class="cell-main">{{ lead.customerName }}</div>
+                  <div class="cell-sub">
+                    {{ lead.state }}@if (lead.zipcode) {, {{ lead.zipcode }}}
+                  </div>
+                </td>
+                <td class="hide-sm">
+                  <div class="cell-sub"><svg lucidePhone class="mini"></svg> {{ formatPhone(lead.phone) }}</div>
+                  @if (lead.email) {
+                    <div class="cell-sub"><svg lucideMail class="mini"></svg> {{ lead.email }}</div>
+                  }
+                </td>
+                <td class="hide-md">{{ lead.carrierName || '—' }}</td>
+                <td class="right num hide-md">{{ formatMoney(lead.coverageAmount) }}</td>
+                <td><app-payment-badge [status]="lead.paymentStatus" /></td>
+                <td class="right hide-md">
+                  <span class="chip"><svg lucideClock></svg>{{ timeAgo(lead.createdAt) }}</span>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <app-pagination
+        [page]="view.page()"
+        [totalPages]="view.totalPages()"
+        [total]="view.total()"
+        (pageChange)="view.page.set($event)"
+      />
     }
   </div>
 </div>
+
+@if (selected(); as lead) {
+  <app-modal title="Lead details" [subtitle]="lead.customerName" [wide]="true" (close)="selected.set(null)">
+    <app-lead-detail [lead]="lead" />
+  </app-modal>
+}

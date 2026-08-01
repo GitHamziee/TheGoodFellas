@@ -1,0 +1,110 @@
+<div class="public-shell">
+  <header class="pub-nav" [class.scrolled]="scrolled()">
+    <div class="pub-nav__inner mkt-container">
+      <a class="pub-nav__brand" routerLink="/" (click)="closeMenu()">
+        <div class="mark">GF</div>
+        <span class="brand-gradient-text">The Good Fellas</span>
+      </a>
+
+      <nav class="pub-nav__links">
+        @for (link of navLinks; track link.path) {
+          <a [routerLink]="link.path" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: link.exact }">{{
+            link.label
+          }}</a>
+        }
+      </nav>
+
+      <div class="pub-nav__actions">
+        @if (isAuthenticated()) {
+          <a class="btn-hero" [routerLink]="homeUrl()">
+            Go to Dashboard
+            <svg lucideArrowRight></svg>
+          </a>
+        } @else {
+          <a class="pub-nav__signin" routerLink="/login">Sign In</a>
+          <a class="btn-hero" routerLink="/register">Get Started</a>
+        }
+      </div>
+
+      <button
+        class="pub-nav__toggle"
+        type="button"
+        (click)="toggleMenu()"
+        [attr.aria-label]="menuOpen() ? 'Close menu' : 'Open menu'"
+      >
+        @if (menuOpen()) {
+          <svg lucideX></svg>
+        } @else {
+          <svg lucideMenu></svg>
+        }
+      </button>
+    </div>
+
+    @if (menuOpen()) {
+      <div class="pub-nav__mobile">
+        @for (link of navLinks; track link.path) {
+          <a
+            [routerLink]="link.path"
+            routerLinkActive="active"
+            [routerLinkActiveOptions]="{ exact: link.exact }"
+            (click)="closeMenu()"
+            >{{ link.label }}</a
+          >
+        }
+        <div class="pub-nav__mobile-actions">
+          @if (isAuthenticated()) {
+            <a class="btn-hero" [routerLink]="homeUrl()" (click)="closeMenu()">Go to Dashboard</a>
+          } @else {
+            <a class="btn-hero btn-hero--outline" routerLink="/login" (click)="closeMenu()">Sign In</a>
+            <a class="btn-hero" routerLink="/register" (click)="closeMenu()">Get Started</a>
+          }
+        </div>
+      </div>
+    }
+  </header>
+
+  <main class="pub-main">
+    <router-outlet />
+  </main>
+
+  <footer class="pub-footer">
+    <div class="mkt-container pub-footer__grid">
+      <div class="pub-footer__brand">
+        <div class="pub-nav__brand">
+          <div class="mark">GF</div>
+          <span class="brand-gradient-text">The Good Fellas</span>
+        </div>
+        <p>Inbound insurance leads, AI-verified and live-transferred to licensed closers — generated, verified and closed by our in-house team.</p>
+        <a class="pub-footer__email" href="mailto:thegoodfellasbpo@gmail.com">
+          <svg lucideMail></svg>
+          thegoodfellasbpo&#64;gmail.com
+        </a>
+      </div>
+
+      <div class="pub-footer__col">
+        <div class="pub-footer__heading">What We Do</div>
+        <span>Inbound Lead Generation</span>
+        <span>AI Verification</span>
+        <span>Live Transfers</span>
+        <span>Policy Closing</span>
+      </div>
+
+      <div class="pub-footer__col">
+        <div class="pub-footer__heading">Company</div>
+        <a routerLink="/about">About</a>
+        <a routerLink="/services">Services</a>
+        <a routerLink="/contact">Contact</a>
+      </div>
+
+      <div class="pub-footer__col">
+        <div class="pub-footer__heading">Account</div>
+        <a routerLink="/login">Sign In</a>
+        <a routerLink="/register">Create Account</a>
+      </div>
+    </div>
+
+    <div class="pub-footer__bottom">
+      <span>© {{ year }} The Good Fellas (Pvt) Ltd. All rights reserved.</span>
+    </div>
+  </footer>
+</div>

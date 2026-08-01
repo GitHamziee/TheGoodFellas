@@ -1,52 +1,197 @@
 <div class="page">
-  <h1>All Leads</h1>
+  <div class="page-head">
+    <div>
+      <h1>All Leads</h1>
+      <p class="sub">Every lead in the pipeline, across all closers and clients.</p>
+    </div>
+  </div>
 
-  <div class="card">
+  <div class="stats-row">
+    <app-stat-tile [value]="stats().total" label="Total leads" tone="tone-gold">
+      <svg lucideLayers></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().submitted" label="Awaiting assignment" tone="tone-warning">
+      <svg lucideSend></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().assigned" label="With clients" tone="tone-a">
+      <svg lucideInbox></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().accepted" label="Accepted" tone="tone-success">
+      <svg lucideCircleCheck></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().rejected" label="Rejected" tone="tone-danger">
+      <svg lucideCircleX></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().unpaid" label="Accepted, unpaid" tone="tone-neutral">
+      <svg lucideWallet></svg>
+    </app-stat-tile>
+  </div>
+
+  @if (error()) {
+    <div class="error">{{ error() }}</div>
+  }
+
+  <div class="toolbar">
+    <app-search-box
+      [value]="view.search()"
+      placeholder="Search name, phone, state, or person…"
+      (valueChange)="view.setSearch($event)"
+    />
+
+    <select
+      class="filter-select"
+      [value]="closerFilter()"
+      (change)="setCloserFilter($any($event.target).value)"
+      aria-label="Filter by closer"
+    >
+      <option value="">All closers</option>
+      @for (closer of closers(); track closer.id) {
+        <option [value]="closer.id">{{ closer.name }}</option>
+      }
+    </select>
+
+    <div class="pills">
+      @for (filter of statusFilters; track filter.value) {
+        <button
+          type="button"
+          class="pill"
+          [class.active]="view.status() === filter.value"
+          (click)="view.setStatus(filter.value)"
+        >
+          {{ filter.label }}
+          <span class="n">{{ statusCounts()[filter.value] }}</span>
+        </button>
+      }
+    </div>
+  </div>
+
+  <div class="card card--flush">
     @if (loading()) {
-      <p class="empty">Loading...</p>
-    } @else if (leads().length === 0) {
-      <p class="empty">No leads yet.</p>
+      <app-skeleton-rows [count]="6" />
+    } @else if (view.total() === 0) {
+      @if (view.isFiltered()) {
+        <app-empty-state title="No leads match those filters" hint="Try a different search term or clear the filters.">
+          <svg lucideFileText></svg>
+        </app-empty-state>
+      } @else {
+        <app-empty-state title="No leads yet" hint="Leads appear here once junior closers start submitting them.">
+          <svg lucideFileText></svg>
+        </app-empty-state>
+      }
     } @else {
-      <table>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Junior</th>
-            <th>Closer</th>
-            <th>Client</th>
-            <th>Status</th>
-            <th>Payment</th>
-            <th>Created</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (lead of leads(); track lead.id) {
+      <div class="table-wrap">
+        <table>
+          <thead>
             <tr>
-              <td>{{ lead.customerName }}</td>
-              <td>{{ lead.juniorCloser.name }}</td>
-              <td>{{ lead.closer.name }}</td>
-              <td>{{ lead.client?.name || '—' }}</td>
-              <td><span [class]="statusBadgeClass(lead.status)">{{ lead.status }}</span></td>
-              <td>
-                @if (lead.status === 'ACCEPTED') {
-                  <button
-                    class="btn"
-                    [class.btn--muted]="lead.paymentStatus === 'UNPAID'"
-                    type="button"
-                    [disabled]="busyId() === lead.id"
-                    (click)="togglePayment(lead)"
-                  >
-                    {{ lead.paymentStatus === 'PAID' ? 'Paid — Closed' : 'Mark paid' }}
-                  </button>
-                } @else {
-                  <span class="empty">—</span>
-                }
-              </td>
-              <td>{{ lead.createdAt | date: 'short' }}</td>
+              <th class="sortable" (click)="view.toggleSort('customerName')">
+                Customer <span class="arrow">{{ sortArrow('customerName') }}</span>
+              </th>
+              <th class="hide-sm">Closer</th>
+              <th class="hide-md">Client</th>
+              <th class="sortable" (click)="view.toggleSort('status')">
+                Status <span class="arrow">{{ sortArrow('status') }}</span>
+              </th>
+              <th class="hide-md">Payment</th>
+              <th class="sortable right" (click)="view.toggleSort('createdAt')">
+                Created <span class="arrow">{{ sortArrow('createdAt') }}</span>
+              </th>
             </tr>
-          }
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            @for (lead of view.rows(); track lead.id) {
+              <tr class="clickable" (click)="selected.set(lead)">
+                <td>
+                  <div class="cell-main">{{ lead.customerName }}</div>
+                  <div class="cell-sub">{{ formatPhone(lead.phone) }} · {{ lead.state }}</div>
+                </td>
+                <td class="hide-sm">
+                  <div class="person">
+                    <span class="avatar-sm" [class]="getAvatarTone(lead.closer.id)">
+                      {{ getInitials(lead.closer.name) }}
+                    </span>
+                    <span class="nm">{{ lead.closer.name }}</span>
+                  </div>
+                </td>
+                <td class="hide-md">
+                  @if (lead.client) {
+                    <div class="person">
+                      <span class="avatar-sm" [class]="getAvatarTone(lead.client.id)">
+                        {{ getInitials(lead.client.name) }}
+                      </span>
+                      <span class="nm">{{ lead.client.name }}</span>
+                    </div>
+                  } @else {
+                    <span class="empty">Unassigned</span>
+                  }
+                </td>
+                <td><app-status-badge [status]="lead.status" /></td>
+                <td class="hide-md">
+                  @if (lead.status === 'ACCEPTED') {
+                    <button
+                      type="button"
+                      class="btn btn--sm"
+                      [class.btn--ghost]="lead.paymentStatus === 'UNPAID'"
+                      [class.btn--success]="lead.paymentStatus === 'PAID'"
+                      [disabled]="busyId() === lead.id"
+                      (click)="togglePayment(lead, $event)"
+                    >
+                      @if (busyId() === lead.id) {
+                        <span class="spinner"></span>
+                      } @else {
+                        <svg lucideBanknote></svg>
+                      }
+                      {{ lead.paymentStatus === 'PAID' ? 'Paid' : 'Mark paid' }}
+                    </button>
+                  } @else {
+                    <span class="empty">—</span>
+                  }
+                </td>
+                <td class="right">
+                  <span class="chip"><svg lucideClock></svg>{{ timeAgo(lead.createdAt) }}</span>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <app-pagination
+        [page]="view.page()"
+        [totalPages]="view.totalPages()"
+        [total]="view.total()"
+        (pageChange)="view.page.set($event)"
+      />
     }
   </div>
 </div>
+
+@if (selected(); as lead) {
+  <app-modal
+    title="Lead details"
+    [subtitle]="lead.customerName"
+    [wide]="true"
+    (close)="selected.set(null)"
+  >
+    <app-lead-detail [lead]="lead" />
+
+    <div footer>
+      @if (lead.status === 'ACCEPTED') {
+        <button
+          type="button"
+          class="btn"
+          [class.btn--ghost]="lead.paymentStatus === 'UNPAID'"
+          [class.btn--success]="lead.paymentStatus === 'PAID'"
+          [disabled]="busyId() === lead.id"
+          (click)="togglePayment(lead, $event)"
+        >
+          @if (busyId() === lead.id) {
+            <span class="spinner"></span>
+          } @else {
+            <svg lucideBanknote></svg>
+          }
+          {{ lead.paymentStatus === 'PAID' ? 'Mark unpaid' : 'Mark paid' }}
+        </button>
+      }
+    </div>
+  </app-modal>
+}

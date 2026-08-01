@@ -1,45 +1,138 @@
 <div class="page">
-  <h1>Overall Analytics</h1>
+  <div class="page-head">
+    <div>
+      <h1>Overall Analytics</h1>
+      <p class="sub">Pipeline health across the whole platform.</p>
+    </div>
+    <div class="page-head-actions">
+      <a class="btn btn--ghost" routerLink="/admin/analytics/junior-closers">Junior closers</a>
+      <a class="btn btn--ghost" routerLink="/admin/analytics/closers">Closers</a>
+    </div>
+  </div>
+
+  @if (error()) {
+    <div class="error">{{ error() }}</div>
+  }
 
   @if (loading()) {
-    <p class="empty">Loading...</p>
-  } @else if (overall(); as o) {
+    <div class="card"><app-skeleton-rows [count]="6" /></div>
+  } @else if (metrics(); as m) {
     <div class="stats-row">
-      <div class="stat"><div class="value">{{ o.totalLeads }}</div><div class="label">Total leads</div></div>
-      <div class="stat"><div class="value">{{ o.statusCounts.ACCEPTED || 0 }}</div><div class="label">Accepted</div></div>
-      <div class="stat"><div class="value">{{ o.unpaidAcceptedCount }}</div><div class="label">Accepted, unpaid</div></div>
-      <div class="stat"><div class="value">{{ o.closedCount }}</div><div class="label">Closed (paid)</div></div>
+      <app-stat-tile [value]="m.total" label="Total leads" tone="tone-gold">
+        <svg lucideLayers></svg>
+      </app-stat-tile>
+      <app-stat-tile [value]="m.inFlight" label="Still in flight" tone="tone-warning">
+        <svg lucideChartColumn></svg>
+      </app-stat-tile>
+      <app-stat-tile [value]="m.accepted" label="Accepted" tone="tone-success">
+        <svg lucideCircleCheck></svg>
+      </app-stat-tile>
+      <app-stat-tile [value]="m.rejected" label="Rejected" tone="tone-danger">
+        <svg lucideCircleX></svg>
+      </app-stat-tile>
+      <app-stat-tile [value]="m.closed" label="Closed & paid" tone="tone-f">
+        <svg lucideWallet></svg>
+      </app-stat-tile>
+      <app-stat-tile [value]="m.unpaid" label="Accepted, unpaid" tone="tone-neutral">
+        <svg lucideWallet></svg>
+      </app-stat-tile>
     </div>
 
-    <div class="card">
-      <h2 style="font-size:0.95rem; margin:0 0 0.75rem;">Leads by status</h2>
-      <table>
-        <thead>
-          <tr><th>Status</th><th>Count</th></tr>
-        </thead>
-        <tbody>
-          <tr><td>New</td><td>{{ o.statusCounts.NEW || 0 }}</td></tr>
-          <tr><td>Submitted</td><td>{{ o.statusCounts.SUBMITTED || 0 }}</td></tr>
-          <tr><td>Assigned</td><td>{{ o.statusCounts.ASSIGNED || 0 }}</td></tr>
-          <tr><td>Accepted</td><td>{{ o.statusCounts.ACCEPTED || 0 }}</td></tr>
-          <tr><td>Rejected</td><td>{{ o.statusCounts.REJECTED || 0 }}</td></tr>
-        </tbody>
-      </table>
+    <div class="stats-row">
+      <app-stat-tile
+        [value]="m.acceptRate === null ? '—' : m.acceptRate + '%'"
+        label="Accept rate (of decided leads)"
+        tone="tone-a"
+      >
+        <svg lucideTarget></svg>
+      </app-stat-tile>
+      <app-stat-tile
+        [value]="m.collectionRate === null ? '—' : m.collectionRate + '%'"
+        label="Collected (of accepted leads)"
+        tone="tone-b"
+      >
+        <svg lucideWallet></svg>
+      </app-stat-tile>
     </div>
 
+    @if (m.total === 0) {
+      <div class="card">
+        <app-empty-state title="No leads yet" hint="Analytics fill in once leads start moving through the pipeline.">
+          <svg lucideChartColumn></svg>
+        </app-empty-state>
+      </div>
+    } @else {
+      <div class="card">
+        <div class="inline-head">
+          <h2>Leads by status</h2>
+          <span class="count">{{ m.total }} total</span>
+        </div>
+
+        <div class="chart">
+          @for (bar of statusBars(); track bar.status) {
+            <div class="bar-col" [title]="bar.label + ' — ' + bar.count + ' leads (' + bar.share + '%)'">
+              <div class="bar-track">
+                <span [class]="bar.barCls" [style.height.%]="bar.pct"></span>
+              </div>
+              <span class="bar-label">{{ bar.label }}</span>
+            </div>
+          }
+        </div>
+
+        <div class="table-wrap stack-top">
+          <table>
+            <thead>
+              <tr>
+                <th>Status</th>
+                <th class="hide-sm">What it means</th>
+                <th class="right">Leads</th>
+                <th class="right">Share</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (bar of statusBars(); track bar.status) {
+                <tr>
+                  <td>
+                    <span class="badge" [class]="'badge badge--' + bar.status.toLowerCase()">{{ bar.label }}</span>
+                  </td>
+                  <td class="hide-sm"><span class="cell-sub">{{ bar.hint }}</span></td>
+                  <td class="right num">{{ bar.count }}</td>
+                  <td class="right num">{{ bar.share }}%</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    }
+
     <div class="card">
-      <h2 style="font-size:0.95rem; margin:0 0 0.75rem;">Staff & clients</h2>
-      <table>
-        <thead>
-          <tr><th>Role</th><th>Count</th></tr>
-        </thead>
-        <tbody>
-          <tr><td>Junior Closers</td><td>{{ o.roleCounts['JUNIOR_CLOSER'] || 0 }}</td></tr>
-          <tr><td>Closers</td><td>{{ o.roleCounts['CLOSER'] || 0 }}</td></tr>
-          <tr><td>Admins</td><td>{{ o.roleCounts['ADMIN'] || 0 }}</td></tr>
-          <tr><td>Clients</td><td>{{ o.roleCounts['CLIENT'] || 0 }}</td></tr>
-        </tbody>
-      </table>
+      <div class="inline-head">
+        <h2>Accounts</h2>
+        <a class="count" routerLink="/admin/users">Manage</a>
+      </div>
+
+      <div class="stats-row" style="margin-bottom: 1.1rem;">
+        @for (row of roleRows(); track row.role) {
+          <app-stat-tile [value]="row.count" [label]="row.label" [tone]="row.tone">
+            @switch (row.role) {
+              @case ('ADMIN') { <svg lucideShieldCheck></svg> }
+              @case ('CLIENT') { <svg lucideBriefcase></svg> }
+              @default { <svg lucideUsers></svg> }
+            }
+          </app-stat-tile>
+        }
+      </div>
+
+      <div class="funnel">
+        @for (row of roleRows(); track row.role) {
+          <div class="funnel-row">
+            <span class="fl">{{ row.label }}</span>
+            <span class="ft"><span class="fb fb--assigned" [style.width.%]="row.share"></span></span>
+            <span class="fn">{{ row.count }}</span>
+          </div>
+        }
+      </div>
     </div>
   }
 </div>

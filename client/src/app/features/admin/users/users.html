@@ -1,65 +1,245 @@
 <div class="page">
-  <h1>Users</h1>
+  <div class="page-head">
+    <div>
+      <h1>Clients & Staff</h1>
+      <p class="sub">Every account on the platform. Junior closer, closer and admin accounts are created here.</p>
+    </div>
+    <div class="page-head-actions">
+      <button type="button" class="btn" (click)="openCreate()">
+        <svg lucideUserPlus></svg> New account
+      </button>
+    </div>
+  </div>
 
-  <form class="card" (ngSubmit)="createUser()">
-    <h2 style="font-size:0.95rem; margin:0 0 0.75rem;">Create staff / client account</h2>
+  <div class="stats-row">
+    <app-stat-tile [value]="stats().total" label="Total accounts" tone="tone-gold">
+      <svg lucideUsers></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().clients" label="Clients" tone="tone-f">
+      <svg lucideBriefcase></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().closers" label="Closers" tone="tone-c">
+      <svg lucideUsers></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().juniors" label="Junior closers" tone="tone-d">
+      <svg lucideUsers></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().admins" label="Admins" tone="tone-b">
+      <svg lucideShieldCheck></svg>
+    </app-stat-tile>
+  </div>
+
+  @if (error() && !showCreate() && !selected()) {
+    <div class="error">{{ error() }}</div>
+  }
+  @if (notice()) {
+    <div class="success"><svg lucideCircleCheck></svg>{{ notice() }}</div>
+  }
+
+  <div class="toolbar">
+    <app-search-box
+      [value]="view.search()"
+      placeholder="Search by name, email, or phone…"
+      (valueChange)="view.setSearch($event)"
+    />
+    <div class="pills">
+      @for (filter of roleFilters; track filter.value) {
+        <button
+          type="button"
+          class="pill"
+          [class.active]="view.status() === filter.value"
+          (click)="view.setStatus(filter.value)"
+        >
+          {{ filter.label }}
+          <span class="n">{{ roleCounts()[filter.value] }}</span>
+        </button>
+      }
+    </div>
+  </div>
+
+  <div class="card card--flush">
+    @if (loading()) {
+      <app-skeleton-rows [count]="6" />
+    } @else if (view.total() === 0) {
+      @if (view.isFiltered()) {
+        <app-empty-state title="No accounts match" hint="Try a different search term or clear the filters.">
+          <svg lucideUsers></svg>
+        </app-empty-state>
+      } @else {
+        <app-empty-state title="No accounts yet" hint="Create the first junior closer or closer account to get started.">
+          <svg lucideUsers></svg>
+        </app-empty-state>
+      }
+    } @else {
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="sortable" (click)="view.toggleSort('name')">
+                Name <span class="arrow">{{ sortArrow('name') }}</span>
+              </th>
+              <th class="sortable hide-sm" (click)="view.toggleSort('email')">
+                Email <span class="arrow">{{ sortArrow('email') }}</span>
+              </th>
+              <th class="hide-md">Phone</th>
+              <th class="sortable" (click)="view.toggleSort('role')">
+                Role <span class="arrow">{{ sortArrow('role') }}</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (user of view.rows(); track user.id) {
+              <tr class="clickable" (click)="openDetail(user)">
+                <td>
+                  <div class="person">
+                    <span class="avatar-sm" [class]="getAvatarTone(user.id)">{{ getInitials(user.name) }}</span>
+                    <span>
+                      <span class="cell-main">{{ user.name }}</span>
+                      @if (isSelf(user)) {
+                        <span class="cell-sub">You</span>
+                      }
+                    </span>
+                  </div>
+                </td>
+                <td class="hide-sm">{{ user.email }}</td>
+                <td class="hide-md">{{ user.phone || '—' }}</td>
+                <td><span class="badge" [class]="'badge ' + roleTone[user.role]">{{ roleLabel[user.role] }}</span></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <app-pagination
+        [page]="view.page()"
+        [totalPages]="view.totalPages()"
+        [total]="view.total()"
+        (pageChange)="view.page.set($event)"
+      />
+    }
+  </div>
+</div>
+
+<!-- Create account -->
+@if (showCreate()) {
+  <app-modal
+    title="New account"
+    subtitle="Junior closers, closers and admins can only be created here."
+    (close)="showCreate.set(false)"
+  >
     @if (error()) {
       <div class="error">{{ error() }}</div>
     }
+
     <div class="form-grid">
-      <label>
-        Name
-        <input type="text" name="name" [(ngModel)]="name" required />
+      <label class="full">
+        Full name
+        <input type="text" [(ngModel)]="name" name="name" placeholder="Jane Doe" />
       </label>
-      <label>
+      <label class="full">
         Email
-        <input type="email" name="email" [(ngModel)]="email" required />
+        <input type="email" [(ngModel)]="email" name="email" placeholder="jane@thegoodfellas.dev" />
       </label>
       <label>
         Password
-        <input type="password" name="password" [(ngModel)]="password" required />
+        <input type="password" [(ngModel)]="password" name="password" placeholder="At least 8 characters" />
+        <span class="hint">Minimum 8 characters.</span>
       </label>
       <label>
+        Phone <span class="hint">Optional</span>
+        <input type="tel" [(ngModel)]="phone" name="phone" />
+      </label>
+      <label class="full">
         Role
-        <select name="role" [(ngModel)]="role">
+        <select [(ngModel)]="role" name="role">
           @for (r of roles; track r) {
-            <option [value]="r">{{ r }}</option>
+            <option [value]="r">{{ roleLabel[r] }}</option>
           }
         </select>
       </label>
     </div>
-    <br />
-    <button class="btn" type="submit" [disabled]="creating()">{{ creating() ? 'Creating...' : 'Create user' }}</button>
-  </form>
 
-  <div class="card">
-    @if (loading()) {
-      <p class="empty">Loading...</p>
-    } @else {
-      <table>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Role</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (user of users(); track user.id) {
-            <tr>
-              <td>{{ user.name }}</td>
-              <td>{{ user.email }}</td>
-              <td>
-                <select [ngModel]="user.role" (ngModelChange)="changeRole(user, $event)" [ngModelOptions]="{ standalone: true }">
-                  @for (r of roles; track r) {
-                    <option [value]="r">{{ r }}</option>
-                  }
-                </select>
-              </td>
-            </tr>
-          }
-        </tbody>
-      </table>
+    <div footer>
+      <button type="button" class="btn" [disabled]="!canSubmitCreate() || creating()" (click)="createUser()">
+        @if (creating()) {
+          <span class="spinner"></span> Creating…
+        } @else {
+          <svg lucideUserPlus></svg> Create account
+        }
+      </button>
+    </div>
+  </app-modal>
+}
+
+<!-- Account detail + role switcher -->
+@if (selected(); as user) {
+  <app-modal title="Account" [subtitle]="user.name" (close)="selected.set(null)">
+    @if (error()) {
+      <div class="error">{{ error() }}</div>
     }
-  </div>
-</div>
+
+    <div class="profile-head">
+      <span class="avatar-lg" [class]="getAvatarTone(user.id)">{{ getInitials(user.name) }}</span>
+      <div class="who">
+        <div class="nm">{{ user.name }}</div>
+        <div class="chips">
+          <span class="chip"><svg lucideMail></svg>{{ user.email }}</span>
+          @if (user.phone) {
+            <span class="chip"><svg lucidePhone></svg>{{ user.phone }}</span>
+          }
+          <span class="badge" [class]="'badge ' + roleTone[user.role]">{{ roleLabel[user.role] }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h4 class="section-title">Role</h4>
+
+      @if (isSelf(user)) {
+        <div class="warn">
+          <svg lucideTriangleAlert></svg>
+          You can't change your own role — it would sign you out of this session.
+        </div>
+      } @else {
+        <p class="role-note">
+          Changing a role bumps the account's token version, which signs the person out of any active session.
+        </p>
+
+        <div class="pills">
+          @for (r of roles; track r) {
+            <button
+              type="button"
+              class="pill"
+              [class.active]="(pendingRole() ?? user.role) === r"
+              (click)="pendingRole.set(r === user.role ? null : r)"
+            >
+              {{ roleLabel[r] }}
+            </button>
+          }
+        </div>
+
+        @if (pendingRole(); as next) {
+          <div class="warn" style="margin-top: 0.9rem;">
+            <svg lucideTriangleAlert></svg>
+            <span>
+              Change <strong>{{ user.name }}</strong> from {{ roleLabel[user.role] }} to
+              <strong>{{ roleLabel[next] }}</strong>? They'll need to sign in again.
+            </span>
+          </div>
+        }
+      }
+    </div>
+
+    <div footer>
+      @if (pendingRole()) {
+        <button type="button" class="btn" [disabled]="savingRole()" (click)="confirmRoleChange()">
+          @if (savingRole()) {
+            <span class="spinner"></span> Saving…
+          } @else {
+            <svg lucideShieldCheck></svg> Confirm role change
+          }
+        </button>
+      }
+    </div>
+  </app-modal>
+}

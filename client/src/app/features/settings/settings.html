@@ -1,37 +1,99 @@
 <div class="page">
-  <h1>Settings</h1>
-
-  <div class="card">
-    <h2 style="font-size:0.95rem; margin:0 0 0.75rem;">Account</h2>
-    <p class="empty">{{ user()?.name }} · {{ user()?.email }}</p>
+  <div class="page-head">
+    <div>
+      <h1>Settings</h1>
+      <p class="sub">Your account details and password.</p>
+    </div>
   </div>
 
+  @if (user(); as u) {
+    <div class="card">
+      <h2 class="section-title"><svg lucideShieldCheck></svg> Account</h2>
+      <div class="profile-head">
+        <span class="avatar-lg" [class]="getAvatarTone(u.id)">{{ getInitials(u.name) }}</span>
+        <div class="who">
+          <div class="nm">{{ u.name }}</div>
+          <div class="chips">
+            <span class="chip"><svg lucideMail></svg>{{ u.email }}</span>
+            @if (u.phone) {
+              <span class="chip"><svg lucidePhone></svg>{{ u.phone }}</span>
+            }
+            <span class="badge badge--assigned">{{ roleLabel[u.role] }}</span>
+          </div>
+        </div>
+      </div>
+      <p class="role-note stack-top">
+        Name, email and role are managed by an admin. Ask them if any of these need to change.
+      </p>
+    </div>
+  }
+
   <form class="card" (ngSubmit)="submit()">
-    <h2 style="font-size:0.95rem; margin:0 0 0.75rem;">Change Password</h2>
+    <h2 class="section-title"><svg lucideKeyRound></svg> Change password</h2>
 
     @if (error()) {
-      <div class="error">{{ error() }}</div>
+      <div class="error"><svg lucideCircleAlert></svg>{{ error() }}</div>
     }
     @if (success()) {
-      <div class="success">Password changed. Signing you out...</div>
+      <div class="success">
+        <svg lucideCircleCheck></svg>
+        Password changed. Signing you out so you can log in with the new one…
+      </div>
     }
 
     <div class="form-grid">
       <label class="full">
         Current password
-        <input type="password" name="currentPassword" [(ngModel)]="currentPassword" required autocomplete="current-password" />
+        <input
+          type="password"
+          name="currentPassword"
+          autocomplete="current-password"
+          [ngModel]="currentPassword()"
+          (ngModelChange)="currentPassword.set($event)"
+        />
       </label>
       <label>
         New password
-        <input type="password" name="newPassword" [(ngModel)]="newPassword" required autocomplete="new-password" />
+        <input
+          type="password"
+          name="newPassword"
+          autocomplete="new-password"
+          [ngModel]="newPassword()"
+          (ngModelChange)="newPassword.set($event)"
+        />
       </label>
       <label>
         Confirm new password
-        <input type="password" name="confirmPassword" [(ngModel)]="confirmPassword" required autocomplete="new-password" />
+        <input
+          type="password"
+          name="confirmPassword"
+          autocomplete="new-password"
+          [ngModel]="confirmPassword()"
+          (ngModelChange)="confirmPassword.set($event)"
+          [class.invalid]="confirmPassword() !== '' && !checks().matches"
+        />
+        @if (confirmPassword() !== '' && !checks().matches) {
+          <span class="field-error">Passwords don't match.</span>
+        }
       </label>
     </div>
 
-    <br />
-    <button class="btn" type="submit" [disabled]="submitting()">{{ submitting() ? 'Updating...' : 'Update password' }}</button>
+    <ul class="checklist">
+      <li [class.met]="checks().length">At least {{ minLength }} characters</li>
+      <li [class.met]="checks().differs">Different from your current password</li>
+      <li [class.met]="checks().matches">Confirmation matches</li>
+    </ul>
+
+    <div class="warn stack-top">
+      Changing your password signs you out everywhere — you'll need to log in again.
+    </div>
+
+    <button class="btn stack-top" type="submit" [disabled]="!canSubmit()">
+      @if (submitting()) {
+        <span class="spinner"></span> Updating…
+      } @else {
+        <svg lucideKeyRound></svg> Update password
+      }
+    </button>
   </form>
 </div>

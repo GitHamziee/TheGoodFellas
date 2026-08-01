@@ -1,0 +1,1327 @@
+/* ============================================================
+   The Good Fellas — public marketing pages
+   Shared vocabulary for PublicShell + Home/About/Services/Contact
+   + the auth pages. Registered globally in angular.json, same
+   rationale as shared-page.css: these classes cross component
+   encapsulation boundaries (nav, footer, page sections, cards).
+   ============================================================ */
+
+.mkt-section {
+  position: relative;
+  padding: 5rem 1.5rem;
+}
+
+.mkt-section--tight {
+  padding: 3.5rem 1.5rem;
+}
+
+.mkt-section--muted {
+  background: var(--gray-50);
+}
+
+/* Full-bleed ink band. The page was six near-white sections and a single dark
+   CTA, which read flat top to bottom; one saturated band mid-page gives the
+   scroll a beat. Ink+gold rather than a second brand colour — see the accent
+   token note in styles.css.
+
+   The grid lines are baked in here rather than by also applying .grid-pattern:
+   that class is declared further down this file and its background-image would
+   replace the ink gradient outright, leaving a white band with white text. */
+.mkt-section--dark {
+  background-color: var(--ink-950);
+  background-image:
+    linear-gradient(rgba(212, 175, 55, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(212, 175, 55, 0.06) 1px, transparent 1px),
+    radial-gradient(circle at 25% 10%, var(--ink-800) 0%, var(--ink-950) 70%);
+  background-size: 44px 44px, 44px 44px, auto;
+  color: #fff;
+}
+
+.mkt-section--dark .mkt-h2 {
+  color: #fff;
+}
+
+.mkt-section--dark .mkt-subtitle {
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.mkt-container {
+  position: relative;
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+/* ---- Ambient texture ---- */
+
+.grid-pattern {
+  background-image:
+    linear-gradient(rgba(212, 175, 55, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(212, 175, 55, 0.08) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  opacity: 0.32;
+  pointer-events: none;
+  z-index: 0;
+  animation: blob-drift 24s ease-in-out infinite;
+}
+
+.blob--gold {
+  background: var(--gold-400);
+}
+
+.blob--accent {
+  background: var(--accent-500);
+}
+
+@keyframes blob-drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(30px, -22px) scale(1.08); }
+}
+
+/* Page-opening wash — shared by the home hero and every inner page header.
+   These previously differed (hero: two radials + two blobs; page-header: one
+   weaker radial + one blob), so home looked designed and the inner pages looked
+   like plain documents. Same stack everywhere now.
+
+   The grid lines live here rather than on a separate .grid-pattern class so the
+   whole treatment can be masked out at the bottom. Painting the grid on the
+   section itself made it stop dead at the section edge — a visible horizontal
+   seam across the page. */
+.mkt-hero::before,
+.page-header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(212, 175, 55, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(212, 175, 55, 0.08) 1px, transparent 1px),
+    radial-gradient(1100px circle at 12% -15%, rgba(212, 175, 55, 0.16), transparent 60%),
+    radial-gradient(900px circle at 92% 5%, rgba(185, 113, 63, 0.12), transparent 55%);
+  background-size: 44px 44px, 44px 44px, auto, auto;
+  -webkit-mask-image: linear-gradient(to bottom, #000 40%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 40%, transparent 100%);
+}
+
+/* ---- Typography ---- */
+
+/* Sizing note: comparable sites in this market run ~60px h1 / ~48px h2, but
+   their headings are 4–5 words. These run 8–10 ("The people — and the machine —
+   behind every transfer"), so the same sizes produced a wall of text that ate
+   whole sections. Held smaller, and capped to a readable measure so they break
+   into balanced lines instead of running the full 1120px container. */
+
+.mkt-h1 {
+  font-size: clamp(2.3rem, 4vw, 3.4rem);
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: -0.025em;
+  margin: 0.85rem 0 1.1rem;
+  text-wrap: balance;
+}
+
+/* Base size is tuned for an h2 sitting in a ~540px grid column, where the
+   larger centred size below wraps and overwhelms the body copy next to it. */
+.mkt-h2 {
+  font-size: clamp(1.7rem, 2.5vw, 2.15rem);
+  font-weight: 800;
+  line-height: 1.16;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.75rem;
+  text-wrap: balance;
+}
+
+/* A centred section head has the full container to work with, so it can carry
+   more weight than an in-column heading. */
+.mkt-section-head .mkt-h2 {
+  font-size: clamp(1.9rem, 3.1vw, 2.6rem);
+}
+
+.mkt-subtitle {
+  font-size: 1.05rem;
+  color: var(--gray-500);
+  line-height: 1.65;
+  max-width: 560px;
+}
+
+.mkt-section-head {
+  text-align: center;
+  max-width: 720px;
+  margin: 0 auto 3.25rem;
+}
+
+.mkt-section-head .mkt-subtitle {
+  margin: 0 auto;
+}
+
+.gradient-text-hero {
+  background: linear-gradient(135deg, var(--gold-600) 0%, var(--accent-500) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Same two-tone treatment for headings sitting on ink/dark bands — the gold-600
+   → copper ramp above is too dark to read there. */
+.gradient-text-hero--on-dark {
+  background: linear-gradient(135deg, var(--gold-300) 0%, var(--accent-400) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ---- Badge / eyebrow pill ---- */
+
+.badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  background: var(--gold-50);
+  color: var(--gold-700);
+  border: 1px solid var(--gold-200);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.badge-pill svg {
+  width: 14px;
+  height: 14px;
+}
+
+.badge-pill--dark {
+  background: rgba(212, 175, 55, 0.12);
+  color: var(--gold-300);
+  border-color: rgba(212, 175, 55, 0.28);
+}
+
+/* ---- Cards ---- */
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-md);
+}
+
+.feature-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.75rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.feature-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--gold-200);
+}
+
+.feature-card--service {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Card variant for use inside .mkt-section--dark. */
+.feature-card--on-dark {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.09);
+}
+
+.feature-card--on-dark:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(212, 175, 55, 0.4);
+}
+
+.feature-card--on-dark .card-title {
+  color: #fff;
+}
+
+.feature-card--on-dark .card-desc {
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.feature-card__num {
+  position: absolute;
+  top: 1.25rem;
+  right: 1.5rem;
+  font-size: 2.25rem;
+  font-weight: 800;
+  color: var(--gold-200);
+  line-height: 1;
+}
+
+.feature-card--highlight {
+  border-color: var(--gold-300);
+  box-shadow: var(--shadow-gold);
+}
+
+/* Only some service cards carry a tag. Reserving the row unconditionally keeps
+   every card title on the same baseline across the grid. */
+.service-card__tagrow {
+  min-height: 2rem;
+  margin-bottom: 0.35rem;
+}
+
+.icon-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--gold-100), var(--gold-50));
+  color: var(--gold-700);
+  margin-bottom: 1rem;
+}
+
+.icon-chip svg {
+  width: 22px;
+  height: 22px;
+}
+
+.icon-chip--dark {
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.18), rgba(124, 92, 240, 0.18));
+  color: var(--gold-300);
+}
+
+.card-title {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.card-desc {
+  margin: 0;
+  color: var(--gray-500);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.prose > p {
+  margin: 0 0 1rem;
+  color: var(--gray-600);
+  font-size: 1rem;
+  line-height: 1.75;
+}
+
+.prose > p:last-child {
+  margin-bottom: 0;
+}
+
+/* ---- Buttons ---- */
+
+.btn-hero {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.85rem 1.6rem;
+  border-radius: var(--radius-md);
+  border: none;
+  background: linear-gradient(135deg, var(--gold-400), var(--gold-600));
+  color: var(--ink-950);
+  font-weight: 700;
+  font-size: 0.95rem;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+
+.btn-hero:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-gold);
+  filter: brightness(1.04);
+}
+
+.btn-hero--outline {
+  background: transparent;
+  border: 1.5px solid var(--border);
+  color: var(--text);
+}
+
+.btn-hero--outline:hover {
+  border-color: var(--gold-400);
+  background: var(--gold-50);
+  box-shadow: none;
+  transform: translateY(-2px);
+}
+
+.btn-hero--on-dark {
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+  color: #fff;
+  background: transparent;
+}
+
+.btn-hero--on-dark:hover {
+  border-color: var(--gold-400);
+  background: rgba(212, 175, 55, 0.1);
+  box-shadow: none;
+  transform: translateY(-2px);
+}
+
+.btn-hero svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* ---- Scroll reveal (see shared/reveal.directive.ts) ---- */
+
+.reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* ---- Grids ---- */
+
+.mkt-hero {
+  position: relative;
+  overflow: hidden;
+  padding: 7rem 1.5rem 5rem;
+}
+
+.mkt-hero-grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: 3rem;
+  align-items: center;
+}
+
+.mkt-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2.5rem;
+  align-items: center;
+}
+
+/* The default centring suits a 2-up prose/card split. A 2×2 grid of equal cards
+   wants them stretched to a common height per row instead. */
+.mkt-grid-2--stretch {
+  align-items: stretch;
+}
+
+.mkt-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.75rem;
+}
+
+.mkt-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.5rem;
+}
+
+.hero-actions,
+.cta-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+/* ---- Numbered process steps ---- */
+
+.step-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.5rem;
+}
+
+/* ---- Connected process rail (Home — 5 stages) ----
+   Five boxed cards wrapped 3 + 2 and left an orphan row, and the "Step N"
+   eyebrow just repeated the badge. Unboxed nodes on a single connector line
+   read as one sequence instead, and fit five across because the copy is kept
+   short (see `steps` in home.ts). */
+
+.process-rail {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 1.5rem;
+}
+
+/* The connector, pinned to the vertical centre of the number badges. Insetting
+   it by a tenth keeps it from spilling past the first and last node. */
+.process-rail::before {
+  content: '';
+  position: absolute;
+  top: 1.4rem;
+  left: 10%;
+  right: 10%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--gold-300) 15%, var(--gold-300) 85%, transparent);
+}
+
+.process-node {
+  position: relative;
+  text-align: center;
+}
+
+.process-node__num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.8rem;
+  height: 2.8rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--gold-400), var(--gold-600));
+  color: var(--ink-950);
+  font-weight: 800;
+  font-size: 1.05rem;
+  margin-bottom: 1rem;
+  box-shadow: var(--shadow-gold);
+  /* Masks the connector line behind the badge. */
+  outline: 6px solid var(--gray-50);
+}
+
+.process-node .card-desc {
+  max-width: 15rem;
+  margin: 0 auto;
+}
+
+.step {
+  position: relative;
+  text-align: left;
+}
+
+.step-card {
+  height: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem 1.4rem;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.step-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--gold-200);
+}
+
+.step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--gold-400), var(--gold-600));
+  color: var(--ink-950);
+  font-weight: 800;
+  font-size: 1rem;
+  margin-bottom: 0.9rem;
+  box-shadow: var(--shadow-gold);
+}
+
+.step-eyebrow {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--gold-700);
+  margin-bottom: 0.35rem;
+}
+
+/* ---- Checklist ----
+   Named mkt-checklist (not .checklist) on purpose: shared-page.css already
+   defines .checklist for the portal's password-rule list, with its own
+   ::before bullet dot. Both stylesheets are global, so reusing .checklist
+   here let that dot leak onto these icon-only rows — two markers per line. */
+
+.mkt-checklist {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.mkt-checklist li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  font-size: 0.9rem;
+  color: var(--gray-700);
+}
+
+.mkt-checklist svg {
+  width: 16px;
+  height: 16px;
+  color: var(--gold-600);
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+}
+
+/* Two-up inside the wide (2-column grid) service cards, so a 4-item list stays
+   two rows tall instead of pushing the card down four. */
+.mkt-checklist--2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem 1.25rem;
+}
+
+@media (max-width: 700px) {
+  .mkt-checklist--2col {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* On a .dark-card (near-black), the default gray-700 li text and gold-600
+   icon both lose contrast — lighten both for that context. */
+/* ---- Qualification tags (vertical cards on Home) ---- */
+
+.tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: auto;
+  padding-top: 1rem;
+}
+
+/* Cards in a row have different description lengths; pushing the chip row down
+   with margin-top:auto lines the chips up across the row. Needs the card itself
+   to be a column flex container. */
+.feature-card--tagged {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Kept deliberately small: at 4-up the cards are ~260px, and anything larger
+   wraps to one chip per line, which reads as a bulleted list rather than tags. */
+.tag {
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  background: var(--gold-50);
+  color: var(--gold-700);
+  border: 1px solid var(--gold-200);
+  white-space: nowrap;
+}
+
+/* ---- Vertical detail card (Services) ---- */
+
+.vertical-card__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.vertical-card__head .icon-chip {
+  margin-bottom: 0;
+  flex-shrink: 0;
+}
+
+/* ---- AI verification result card (Home) ----
+   Sits in a .console shell, same as the hero card. */
+
+.ai-score {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.ai-score__value {
+  font-size: 3.2rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  background: linear-gradient(135deg, var(--gold-600) 0%, var(--accent-500) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.ai-score__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.ai-score__label {
+  font-size: 0.78rem;
+  color: var(--gray-500);
+}
+
+.ai-score__verdict {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--success-700);
+}
+
+.ai-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 1.35rem 0 0.5rem;
+}
+
+.ai-check {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid var(--gray-100);
+}
+
+.ai-check:last-child {
+  border-bottom: none;
+}
+
+.ai-check svg {
+  width: 15px;
+  height: 15px;
+  color: var(--success-600);
+  flex-shrink: 0;
+}
+
+.ai-check__label {
+  flex: 1;
+  font-size: 0.85rem;
+  color: var(--gray-700);
+}
+
+.ai-check__value {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  background: var(--success-50);
+  color: var(--success-700);
+}
+
+/* ---- CTA band ---- */
+
+.cta-band {
+  position: relative;
+  overflow: hidden;
+  background: radial-gradient(circle at 20% 20%, var(--ink-800) 0%, var(--ink-950) 60%);
+  border-radius: var(--radius-xl);
+  color: #fff;
+  padding: 3.5rem 2.5rem;
+  text-align: center;
+}
+
+.cta-band .mkt-h2 {
+  color: #fff;
+}
+
+.cta-band .mkt-subtitle {
+  color: rgba(255, 255, 255, 0.68);
+  margin: 0 auto 1.75rem;
+}
+
+/* ---- Page header (About / Services / Contact) ---- */
+
+.page-header {
+  position: relative;
+  overflow: hidden;
+  padding: 6.5rem 1.5rem 4rem;
+  text-align: center;
+}
+
+.page-header .mkt-h1,
+.page-header .mkt-subtitle {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Without a cap the headline runs the full container and breaks wherever it
+   runs out of room, stranding a single word on line two. */
+.page-header .mkt-h1 {
+  max-width: 15em;
+}
+
+/* Keeps the heading above the ::before wash. */
+.page-header > .mkt-container {
+  position: relative;
+  z-index: 1;
+}
+
+/* ---- Pipeline preview card (hero) ---- */
+
+.pipeline-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--success-600);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.5); }
+  70% { box-shadow: 0 0 0 8px rgba(22, 163, 74, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0); }
+}
+
+.pipeline-stage {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--gray-100);
+}
+
+.pipeline-stage:last-child {
+  border-bottom: none;
+}
+
+.pipeline-stage__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  background: var(--gray-300);
+}
+
+.pipeline-stage--done .pipeline-stage__dot {
+  background: var(--success-600);
+}
+
+.pipeline-stage--active .pipeline-stage__dot {
+  background: var(--gold-500);
+  box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.18);
+}
+
+.pipeline-stage__label {
+  flex: 1;
+  font-size: 0.88rem;
+  color: var(--gray-700);
+}
+
+.pipeline-stage--active .pipeline-stage__label {
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* ---- Hero transfer console ----
+   Light, not dark. A hard black panel on the light hero wash read as a harsh
+   cut-out, and ink is already carrying the mid-page band, the CTA and the
+   footer — reserving it for those gives them more weight. This reads as a
+   product surface instead: white, elevated, gold top edge. */
+
+.console {
+  position: relative;
+  padding: 1.6rem;
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  box-shadow:
+    0 26px 60px -24px rgba(24, 24, 27, 0.26),
+    0 2px 6px rgba(24, 24, 27, 0.04);
+}
+
+/* Brand edge along the top of the card. */
+.console::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--gold-400), var(--accent-500));
+}
+
+.console__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.35rem;
+}
+
+.console__title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--gray-500);
+}
+
+.console__live {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.22rem 0.6rem;
+  border-radius: 999px;
+  background: var(--success-50);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--success-700);
+}
+
+.console__hero {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.console__hero-value {
+  font-size: 3.6rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.035em;
+  font-variant-numeric: tabular-nums;
+  background: linear-gradient(135deg, var(--gold-600) 0%, var(--accent-500) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.console__hero-label {
+  font-size: 0.82rem;
+  color: var(--gray-500);
+}
+
+.console__meter {
+  margin: 1.2rem 0 1.3rem;
+}
+
+.console__meter-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.74rem;
+  color: var(--gray-500);
+  margin-bottom: 0.5rem;
+}
+
+.console__meter-value {
+  font-weight: 800;
+  color: var(--gold-700);
+  font-variant-numeric: tabular-nums;
+}
+
+.console__meter-track {
+  height: 5px;
+  border-radius: 999px;
+  background: var(--gray-200);
+  overflow: hidden;
+}
+
+.console__meter-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--gold-600), var(--gold-300));
+  transform-origin: left;
+  animation: meter-grow 1.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes meter-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+.console__kpis {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+
+.console__kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: var(--radius-md);
+  background: var(--gray-50);
+  border: 1px solid var(--border);
+}
+
+.console__kpi-value {
+  font-size: 1.2rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.console__kpi-label {
+  font-size: 0.71rem;
+  color: var(--gray-500);
+}
+
+.console__feed {
+  margin-top: 1.35rem;
+  padding-top: 1.05rem;
+  border-top: 1px solid var(--border);
+}
+
+.console__feed-head {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--gray-400);
+  margin-bottom: 0.55rem;
+}
+
+.console__row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.42rem 0;
+  animation: console-row-in 0.6s ease both;
+}
+
+.console__row:nth-child(2) { animation-delay: 0.1s; }
+.console__row:nth-child(3) { animation-delay: 0.2s; }
+.console__row:nth-child(4) { animation-delay: 0.3s; }
+.console__row:nth-child(5) { animation-delay: 0.4s; }
+
+@keyframes console-row-in {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+}
+
+.console__row-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.console__row-name {
+  flex: 1;
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.console__row-state {
+  font-size: 0.72rem;
+  color: var(--gray-400);
+  font-variant-numeric: tabular-nums;
+}
+
+.console__row-status {
+  font-size: 0.66rem;
+  font-weight: 700;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* Status tones — gold = mid-transfer, green = landed, muted = still screening. */
+.console__row-dot.is-gold { background: var(--gold-500); box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.18); }
+.console__row-dot.is-green { background: var(--success-600); box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.14); }
+.console__row-dot.is-muted { background: var(--gray-300); }
+
+.console__row-status.is-gold { background: var(--gold-50); color: var(--gold-700); }
+.console__row-status.is-green { background: var(--success-50); color: var(--success-700); }
+.console__row-status.is-muted { background: var(--gray-100); color: var(--gray-500); }
+
+/* Separator between feed rows, dropped on the last so the card doesn't end on a
+   hanging rule. */
+.console__row + .console__row {
+  border-top: 1px solid var(--gray-100);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .console__meter-fill,
+  .console__row {
+    animation: none;
+  }
+}
+
+/* ---- Contact page ---- */
+
+.contact-grid {
+  display: grid;
+  grid-template-columns: 0.8fr 1.2fr;
+  gap: 1.75rem;
+  align-items: stretch;
+}
+
+.contact-aside,
+.contact-form-card {
+  padding: 1.75rem;
+}
+
+.contact-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  padding: 0.9rem 0;
+  border-bottom: 1px solid var(--gray-100);
+  text-decoration: none;
+  color: inherit;
+}
+
+.contact-row:last-of-type {
+  border-bottom: none;
+}
+
+.contact-row .icon-chip {
+  margin-bottom: 0;
+  flex-shrink: 0;
+  width: 2.4rem;
+  height: 2.4rem;
+}
+
+.contact-row .icon-chip svg {
+  width: 18px;
+  height: 18px;
+}
+
+.contact-row > span {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.contact-row__label {
+  font-size: 0.75rem;
+  color: var(--gray-500);
+}
+
+.contact-row__value {
+  color: var(--text);
+  font-weight: 600;
+  font-size: 0.92rem;
+  word-break: break-word;
+}
+
+a.contact-row:hover .contact-row__value {
+  color: var(--gold-700);
+}
+
+.contact-row__note {
+  font-size: 0.78rem;
+  color: var(--gray-500);
+  line-height: 1.45;
+  margin-top: 0.15rem;
+}
+
+.field-opt {
+  font-weight: 400;
+  color: var(--gray-400);
+}
+
+.contact-legal {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--gray-500);
+  line-height: 1.5;
+}
+
+/* ---- FAQ ---- */
+
+.faq-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem;
+  align-items: start;
+}
+
+.faq {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.1rem 1.35rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.faq[open] {
+  border-color: var(--gold-200);
+  box-shadow: var(--shadow-md);
+}
+
+.faq summary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  cursor: pointer;
+  list-style: none;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+/* Safari still renders the default disclosure triangle without this. */
+.faq summary::-webkit-details-marker {
+  display: none;
+}
+
+/* Plus that becomes a minus when open — drawn rather than an icon component so
+   it can animate. */
+.faq__sign {
+  position: relative;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin-top: 0.15rem;
+}
+
+.faq__sign::before,
+.faq__sign::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 12px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--gold-600);
+  transform: translate(-50%, -50%);
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.faq__sign::after {
+  transform: translate(-50%, -50%) rotate(90deg);
+}
+
+.faq[open] .faq__sign::after {
+  transform: translate(-50%, -50%) rotate(0deg);
+  opacity: 0;
+}
+
+.faq p {
+  margin: 0.85rem 0 0;
+  font-size: 0.9rem;
+  line-height: 1.65;
+  color: var(--gray-600);
+}
+
+.contact-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.contact-form__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.1rem;
+}
+
+.contact-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--gray-700);
+  font-weight: 600;
+}
+
+.contact-field input,
+.contact-field select,
+.contact-field textarea {
+  font-family: var(--font-sans);
+  padding: 0.72rem 0.85rem;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  font-weight: 400;
+  color: var(--text);
+  background: var(--surface);
+  resize: vertical;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.contact-field input::placeholder,
+.contact-field textarea::placeholder {
+  color: var(--gray-400);
+}
+
+.contact-field input:focus-visible,
+.contact-field select:focus-visible,
+.contact-field textarea:focus-visible {
+  border-color: var(--gold-500);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.18);
+}
+
+.contact-success {
+  text-align: center;
+  padding: 2rem 0;
+}
+
+.contact-success .icon-chip {
+  margin: 0 auto 1rem;
+}
+
+/* ---- Responsive ---- */
+
+@media (max-width: 960px) {
+  .mkt-hero-grid,
+  .mkt-grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  /* Five across stops fitting well before the other grids do. Drop straight to a
+     single centred column — at 2-up the fifth node is orphaned again. */
+  .process-rail {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+    max-width: 30rem;
+    margin: 0 auto;
+  }
+
+  .process-rail::before {
+    display: none;
+  }
+}
+
+@media (max-width: 880px) {
+  .step-grid,
+  .mkt-grid-4 {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .contact-grid,
+  .faq-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .mkt-section,
+  .page-header {
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+  }
+  .mkt-hero {
+    padding-top: 6rem;
+  }
+  .step-grid,
+  .mkt-grid-3,
+  .mkt-grid-4 {
+    grid-template-columns: 1fr;
+  }
+  .cta-band {
+    padding: 2.5rem 1.5rem;
+  }
+  .contact-form__row {
+    grid-template-columns: 1fr;
+  }
+}

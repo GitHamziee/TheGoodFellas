@@ -1,10 +1,21 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { AnalyticsService, UserOutcomeRow } from '../../../core/services/analytics.service';
+import { OutcomeAnalytics } from '../outcome-analytics';
 
 @Component({
   selector: 'app-analytics-junior',
-  templateUrl: './analytics-junior.html',
-  styleUrl: '../../shared-page.css',
+  imports: [OutcomeAnalytics],
+  template: `
+    <app-outcome-analytics
+      title="Analytics — Junior Closers"
+      subtitle="How each junior closer's submitted leads end up, once a client has decided."
+      peopleLabel="Junior closers"
+      emptyTitle="No junior closers yet"
+      emptyHint="Create junior closer accounts and their lead outcomes will show up here."
+      [source]="rows()"
+      [loading]="loading()"
+    />
+  `,
 })
 export class AnalyticsJunior implements OnInit {
   private readonly analyticsService = inject(AnalyticsService);
@@ -13,7 +24,10 @@ export class AnalyticsJunior implements OnInit {
   readonly loading = signal(true);
 
   async ngOnInit(): Promise<void> {
-    this.rows.set(await this.analyticsService.juniorClosers());
-    this.loading.set(false);
+    try {
+      this.rows.set(await this.analyticsService.juniorClosers());
+    } finally {
+      this.loading.set(false);
+    }
   }
 }

@@ -1,9 +1,107 @@
 <div class="page">
-  <h1>Closer Dashboard</h1>
-
-  <div class="stats-row">
-    <div class="stat"><div class="value">{{ inbox().length }}</div><div class="label">Waiting for you</div></div>
+  <div class="page-head">
+    <div>
+      <h1>Welcome back{{ firstName() ? ', ' + firstName() : '' }}</h1>
+      <p class="sub">Your workload and how your submitted leads are landing.</p>
+    </div>
+    <div class="page-head-actions">
+      <a class="btn" routerLink="/closer/inbox"><svg lucideInbox></svg> Go to inbox</a>
+    </div>
   </div>
 
-  <a class="btn" routerLink="/closer/inbox">Go to inbox</a>
+  <div class="stats-row">
+    <app-stat-tile [value]="stats().waiting" label="Waiting for you" tone="tone-gold">
+      <svg lucideInbox></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().stale" label="Ageing (3+ days)" tone="tone-warning">
+      <svg lucideTriangleAlert></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().submitted" label="Submitted total" tone="tone-c">
+      <svg lucideSend></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().thisMonth" label="This month" tone="tone-d">
+      <svg lucideClock></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().accepted" label="Accepted" tone="tone-success">
+      <svg lucideCircleCheck></svg>
+    </app-stat-tile>
+    <app-stat-tile
+      [value]="stats().acceptRate === null ? '—' : stats().acceptRate + '%'"
+      label="Accept rate"
+      tone="tone-a"
+    >
+      <svg lucideTarget></svg>
+    </app-stat-tile>
+  </div>
+
+  <div class="split">
+    <div class="card">
+      <div class="inline-head">
+        <h2>Work these next</h2>
+        <a class="count" routerLink="/closer/inbox">View inbox</a>
+      </div>
+
+      @if (loading()) {
+        <app-skeleton-rows [count]="4" />
+      } @else if (upNext().length === 0) {
+        <app-empty-state title="Inbox is clear" hint="Nothing waiting on you right now. Nice work.">
+          <svg lucideCircleCheck></svg>
+        </app-empty-state>
+      } @else {
+        <div class="feed">
+          @for (lead of upNext(); track lead.id) {
+            <a class="feed-row feed-row--link" [routerLink]="['/closer/leads', lead.id]">
+              <span class="avatar-sm" [class]="getAvatarTone(lead.id)">
+                {{ getInitials(lead.customerName) }}
+              </span>
+              <span class="who">
+                <span class="nm">{{ lead.customerName }}</span>
+                <span class="mt">
+                  {{ formatPhone(lead.phone) }} · {{ lead.state }}
+                  @if (lead.need) { · {{ humanizeEnum(lead.need) }} }
+                </span>
+              </span>
+              @if (isStale(lead)) {
+                <span class="badge badge--submitted">
+                  <svg lucideTriangleAlert></svg>{{ timeAgo(lead.createdAt) }}
+                </span>
+              } @else {
+                <span class="chip"><svg lucideClock></svg>{{ timeAgo(lead.createdAt) }}</span>
+              }
+            </a>
+          }
+        </div>
+      }
+    </div>
+
+    <div class="card">
+      <div class="inline-head">
+        <h2>Recent outcomes</h2>
+        <a class="count" routerLink="/closer/history">View history</a>
+      </div>
+
+      @if (loading()) {
+        <app-skeleton-rows [count]="4" />
+      } @else if (recentOutcomes().length === 0) {
+        <app-empty-state title="Nothing submitted yet" hint="Leads you send onward will show their outcome here.">
+          <svg lucideSend></svg>
+        </app-empty-state>
+      } @else {
+        <div class="feed">
+          @for (lead of recentOutcomes(); track lead.id) {
+            <div class="feed-row">
+              <span class="avatar-sm" [class]="getAvatarTone(lead.id)">
+                {{ getInitials(lead.customerName) }}
+              </span>
+              <span class="who">
+                <span class="nm">{{ lead.customerName }}</span>
+                <span class="mt">{{ timeAgo(lead.createdAt) }}</span>
+              </span>
+              <app-status-badge [status]="lead.status" />
+            </div>
+          }
+        </div>
+      }
+    </div>
+  </div>
 </div>

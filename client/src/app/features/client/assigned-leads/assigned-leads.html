@@ -1,35 +1,222 @@
 <div class="page">
-  <h1>New Leads</h1>
+  <div class="page-head">
+    <div>
+      <h1>New Leads</h1>
+      <p class="sub">Leads the admin team has offered you. Accept to unlock full contact and policy details.</p>
+    </div>
+  </div>
 
-  @if (error()) {
+  <div class="stats-row">
+    <app-stat-tile [value]="stats().total" label="Awaiting your decision" tone="tone-gold">
+      <svg lucideInbox></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().today" label="Arrived today" tone="tone-c">
+      <svg lucideClock></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().states" label="States covered" tone="tone-f">
+      <svg lucideMapPin></svg>
+    </app-stat-tile>
+  </div>
+
+  @if (error() && !rejecting()) {
     <div class="error">{{ error() }}</div>
   }
-
-  @if (loading()) {
-    <p class="empty">Loading...</p>
-  } @else if (leads().length === 0) {
-    <p class="empty">No new leads right now.</p>
-  } @else {
-    @for (lead of leads(); track lead.id) {
-      <div class="card">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <strong>{{ lead.customerName }}</strong>
-          <span class="empty">{{ lead.state }}@if (lead.zipcode) {, {{ lead.zipcode }}}</span>
-        </div>
-        <p class="empty" style="margin: 0.4rem 0;">
-          @if (lead.need) { Need: {{ lead.need }} · }
-          @if (lead.maritalStatus) { {{ lead.maritalStatus }} · }
-          Full details are revealed once you accept.
-        </p>
-
-        <label class="full">
-          Reason for rejecting (optional)
-          <input type="text" [(ngModel)]="rejectReasonDraft[lead.id]" [ngModelOptions]="{ standalone: true }" />
-        </label>
-        <br />
-        <button class="btn" type="button" [disabled]="busyId() === lead.id" (click)="accept(lead.id)">Accept</button>
-        <button class="btn btn--danger" type="button" [disabled]="busyId() === lead.id" (click)="reject(lead.id)">Reject</button>
-      </div>
-    }
+  @if (notice()) {
+    <div class="success"><svg lucideCircleCheck></svg>{{ notice() }}</div>
   }
+
+  @if (!loading() && leads().length > 0) {
+    <div class="locked">
+      <svg lucideLock></svg>
+      <span>
+        Contact details, SSN and banking information stay hidden until you accept a lead — you're seeing a preview only.
+      </span>
+    </div>
+  }
+
+  <div class="toolbar">
+    <app-search-box
+      [value]="view.search()"
+      placeholder="Search by name, state, or need…"
+      (valueChange)="view.setSearch($event)"
+    />
+  </div>
+
+  <div class="card card--flush">
+    @if (loading()) {
+      <app-skeleton-rows [count]="4" />
+    } @else if (view.total() === 0) {
+      @if (view.isFiltered()) {
+        <app-empty-state title="No leads match" hint="Try a different search term.">
+          <svg lucideInbox></svg>
+        </app-empty-state>
+      } @else {
+        <app-empty-state title="No new leads right now" hint="When the admin team assigns you a lead, it'll show up here for you to accept or reject.">
+          <svg lucideInbox></svg>
+        </app-empty-state>
+      }
+    } @else {
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="sortable" (click)="view.toggleSort('customerName')">
+                Customer <span class="arrow">{{ sortArrow('customerName') }}</span>
+              </th>
+              <th class="hide-sm">Need</th>
+              <th class="hide-md">Closer</th>
+              <th class="sortable hide-md" (click)="view.toggleSort('createdAt')">
+                Received <span class="arrow">{{ sortArrow('createdAt') }}</span>
+              </th>
+              <th class="right">Decision</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (lead of view.rows(); track lead.id) {
+              <tr class="clickable" (click)="selected.set(lead)">
+                <td>
+                  <div class="cell-main">{{ lead.customerName }}</div>
+                  <div class="cell-sub">
+                    {{ lead.state }}@if (lead.zipcode) {, {{ lead.zipcode }}}
+                    @if (lead.maritalStatus) { · {{ humanizeEnum(lead.maritalStatus) }} }
+                  </div>
+                </td>
+                <td class="hide-sm">
+                  @if (lead.need) {
+                    <span class="chip">{{ humanizeEnum(lead.need) }}</span>
+                  } @else {
+                    <span class="empty">—</span>
+                  }
+                </td>
+                <td class="hide-md">
+                  <div class="person">
+                    <span class="avatar-sm" [class]="getAvatarTone(lead.closer.id)">
+                      {{ getInitials(lead.closer.name) }}
+                    </span>
+                    <span class="nm">{{ lead.closer.name }}</span>
+                  </div>
+                </td>
+                <td class="hide-md">
+                  <span class="chip"><svg lucideClock></svg>{{ timeAgo(lead.createdAt) }}</span>
+                </td>
+                <td>
+                  <div class="row-actions">
+                    <button
+                      type="button"
+                      class="btn btn--sm btn--danger"
+                      [disabled]="busyId() === lead.id"
+                      (click)="openReject(lead, $event)"
+                    >
+                      <svg lucideThumbsDown></svg> Reject
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn--sm btn--success"
+                      [disabled]="busyId() === lead.id"
+                      (click)="accept(lead, $event)"
+                    >
+                      @if (busyId() === lead.id) {
+                        <span class="spinner"></span>
+                      } @else {
+                        <svg lucideThumbsUp></svg>
+                      }
+                      Accept
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <app-pagination
+        [page]="view.page()"
+        [totalPages]="view.totalPages()"
+        [total]="view.total()"
+        (pageChange)="view.page.set($event)"
+      />
+    }
+  </div>
 </div>
+
+<!-- Preview -->
+@if (selected(); as lead) {
+  <app-modal title="Lead preview" [subtitle]="lead.customerName" (close)="selected.set(null)">
+    <div class="locked">
+      <svg lucideLock></svg>
+      <span>This is a preview. Phone, email, address, SSN and banking details unlock once you accept.</span>
+    </div>
+
+    <div class="detail-grid" style="margin-top: 1.1rem;">
+      <app-detail label="Customer" [value]="lead.customerName" />
+      <app-detail label="State" [value]="lead.state" />
+      <app-detail label="Zipcode" [value]="lead.zipcode" />
+      <app-detail label="Need" [value]="humanizeEnum(lead.need)" />
+      <app-detail label="Marital status" [value]="humanizeEnum(lead.maritalStatus)" />
+      <app-detail label="Closer" [value]="lead.closer.name" />
+      <app-detail label="Received" [value]="timeAgo(lead.createdAt)" />
+    </div>
+
+    <div footer>
+      <button
+        type="button"
+        class="btn btn--danger"
+        [disabled]="busyId() === lead.id"
+        (click)="openReject(lead)"
+      >
+        <svg lucideThumbsDown></svg> Reject
+      </button>
+      <button
+        type="button"
+        class="btn btn--success"
+        [disabled]="busyId() === lead.id"
+        (click)="accept(lead)"
+      >
+        @if (busyId() === lead.id) {
+          <span class="spinner"></span> Accepting…
+        } @else {
+          <svg lucideThumbsUp></svg> Accept lead
+        }
+      </button>
+    </div>
+  </app-modal>
+}
+
+<!-- Reject with reason -->
+@if (rejecting(); as lead) {
+  <app-modal
+    title="Reject lead"
+    [subtitle]="lead.customerName + ' goes back to the admin team'"
+    (close)="rejecting.set(null)"
+  >
+    @if (error()) {
+      <div class="error">{{ error() }}</div>
+    }
+
+    <label>
+      Reason for rejecting <span class="hint">Optional, but it helps the team fix and resend</span>
+      <textarea
+        rows="4"
+        [(ngModel)]="rejectReason"
+        name="rejectReason"
+        placeholder="e.g. Outside my licensed states, or coverage amount too low"
+      ></textarea>
+    </label>
+
+    <div footer>
+      <button
+        type="button"
+        class="btn btn--danger"
+        [disabled]="busyId() === lead.id"
+        (click)="confirmReject()"
+      >
+        @if (busyId() === lead.id) {
+          <span class="spinner"></span> Rejecting…
+        } @else {
+          <svg lucideCircleX></svg> Confirm rejection
+        }
+      </button>
+    </div>
+  </app-modal>
+}

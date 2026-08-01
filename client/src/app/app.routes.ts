@@ -3,7 +3,19 @@ import { authGuard } from './core/guards/auth.guard';
 import { roleGuard } from './core/guards/role.guard';
 
 export const routes: Routes = [
-  { path: '', pathMatch: 'full', redirectTo: 'login' },
+  {
+    path: '',
+    loadComponent: () => import('./layout/public-shell/public-shell').then((m) => m.PublicShell),
+    children: [
+      { path: '', loadComponent: () => import('./features/marketing/home/home').then((m) => m.Home) },
+      { path: 'about', loadComponent: () => import('./features/marketing/about/about').then((m) => m.About) },
+      {
+        path: 'services',
+        loadComponent: () => import('./features/marketing/services/services').then((m) => m.Services),
+      },
+      { path: 'contact', loadComponent: () => import('./features/marketing/contact/contact').then((m) => m.Contact) },
+    ],
+  },
 
   {
     path: 'login',
@@ -33,6 +45,10 @@ export const routes: Routes = [
         loadComponent: () => import('./features/junior-closer/my-leads/my-leads').then((m) => m.MyLeads),
       },
       {
+        path: 'chat',
+        loadComponent: () => import('./features/chat/chat').then((m) => m.Chat),
+      },
+      {
         path: 'settings',
         loadComponent: () => import('./features/settings/settings').then((m) => m.Settings),
       },
@@ -60,6 +76,10 @@ export const routes: Routes = [
       {
         path: 'history',
         loadComponent: () => import('./features/closer/history/history').then((m) => m.CloserHistory),
+      },
+      {
+        path: 'chat',
+        loadComponent: () => import('./features/chat/chat').then((m) => m.Chat),
       },
       {
         path: 'settings',
@@ -103,6 +123,10 @@ export const routes: Routes = [
         loadComponent: () => import('./features/admin/analytics-overall/analytics-overall').then((m) => m.AnalyticsOverall),
       },
       {
+        path: 'chat',
+        loadComponent: () => import('./features/chat/chat').then((m) => m.Chat),
+      },
+      {
         path: 'settings',
         loadComponent: () => import('./features/settings/settings').then((m) => m.Settings),
       },
@@ -134,5 +158,5 @@ export const routes: Routes = [
     ],
   },
 
-  { path: '**', redirectTo: 'login' },
+  { path: '**', redirectTo: '' },
 ];

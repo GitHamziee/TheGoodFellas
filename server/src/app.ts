@@ -6,6 +6,7 @@ import authRoutes from "./routes/auth.routes";
 import userRoutes from "./routes/users.routes";
 import leadRoutes from "./routes/leads.routes";
 import analyticsRoutes from "./routes/analytics.routes";
+import chatRoutes from "./routes/chat.routes";
 
 const app = express();
 
@@ -18,6 +19,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/leads", leadRoutes);
 app.use("/api/admin/analytics", analyticsRoutes);
+app.use("/api/chat", chatRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({ error: "Not found" });

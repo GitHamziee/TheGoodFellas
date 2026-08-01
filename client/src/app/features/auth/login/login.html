@@ -1,13 +1,48 @@
-<div class="auth-page">
-  <div>
-    <div class="auth-brand">
-      <div class="mark">GF</div>
-      <h1 class="brand-gradient-text">The Good Fellas</h1>
+<div class="auth-split">
+  <aside class="auth-aside">
+    <a class="auth-brand" routerLink="/">
+      <span class="mark">GF</span>
+      <span class="brand-gradient-text">The Good Fellas</span>
+    </a>
+
+    <div>
+      <h2 class="auth-headline">
+        Verified calls, <span class="gradient-text-hero--on-dark">transferred live</span>.
+      </h2>
+      <p class="auth-lede">
+        Track every transfer and every policy we deliver — from the moment the call lands to the day it's paid.
+      </p>
+      <ul class="auth-points">
+        @for (point of asidePoints; track point) {
+          <li>
+            <svg lucideCheck></svg>
+            <span>{{ point }}</span>
+          </li>
+        }
+      </ul>
     </div>
 
-    <form class="auth-card" (ngSubmit)="submit()">
-      <h1>Sign in</h1>
-      <p class="subtitle">Welcome back — sign in to your portal</p>
+    <div class="auth-verticals">
+      @for (vertical of verticals; track vertical) {
+        <span>{{ vertical }}</span>
+      }
+    </div>
+  </aside>
+
+  <main class="auth-main">
+    <a class="auth-back" routerLink="/">
+      <svg lucideArrowLeft></svg>
+      Back to home
+    </a>
+
+    <form class="auth-form" (ngSubmit)="submit()">
+      <a class="auth-brand" routerLink="/">
+        <span class="mark">GF</span>
+        <span class="brand-gradient-text">The Good Fellas</span>
+      </a>
+
+      <h1 class="auth-form__title">Sign in</h1>
+      <p class="auth-form__sub">Welcome back — access your portal.</p>
 
       @if (error()) {
         <div class="error">{{ error() }}</div>
@@ -15,17 +50,45 @@
 
       <label>
         Email
-        <input type="email" name="email" [(ngModel)]="email" required autocomplete="email" />
+        <input
+          type="email"
+          name="email"
+          [(ngModel)]="email"
+          required
+          autocomplete="email"
+          placeholder="you@agency.com"
+        />
       </label>
 
       <label>
         Password
-        <input type="password" name="password" [(ngModel)]="password" required autocomplete="current-password" />
+        <div class="password-field">
+          <input
+            [type]="showPassword() ? 'text' : 'password'"
+            name="password"
+            [(ngModel)]="password"
+            required
+            autocomplete="current-password"
+            placeholder="Enter your password"
+          />
+          <button
+            type="button"
+            class="password-toggle"
+            (click)="togglePasswordVisibility()"
+            [attr.aria-label]="showPassword() ? 'Hide password' : 'Show password'"
+          >
+            @if (showPassword()) {
+              <svg lucideEyeOff></svg>
+            } @else {
+              <svg lucideEye></svg>
+            }
+          </button>
+        </div>
       </label>
 
-      <button type="submit" [disabled]="loading()">{{ loading() ? 'Signing in...' : 'Sign in' }}</button>
+      <button type="submit" [disabled]="loading()">{{ loading() ? 'Signing in…' : 'Sign in' }}</button>
 
       <p class="switch">New client? <a routerLink="/register">Create an account</a></p>
     </form>
-  </div>
+  </main>
 </div>

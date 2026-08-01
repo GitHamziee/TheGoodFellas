@@ -68,6 +68,15 @@
   --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.05);
   --shadow-gold: 0 8px 24px rgba(212, 175, 55, 0.25);
 
+  /* Accent — warm copper, secondary gradient companion to gold. Decorative
+     only: blobs, gradient-text flourishes on marketing pages. Never used for
+     buttons/CTAs — gold stays the sole action color. Chosen over a cool/violet
+     accent so it stays a natural, complementary warm tone next to gold+ink. */
+  --accent-400: #d99b6a;
+  --accent-500: #b9713f;
+  --accent-600: #96582e;
+  --shadow-accent: 0 8px 24px rgba(185, 113, 63, 0.28);
+
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
 
@@ -107,21 +116,19 @@ button {
   font-family: var(--font-sans);
 }
 
-/* Thin, unobtrusive scrollbars — webkit */
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+/* Scrollbars hidden site-wide — the page and every inner scroll container
+   (chat timeline, sidebar drawer, wide tables). Only the visual track and thumb
+   are removed: wheel, trackpad, touch, keyboard and scrollIntoView all still
+   scroll normally. Applied to * rather than just html so a stray inner
+   scrollbar doesn't show up against a page that has none. */
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* legacy Edge / IE */
 }
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: var(--gray-300);
-  border-radius: 999px;
-  border: 2px solid var(--surface-muted);
-}
-::-webkit-scrollbar-thumb:hover {
-  background: var(--gray-400);
+
+*::-webkit-scrollbar {
+  /* Chrome, Safari, current Edge */
+  display: none;
 }
 
 /* Gold gradient text — reads best on dark surfaces (sidebar wordmark) */

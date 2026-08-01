@@ -1,0 +1,170 @@
+<div class="wa" [class.wa--list-open]="mobileShowList()">
+  @if (error()) {
+    <div class="wa-error">
+      <svg lucideCircleAlert></svg>
+      {{ error() }}
+    </div>
+  }
+
+  <!-- ───────── Conversation list ───────── -->
+  <aside class="wa-list">
+    <div class="wa-list-head">
+      <span class="wa-list-title">Chats</span>
+      <span class="wa-conn" [class.wa-conn--live]="connected()" [title]="connected() ? 'Connected' : 'Reconnecting'">
+        <span class="wa-dot"></span>
+        {{ connected() ? 'Online' : 'Connecting…' }}
+      </span>
+    </div>
+
+    <div class="wa-list-body">
+      @for (room of rooms(); track room) {
+        <button type="button" class="wa-chat" [class.active]="room === activeRoom()" (click)="switchRoom(room)">
+          <span class="wa-chat-avatar"><svg lucideUsers></svg></span>
+
+          <span class="wa-chat-main">
+            <span class="wa-chat-top">
+              <span class="wa-chat-name">{{ roomLabel[room] }}</span>
+              <span class="wa-chat-time">{{ previewTimeFor(room) }}</span>
+            </span>
+            <span class="wa-chat-bottom">
+              <span class="wa-chat-preview">{{ previewFor(room) }}</span>
+              @if (unreadFor(room); as count) {
+                <span class="wa-chat-unread">{{ count }}</span>
+              }
+            </span>
+          </span>
+        </button>
+      }
+    </div>
+  </aside>
+
+  <!-- ───────── Conversation ───────── -->
+  <section class="wa-thread">
+    <header class="wa-thread-head">
+      <button type="button" class="wa-back" (click)="mobileShowList.set(true)" aria-label="Back to chats">
+        <svg lucideArrowLeft></svg>
+      </button>
+      <span class="wa-chat-avatar wa-chat-avatar--sm"><svg lucideUsers></svg></span>
+      <div class="wa-thread-id">
+        <div class="wa-thread-name">{{ activeRoom() ? roomLabel[activeRoom()!] : 'Chat' }}</div>
+        <div class="wa-thread-members">
+          @if (typingLabel()) {
+            <span class="wa-typing">{{ typingLabel() }}</span>
+          } @else if (activeRoom()) {
+            {{ roomMembers[activeRoom()!] }}
+          }
+        </div>
+      </div>
+    </header>
+
+    <div class="wa-canvas" #scroller (scroll)="onScroll()">
+      @if (loading()) {
+        <div class="wa-status">Loading messages…</div>
+      } @else {
+        @if (hasMore()) {
+          <div class="wa-load-older">
+            <button type="button" (click)="loadOlder()">Load earlier messages</button>
+          </div>
+        }
+
+        @for (item of timeline(); track item.message.id) {
+          @if (item.daySeparator) {
+            <div class="wa-day"><span>{{ item.daySeparator }}</span></div>
+          }
+
+          <div class="wa-row" [class.wa-row--own]="item.own" [class.wa-row--tail]="item.startsBlock">
+            <div class="wa-bubble" [class.wa-bubble--deleted]="item.message.deleted">
+              @if (item.startsBlock && !item.own && !item.message.deleted) {
+                <div class="wa-sender" [style.color]="nameColor(item.message.sender.id)">
+                  {{ item.message.sender.name }}
+                  <span class="wa-sender-role">{{ roleLabel[item.message.sender.role] }}</span>
+                </div>
+              }
+
+              @if (editingId() === item.message.id) {
+                <div class="wa-edit">
+                  <textarea
+                    rows="2"
+                    [ngModel]="editDraft()"
+                    (ngModelChange)="editDraft.set($event)"
+                    (keydown)="onEditKeydown($event)"
+                  ></textarea>
+                  <div class="wa-edit-actions">
+                    <button type="button" class="wa-edit-save" (click)="saveEdit()">
+                      <svg lucideCheck></svg> Save
+                    </button>
+                    <button type="button" class="wa-edit-cancel" (click)="cancelEdit()">Cancel</button>
+                  </div>
+                </div>
+              } @else {
+                @if (item.message.deleted) {
+                  <span class="wa-deleted">This message was deleted</span>
+                } @else {
+                  <span class="wa-text">{{ item.message.body }}</span>
+                }
+
+                <span class="wa-meta">
+                  @if (item.message.edited) {
+                    <span class="wa-edited">edited</span>
+                  }
+                  <span class="wa-time">{{ time(item.message.createdAt) }}</span>
+                </span>
+
+                @if (hasMenu(item.message)) {
+                  <button
+                    type="button"
+                    class="wa-caret"
+                    (click)="toggleMenu(item.message.id)"
+                    aria-label="Message options"
+                  >
+                    <svg lucideChevronDown></svg>
+                  </button>
+
+                  @if (openMenuId() === item.message.id) {
+                    <div class="wa-menu">
+                      @if (canEdit(item.message)) {
+                        <button type="button" (click)="startEdit(item.message)">
+                          <svg lucidePencil></svg> Edit
+                        </button>
+                      }
+                      @if (canDelete(item.message)) {
+                        <button type="button" class="danger" (click)="remove(item.message)">
+                          <svg lucideTrash2></svg> Delete
+                        </button>
+                      }
+                    </div>
+                  }
+                }
+              }
+            </div>
+          </div>
+        } @empty {
+          <div class="wa-status wa-status--empty">
+            <svg lucideMessageSquare></svg>
+            <p>No messages yet</p>
+            <span>Send a message to start the conversation.</span>
+          </div>
+        }
+      }
+    </div>
+
+    <footer class="wa-composer">
+      <textarea
+        rows="1"
+        placeholder="Type a message"
+        [ngModel]="draft()"
+        (ngModelChange)="onDraftInput($event)"
+        (keydown)="onComposerKeydown($event)"
+        [disabled]="!activeRoom()"
+      ></textarea>
+      <button type="button" class="wa-send" [disabled]="!canSend()" (click)="send()" aria-label="Send">
+        <svg lucideSendHorizontal></svg>
+      </button>
+    </footer>
+  </section>
+
+  <!-- Click-away target for the open message menu. -->
+  @if (openMenuId()) {
+    <div class="wa-scrim" (click)="closeMenu()"></div>
+  }
+</div>

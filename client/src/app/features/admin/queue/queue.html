@@ -1,57 +1,268 @@
 <div class="page">
-  <h1>Queue</h1>
-  <p class="empty" style="margin-top: -0.75rem;">Newly submitted leads and leads a client rejected.</p>
+  <div class="page-head">
+    <div>
+      <h1>Queue</h1>
+      <p class="sub">Leads waiting on you — newly submitted by closers, or sent back by a client.</p>
+    </div>
+  </div>
+
+  <div class="stats-row">
+    <app-stat-tile [value]="stats().total" label="Needs action" tone="tone-gold">
+      <svg lucideListChecks></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().submitted" label="Awaiting assignment" tone="tone-warning">
+      <svg lucideSend></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().rejected" label="Rejected — fix & reassign" tone="tone-danger">
+      <svg lucideCircleX></svg>
+    </app-stat-tile>
+  </div>
 
   @if (error()) {
     <div class="error">{{ error() }}</div>
   }
-
-  @if (loading()) {
-    <p class="empty">Loading...</p>
-  } @else if (leads().length === 0) {
-    <p class="empty">Nothing needs your attention right now.</p>
-  } @else {
-    @for (lead of leads(); track lead.id) {
-      <div class="card">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <strong>{{ lead.customerName }}</strong>
-          <span [class]="statusBadgeClass(lead.status)">{{ lead.status }}</span>
-        </div>
-        <p class="empty" style="margin: 0.4rem 0;">
-          Junior: {{ lead.juniorCloser.name }} · Closer: {{ lead.closer.name }}<br />
-          Closer notes: {{ lead.closerNotes || '—' }}
-          @if (lead.status === 'REJECTED') {
-            <br />Rejection reason: {{ lead.rejectionReason || '—' }}
-          }
-        </p>
-
-        @if (lead.status === 'REJECTED') {
-          <div class="form-grid">
-            <label>
-              Name
-              <input type="text" [(ngModel)]="draftFor(lead).customerName" [ngModelOptions]="{ standalone: true }" />
-            </label>
-            <label>
-              Phone
-              <input type="text" [(ngModel)]="draftFor(lead).phone" [ngModelOptions]="{ standalone: true }" />
-            </label>
-          </div>
-          <br />
-          <button class="btn btn--muted" type="button" [disabled]="busyId() === lead.id" (click)="saveEdit(lead)">Save edits</button>
-        }
-
-        <div style="margin-top: 0.75rem; display:flex; gap:0.5rem; align-items:center;">
-          <select [(ngModel)]="clientChoice[lead.id]" [ngModelOptions]="{ standalone: true }">
-            <option value="" disabled selected>Select a client</option>
-            @for (client of clients(); track client.id) {
-              <option [value]="client.id">{{ client.name }} ({{ client.email }})</option>
-            }
-          </select>
-          <button class="btn" type="button" [disabled]="busyId() === lead.id" (click)="assign(lead)">
-            {{ busyId() === lead.id ? 'Assigning...' : 'Assign to client' }}
-          </button>
-        </div>
-      </div>
-    }
+  @if (notice()) {
+    <div class="success"><svg lucideCircleCheck></svg>{{ notice() }}</div>
   }
+
+  <div class="toolbar">
+    <app-search-box
+      [value]="view.search()"
+      placeholder="Search name, phone, or person…"
+      (valueChange)="view.setSearch($event)"
+    />
+    <div class="pills">
+      @for (filter of statusFilters; track filter.value) {
+        <button
+          type="button"
+          class="pill"
+          [class.active]="view.status() === filter.value"
+          (click)="view.setStatus(filter.value)"
+        >
+          {{ filter.label }}
+          <span class="n">{{ statusCounts()[filter.value] }}</span>
+        </button>
+      }
+    </div>
+  </div>
+
+  <div class="card card--flush">
+    @if (loading()) {
+      <app-skeleton-rows [count]="5" />
+    } @else if (view.total() === 0) {
+      @if (view.isFiltered()) {
+        <app-empty-state title="No leads match those filters" hint="Try a different search term or clear the filters.">
+          <svg lucideListChecks></svg>
+        </app-empty-state>
+      } @else {
+        <app-empty-state title="Queue is clear" hint="Nothing needs your attention right now. Submitted and rejected leads land here.">
+          <svg lucideCircleCheck></svg>
+        </app-empty-state>
+      }
+    } @else {
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="sortable" (click)="view.toggleSort('customerName')">
+                Customer <span class="arrow">{{ sortArrow('customerName') }}</span>
+              </th>
+              <th class="hide-sm">Closer</th>
+              <th>Status</th>
+              <th class="hide-md">Reason / notes</th>
+              <th class="sortable hide-md" (click)="view.toggleSort('createdAt')">
+                Age <span class="arrow">{{ sortArrow('createdAt') }}</span>
+              </th>
+              <th class="right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (lead of view.rows(); track lead.id) {
+              <tr class="clickable" (click)="detailLead.set(lead)">
+                <td>
+                  <div class="cell-main">{{ lead.customerName }}</div>
+                  <div class="cell-sub">{{ formatPhone(lead.phone) }} · {{ lead.state }}</div>
+                </td>
+                <td class="hide-sm">
+                  <div class="person">
+                    <span class="avatar-sm" [class]="getAvatarTone(lead.closer.id)">
+                      {{ getInitials(lead.closer.name) }}
+                    </span>
+                    <span class="nm">{{ lead.closer.name }}</span>
+                  </div>
+                </td>
+                <td><app-status-badge [status]="lead.status" /></td>
+                <td class="hide-md">
+                  @if (lead.status === 'REJECTED' && lead.rejectionReason) {
+                    <span class="cell-sub">{{ lead.rejectionReason }}</span>
+                  } @else if (lead.closerNotes) {
+                    <span class="cell-sub">{{ lead.closerNotes }}</span>
+                  } @else {
+                    <span class="empty">—</span>
+                  }
+                </td>
+                <td class="hide-md">
+                  <span class="chip"><svg lucideClock></svg>{{ timeAgo(lead.createdAt) }}</span>
+                </td>
+                <td>
+                  <div class="row-actions">
+                    @if (lead.status === 'REJECTED') {
+                      <button type="button" class="btn btn--sm btn--ghost" (click)="openEdit(lead, $event)">
+                        <svg lucideSquarePen></svg> Edit
+                      </button>
+                    }
+                    <button type="button" class="btn btn--sm" (click)="openAssign(lead, $event)">
+                      <svg lucideUserCheck></svg> Assign
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <app-pagination
+        [page]="view.page()"
+        [totalPages]="view.totalPages()"
+        [total]="view.total()"
+        (pageChange)="view.page.set($event)"
+      />
+    }
+  </div>
 </div>
+
+<!-- Detail -->
+@if (detailLead(); as lead) {
+  <app-modal title="Lead details" [subtitle]="lead.customerName" [wide]="true" (close)="detailLead.set(null)">
+    <app-lead-detail [lead]="lead" />
+    <div footer>
+      @if (lead.status === 'REJECTED') {
+        <button type="button" class="btn btn--ghost" (click)="detailLead.set(null); openEdit(lead)">
+          <svg lucideSquarePen></svg> Edit
+        </button>
+      }
+      <button type="button" class="btn" (click)="detailLead.set(null); openAssign(lead)">
+        <svg lucideUserCheck></svg> Assign to client
+      </button>
+    </div>
+  </app-modal>
+}
+
+<!-- Assign -->
+@if (assignLead(); as lead) {
+  <app-modal
+    title="Assign lead"
+    [subtitle]="'Choose which client receives ' + lead.customerName"
+    (close)="assignLead.set(null)"
+  >
+    @if (error()) {
+      <div class="error">{{ error() }}</div>
+    }
+
+    <app-search-box
+      [value]="clientSearch()"
+      placeholder="Search clients by name or email…"
+      (valueChange)="clientSearch.set($event)"
+    />
+
+    <div class="pick-list">
+      @for (client of filteredClients(); track client.id) {
+        <button
+          type="button"
+          class="pick-row"
+          [class.chosen]="chosenClientId() === client.id"
+          (click)="chosenClientId.set(client.id)"
+        >
+          <span class="avatar-sm" [class]="getAvatarTone(client.id)">{{ getInitials(client.name) }}</span>
+          <span class="who">
+            <span class="cell-main">{{ client.name }}</span>
+            <span class="cell-sub">{{ client.email }}</span>
+          </span>
+          @if (chosenClientId() === client.id) {
+            <svg lucideCircleCheck class="tick"></svg>
+          }
+        </button>
+      } @empty {
+        <app-empty-state title="No clients match" hint="Clear the search to see everyone.">
+          <svg lucideUserCheck></svg>
+        </app-empty-state>
+      }
+    </div>
+
+    <div footer>
+      <button
+        type="button"
+        class="btn"
+        [disabled]="!chosenClientId() || busyId() === lead.id"
+        (click)="confirmAssign()"
+      >
+        @if (busyId() === lead.id) {
+          <span class="spinner"></span> Assigning…
+        } @else {
+          <svg lucideUserCheck></svg> Confirm assignment
+        }
+      </button>
+    </div>
+  </app-modal>
+}
+
+<!-- Edit rejected lead -->
+@if (editLead(); as lead) {
+  @if (draft(); as d) {
+    <app-modal
+      title="Edit lead"
+      subtitle="Correct the details a client rejected, then reassign."
+      [wide]="true"
+      (close)="editLead.set(null)"
+    >
+      @if (error()) {
+        <div class="error">{{ error() }}</div>
+      }
+      @if (lead.rejectionReason) {
+        <div class="warn">Client's reason for rejecting: {{ lead.rejectionReason }}</div>
+      }
+
+      <div class="form-grid">
+        <label>
+          Customer name
+          <input type="text" [ngModel]="d.customerName" (ngModelChange)="updateDraft('customerName', $event)" name="customerName" />
+        </label>
+        <label>
+          Phone
+          <input type="text" [ngModel]="d.phone" (ngModelChange)="updateDraft('phone', $event)" name="phone" />
+        </label>
+        <label>
+          State
+          <input type="text" [ngModel]="d.state" (ngModelChange)="updateDraft('state', $event)" name="state" />
+        </label>
+        <label>
+          Zipcode
+          <input type="text" [ngModel]="d.zipcode" (ngModelChange)="updateDraft('zipcode', $event)" name="zipcode" />
+        </label>
+        <label>
+          Marital status
+          <input type="text" [ngModel]="d.maritalStatus" (ngModelChange)="updateDraft('maritalStatus', $event)" name="maritalStatus" />
+        </label>
+        <label class="full">
+          Health conditions
+          <input type="text" [ngModel]="d.healthConditions" (ngModelChange)="updateDraft('healthConditions', $event)" name="healthConditions" />
+        </label>
+        <label class="full">
+          Closer notes
+          <textarea rows="3" [ngModel]="d.closerNotes" (ngModelChange)="updateDraft('closerNotes', $event)" name="closerNotes"></textarea>
+        </label>
+      </div>
+
+      <div footer>
+        <button type="button" class="btn" [disabled]="busyId() === lead.id" (click)="saveEdit()">
+          @if (busyId() === lead.id) {
+            <span class="spinner"></span> Saving…
+          } @else {
+            Save changes
+          }
+        </button>
+      </div>
+    </app-modal>
+  }
+}

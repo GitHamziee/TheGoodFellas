@@ -1,0 +1,112 @@
+<section class="page-header">
+  <div class="blob blob--gold" style="width: 460px; height: 460px; top: -220px; right: -120px"></div>
+  <div class="blob blob--accent" style="width: 400px; height: 400px; top: -190px; left: -100px"></div>
+  <div class="mkt-container">
+    <span class="badge-pill">About us</span>
+    <h1 class="mkt-h1">We don't buy leads. <span class="gradient-text-hero">We generate them.</span></h1>
+    <p class="mkt-subtitle">
+      The Good Fellas (Pvt) Ltd is a Rawalpindi-based lead generation and live transfer operation for insurance
+      clients across the United States.
+    </p>
+  </div>
+</section>
+
+<section class="mkt-section" appReveal>
+  <div class="mkt-container mkt-grid-2">
+    <div>
+      <span class="badge-pill">Who we are</span>
+      <h2 class="mkt-h2" style="margin-top: 1rem">Our own calls, <span class="gradient-text-hero">start to finish</span></h2>
+      <div class="prose">
+        <p>
+          We run our own inbound campaigns across Final Expense, Medicare, Health Insurance and Auto Insurance.
+          The people who call us are actively shopping for coverage — they are not a purchased list, and they are
+          never resold to a second buyer.
+        </p>
+        <p>
+          Every call is screened by AI verification the moment it lands, then confirmed by a live Verifier who
+          checks it against your criteria. Only then is the caller live-transferred to a licensed Closer, who
+          presents the plan, handles the objections and writes the policy while the caller is still on the line.
+        </p>
+        <p>
+          That is the whole business: generate the call, verify it, transfer it, close it. One accountable
+          pipeline, one status per lead, visible to you the entire way through.
+        </p>
+      </div>
+    </div>
+
+    <div class="console">
+      <div class="console__bar">
+        <span class="console__title">How we work</span>
+      </div>
+      <div class="pipeline-stage pipeline-stage--done">
+        <span class="pipeline-stage__dot"></span>
+        <span class="pipeline-stage__label">Inbound call from our campaign</span>
+      </div>
+      <div class="pipeline-stage pipeline-stage--done">
+        <span class="pipeline-stage__dot"></span>
+        <span class="pipeline-stage__label">AI verification scores the call</span>
+      </div>
+      <div class="pipeline-stage pipeline-stage--done">
+        <span class="pipeline-stage__dot"></span>
+        <span class="pipeline-stage__label">Verifier confirms intent & eligibility</span>
+      </div>
+      <div class="pipeline-stage pipeline-stage--active">
+        <span class="pipeline-stage__dot"></span>
+        <span class="pipeline-stage__label">Live transfer to a licensed Closer</span>
+      </div>
+      <div class="pipeline-stage">
+        <span class="pipeline-stage__dot"></span>
+        <span class="pipeline-stage__label">Policy closed & delivered to you</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="mkt-section mkt-section--muted" appReveal>
+  <div class="mkt-container">
+    <div class="mkt-section-head">
+      <span class="badge-pill">What we value</span>
+      <h2 class="mkt-h2">The principles <span class="gradient-text-hero">behind the pipeline</span></h2>
+    </div>
+    <div class="mkt-grid-4">
+      @for (value of values; track value.title) {
+        <div class="feature-card">
+          <div class="icon-chip">
+            @switch (value.icon) {
+              @case ('target') {
+                <svg lucideTarget></svg>
+              }
+              @case ('shield') {
+                <svg lucideShield></svg>
+              }
+              @case ('clock') {
+                <svg lucideClock></svg>
+              }
+              @case ('eye') {
+                <svg lucideEye></svg>
+              }
+            }
+          </div>
+          <h3 class="card-title">{{ value.title }}</h3>
+          <p class="card-desc">{{ value.desc }}</p>
+        </div>
+      }
+    </div>
+  </div>
+</section>
+
+<section class="mkt-section mkt-section--tight" appReveal>
+  <div class="mkt-container">
+    <div class="cta-band grid-pattern">
+      <h2 class="mkt-h2">See our pipeline <span class="gradient-text-hero--on-dark">in action</span></h2>
+      <p class="mkt-subtitle">Sign in to your client portal or reach out to talk about live transfer volume.</p>
+      <div class="cta-actions">
+        <a class="btn-hero" routerLink="/contact">
+          Partner With Us
+          <svg lucideArrowRight></svg>
+        </a>
+        <a class="btn-hero btn-hero--on-dark" routerLink="/login">Client Portal</a>
+      </div>
+    </div>
+  </div>
+</section>
