@@ -1,0 +1,351 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <p class="sub">Live-transfer leads — shorter intake, no closer step. Filter by D-code, date, or submitting junior.</p>
+    </div>
+  </div>
+
+  <div class="stats-row">
+    <app-stat-tile [value]="stats().total" label="Total CPL leads" tone="tone-gold">
+      <svg lucideTag></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().submitted" label="Awaiting assignment" tone="tone-warning">
+      <svg lucideClock></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().assigned" label="Assigned — awaiting client" tone="tone-info">
+      <svg lucideUserCheck></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().accepted" label="Accepted" tone="tone-success">
+      <svg lucideCircleCheck></svg>
+    </app-stat-tile>
+  </div>
+
+  @if (error()) {
+    <div class="error">{{ error() }}</div>
+  }
+  @if (notice()) {
+    <div class="success"><svg lucideCircleCheck></svg>{{ notice() }}</div>
+  }
+
+  <div class="toolbar">
+    <app-search-box
+      [value]="view.search()"
+      placeholder="Search name, phone, or junior closer…"
+      (valueChange)="view.setSearch($event)"
+    />
+    <div class="pills">
+      @for (filter of statusFilters; track filter.value) {
+        <button
+          type="button"
+          class="pill"
+          [class.active]="view.status() === filter.value"
+          (click)="view.setStatus(filter.value)"
+        >
+          {{ filter.label }}
+          <span class="n">{{ statusCounts()[filter.value] }}</span>
+        </button>
+      }
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <app-select
+      [options]="dCodeOptions"
+      [ngModel]="dCodeFilter()"
+      (ngModelChange)="dCodeFilter.set($event)"
+      ariaLabel="Filter by D-code"
+    />
+    <app-select
+      [options]="juniorOptions()"
+      [ngModel]="juniorFilter()"
+      (ngModelChange)="juniorFilter.set($event)"
+      ariaLabel="Filter by Junior Closer"
+    />
+    <input
+      type="date"
+      [ngModel]="dateFrom()"
+      (ngModelChange)="dateFrom.set($event)"
+      aria-label="From date"
+    />
+    <input
+      type="date"
+      [ngModel]="dateTo()"
+      (ngModelChange)="dateTo.set($event)"
+      aria-label="To date"
+    />
+    @if (dCodeFilter() || juniorFilter() || dateFrom() || dateTo()) {
+      <button type="button" class="btn btn--sm btn--ghost" (click)="clearCplFilters()">Clear filters</button>
+    }
+  </div>
+
+  <div class="card card--flush">
+    @if (loading()) {
+      <app-skeleton-rows [count]="5" />
+    } @else if (view.total() === 0) {
+      @if (view.isFiltered() || dCodeFilter() || juniorFilter() || dateFrom() || dateTo()) {
+        <app-empty-state title="No leads match those filters" hint="Try a different search term or clear the filters.">
+          <svg lucideTag></svg>
+        </app-empty-state>
+      } @else {
+        <app-empty-state title="No CPL leads yet" hint="Leads land here once a Junior Closer submits one as CPL.">
+          <svg lucideTag></svg>
+        </app-empty-state>
+      }
+    } @else {
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="sortable" (click)="view.toggleSort('customerName')">
+                Customer <span class="arrow">{{ sortArrow('customerName') }}</span>
+              </th>
+              <th class="hide-sm">D-code</th>
+              <th class="hide-md">Decision maker</th>
+              <th class="hide-md">Bank account</th>
+              <th class="hide-sm">Junior closer</th>
+              <th>Status</th>
+              <th class="sortable hide-md" (click)="view.toggleSort('createdAt')">
+                Age <span class="arrow">{{ sortArrow('createdAt') }}</span>
+              </th>
+              <th class="right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (lead of view.rows(); track lead.id) {
+              <tr class="clickable" (click)="detailLead.set(lead)">
+                <td>
+                  <div class="cell-main">{{ lead.customerName }}</div>
+                  <div class="cell-sub">{{ formatPhone(lead.phone) }} · {{ lead.state }}</div>
+                </td>
+                <td class="hide-sm">
+                  @if (lead.dCode) {
+                    <span class="chip">{{ lead.dCode }}</span>
+                  } @else {
+                    <span class="empty">—</span>
+                  }
+                </td>
+                <td class="hide-md">{{ lead.decisionMaker === true ? 'Yes' : lead.decisionMaker === false ? 'No' : '—' }}</td>
+                <td class="hide-md">{{ lead.bankAccount === true ? 'Yes' : lead.bankAccount === false ? 'No' : '—' }}</td>
+                <td class="hide-sm">
+                  @if (lead.juniorCloser) {
+                    <div class="person">
+                      <span class="avatar-sm" [class]="getAvatarTone(lead.juniorCloser.id)">
+                        {{ getInitials(lead.juniorCloser.name) }}
+                      </span>
+                      <span class="nm">{{ lead.juniorCloser.name }}</span>
+                    </div>
+                  } @else {
+                    <span class="empty">—</span>
+                  }
+                </td>
+                <td><app-status-badge [status]="lead.status" /></td>
+                <td class="hide-md">
+                  <span class="chip"><svg lucideClock></svg>{{ timeAgo(lead.createdAt) }}</span>
+                </td>
+                <td>
+                  <div class="row-actions">
+                    @if (lead.status === 'SUBMITTED' || lead.status === 'REJECTED') {
+                      <button type="button" class="btn btn--sm btn--ghost" (click)="openReturn(lead, $event)">
+                        <svg lucideUndo2></svg> Send back
+                      </button>
+                      <button type="button" class="btn btn--sm btn--ghost" (click)="openAssignExternal(lead, $event)">
+                        <svg lucideBuilding2></svg> Assign External
+                      </button>
+                      <button type="button" class="btn btn--sm" (click)="openAssign(lead, $event)">
+                        <svg lucideUserCheck></svg> Assign
+                      </button>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <app-pagination
+        [page]="view.page()"
+        [totalPages]="view.totalPages()"
+        [total]="view.total()"
+        (pageChange)="view.page.set($event)"
+      />
+    }
+  </div>
+</div>
+
+<!-- Detail -->
+@if (detailLead(); as lead) {
+  <app-modal title="Lead details" [subtitle]="lead.customerName" [wide]="true" (close)="detailLead.set(null)">
+    <app-lead-detail [lead]="lead" />
+    <div footer>
+      @if (lead.status === 'SUBMITTED' || lead.status === 'REJECTED') {
+        <button type="button" class="btn btn--ghost" (click)="detailLead.set(null); openReturn(lead)">
+          <svg lucideUndo2></svg> Send back
+        </button>
+        <button type="button" class="btn btn--ghost" (click)="detailLead.set(null); openAssignExternal(lead)">
+          <svg lucideBuilding2></svg> Assign to external
+        </button>
+        <button type="button" class="btn" (click)="detailLead.set(null); openAssign(lead)">
+          <svg lucideUserCheck></svg> Assign to client
+        </button>
+      }
+    </div>
+  </app-modal>
+}
+
+<!-- Send back to Junior — CPL has no Closer, so there's only ever one target -->
+@if (returnLead(); as lead) {
+  <app-modal title="Send back to Junior Closer" [subtitle]="lead.customerName" (close)="returnLead.set(null)">
+    @if (error()) {
+      <div class="error">{{ error() }}</div>
+    }
+    <div class="warn">
+      This leaves the queue and reappears for {{ lead.juniorCloser?.name }} to correct. It
+      comes straight back to you once they resubmit.
+    </div>
+
+    <div class="form-grid">
+      <label class="full">
+        What needs fixing?
+        <textarea
+          rows="3"
+          name="returnReason"
+          [ngModel]="returnReason()"
+          (ngModelChange)="returnReason.set($event)"
+          placeholder="e.g. Phone number doesn't connect — please re-check."
+        ></textarea>
+      </label>
+    </div>
+
+    <div footer>
+      <button
+        type="button"
+        class="btn"
+        [disabled]="!returnReason().trim() || busyId() === lead.id"
+        (click)="confirmReturn()"
+      >
+        @if (busyId() === lead.id) {
+          <span class="spinner"></span> Sending…
+        } @else {
+          <svg lucideUndo2></svg> Send back
+        }
+      </button>
+    </div>
+  </app-modal>
+}
+
+<!-- Assign -->
+@if (assignLead(); as lead) {
+  <app-modal
+    title="Assign lead"
+    [subtitle]="'Choose which client receives ' + lead.customerName"
+    (close)="assignLead.set(null)"
+  >
+    @if (error()) {
+      <div class="error">{{ error() }}</div>
+    }
+
+    <app-search-box
+      [value]="clientSearch()"
+      placeholder="Search clients by name or email…"
+      (valueChange)="clientSearch.set($event)"
+    />
+
+    <div class="pick-list">
+      @for (client of filteredClients(); track client.id) {
+        <button
+          type="button"
+          class="pick-row"
+          [class.chosen]="chosenClientId() === client.id"
+          (click)="chosenClientId.set(client.id)"
+        >
+          <span class="avatar-sm" [class]="getAvatarTone(client.id)">{{ getInitials(client.name) }}</span>
+          <span class="who">
+            <span class="cell-main">{{ client.name }}</span>
+            <span class="cell-sub">{{ client.email }}</span>
+          </span>
+          @if (chosenClientId() === client.id) {
+            <svg lucideCircleCheck class="tick"></svg>
+          }
+        </button>
+      } @empty {
+        <app-empty-state title="No clients match" hint="Clear the search to see everyone.">
+          <svg lucideUserCheck></svg>
+        </app-empty-state>
+      }
+    </div>
+
+    <div footer>
+      <button
+        type="button"
+        class="btn"
+        [disabled]="!chosenClientId() || busyId() === lead.id"
+        (click)="confirmAssign()"
+      >
+        @if (busyId() === lead.id) {
+          <span class="spinner"></span> Assigning…
+        } @else {
+          <svg lucideUserCheck></svg> Confirm assignment
+        }
+      </button>
+    </div>
+  </app-modal>
+}
+
+<!-- Assign external -->
+@if (assignExternalLead(); as lead) {
+  <app-modal
+    title="Assign to external client"
+    [subtitle]="'Choose which external client receives ' + lead.customerName"
+    (close)="assignExternalLead.set(null)"
+  >
+    @if (error()) {
+      <div class="error">{{ error() }}</div>
+    }
+
+    <app-search-box
+      [value]="externalClientSearch()"
+      placeholder="Search external clients by name, company, or email…"
+      (valueChange)="externalClientSearch.set($event)"
+    />
+
+    <div class="pick-list">
+      @for (client of filteredExternalClients(); track client.id) {
+        <button
+          type="button"
+          class="pick-row"
+          [class.chosen]="chosenExternalClientId() === client.id"
+          (click)="chosenExternalClientId.set(client.id)"
+        >
+          <span class="avatar-sm" [class]="getAvatarTone(client.id)">{{ getInitials(client.name) }}</span>
+          <span class="who">
+            <span class="cell-main">{{ client.name }}</span>
+            <span class="cell-sub">{{ client.company || client.email || 'No contact info' }}</span>
+          </span>
+          @if (chosenExternalClientId() === client.id) {
+            <svg lucideCircleCheck class="tick"></svg>
+          }
+        </button>
+      } @empty {
+        <app-empty-state title="No external clients match" hint="Clear the search to see everyone.">
+          <svg lucideBuilding2></svg>
+        </app-empty-state>
+      }
+    </div>
+
+    <div footer>
+      <button
+        type="button"
+        class="btn"
+        [disabled]="!chosenExternalClientId() || busyId() === lead.id"
+        (click)="confirmAssignExternal()"
+      >
+        @if (busyId() === lead.id) {
+          <span class="spinner"></span> Assigning…
+        } @else {
+          <svg lucideBuilding2></svg> Confirm assignment
+        }
+      </button>
+    </div>
+  </app-modal>
+}

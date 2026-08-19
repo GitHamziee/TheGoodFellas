@@ -99,21 +99,11 @@
           <div class="contact-form__row">
             <label class="contact-field">
               Vertical
-              <select name="vertical" [(ngModel)]="vertical" required>
-                <option value="" disabled selected>Select a vertical</option>
-                @for (v of verticals; track v) {
-                  <option [value]="v">{{ v }}</option>
-                }
-              </select>
+              <app-select [options]="verticalOptions" [(ngModel)]="vertical" placeholder="Select a vertical" name="vertical" />
             </label>
             <label class="contact-field">
               Transfers you can take
-              <select name="volume" [(ngModel)]="volume">
-                <option value="" disabled selected>Select a volume</option>
-                @for (v of volumes; track v) {
-                  <option [value]="v">{{ v }}</option>
-                }
-              </select>
+              <app-select [options]="volumeOptions" [(ngModel)]="volume" placeholder="Select a volume" name="volume" />
             </label>
           </div>
 

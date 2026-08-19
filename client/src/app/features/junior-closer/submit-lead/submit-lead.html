@@ -1,19 +1,50 @@
-<div class="page">
+<div class="page page--narrow">
   <div class="page-head">
     <div>
-      <a class="back-link" routerLink="/junior/my-leads"><svg lucideArrowLeft></svg> My lead history</a>
-      <h1>New Lead</h1>
-      <p class="sub">Capture the intake, pick the closer who'll work it, and send it on.</p>
+      @if (isCorrection) {
+        <a class="back-link" routerLink="/junior/returned"><svg lucideArrowLeft></svg> Sent back to me</a>
+        <h1>Correct Lead</h1>
+        <p class="sub">Fix what the admin flagged, then send it back to them.</p>
+      } @else {
+        <a class="back-link" routerLink="/junior/my-leads"><svg lucideArrowLeft></svg> My lead history</a>
+        <p class="sub">Capture the intake, pick the closer who'll work it, and send it on.</p>
+      }
     </div>
   </div>
 
   @if (error()) {
     <div class="error"><svg lucideCircleAlert></svg>{{ error() }}</div>
   }
+  @if (returnReason(); as reason) {
+    <div class="warn"><strong>Admin asked you to fix:</strong> {{ reason }}</div>
+  }
 
-  <form (ngSubmit)="submit()">
-    <!-- Routing -->
+  <form appNoCopy (ngSubmit)="submit()">
     <div class="card">
+    <!-- Lead type — creation only; a returned lead keeps the type it already has. -->
+    @if (!isCorrection) {
+    <div class="section">
+      <h2 class="section-title"><svg lucideSend></svg> Lead type</h2>
+      <div class="picker-grid">
+        <button type="button" class="pick-card" [class.chosen]="leadType() === 'CPA'" (click)="setLeadType('CPA')">
+          <span class="who">
+            <span class="cell-main">CPA</span>
+            <span class="cell-sub">Full intake, routed to a closer to enrich</span>
+          </span>
+        </button>
+        <button type="button" class="pick-card" [class.chosen]="leadType() === 'CPL'" (click)="setLeadType('CPL')">
+          <span class="who">
+            <span class="cell-main">CPL</span>
+            <span class="cell-sub">Live transfer — shorter intake, straight to admin</span>
+          </span>
+        </button>
+      </div>
+    </div>
+    }
+
+    <!-- Routing — CPA creation only; a returned lead keeps the closer it already has. -->
+    @if (!isCorrection && leadType() === 'CPA') {
+    <div class="section">
       <h2 class="section-title"><svg lucideUsers></svg> Route to a closer</h2>
 
       @if (closers().length === 0) {
@@ -40,9 +71,10 @@
         }
       }
     </div>
+    }
 
     <!-- Customer -->
-    <div class="card">
+    <div class="section">
       <h2 class="section-title"><svg lucideUser></svg> Customer</h2>
       <div class="form-grid">
         <label>
@@ -89,125 +121,151 @@
           <input type="text" name="zipcode" [(ngModel)]="form.zipcode" />
         </label>
 
-        <label>
-          Marital status
-          <select name="maritalStatus" [(ngModel)]="form.maritalStatus">
-            <option value="">Select…</option>
-            @for (m of maritalStatusOptions; track m) {
-              <option [value]="m">{{ m }}</option>
-            }
-          </select>
-        </label>
+        @if (leadType() === 'CPA') {
+          <label>
+            Marital status
+            <app-select [options]="maritalStatusOptions" [(ngModel)]="form.maritalStatus" name="maritalStatus" />
+          </label>
 
-        <label>
-          Birth state
-          <input type="text" name="birthState" [(ngModel)]="form.birthState" />
-        </label>
+          <label>
+            Birth state
+            <input type="text" name="birthState" [(ngModel)]="form.birthState" />
+          </label>
+
+          <label>
+            Gender
+            <app-select [options]="genderOptions" [(ngModel)]="form.gender" name="gender" />
+          </label>
+        }
       </div>
     </div>
 
     <!-- Physical -->
-    <div class="card">
+    <div class="section">
       <h2 class="section-title"><svg lucideHeartPulse></svg> Physical & health</h2>
       <div class="form-grid">
-        <label>
-          Date of birth
-          <input type="date" name="dob" [(ngModel)]="form.dob" />
-        </label>
+        @if (leadType() === 'CPA') {
+          <label>
+            Date of birth
+            <input type="date" name="dob" [(ngModel)]="form.dob" />
+          </label>
 
-        <label>
-          Age
-          <input type="number" name="age" min="0" max="130" [(ngModel)]="form.age" />
-        </label>
+          <label>
+            Age
+            <input type="number" name="age" min="0" max="130" [(ngModel)]="form.age" />
+          </label>
 
-        <label>
-          Height
-          <input type="text" name="height" placeholder="e.g. 5'10&quot;" [(ngModel)]="form.height" />
-        </label>
+          <label>
+            Height
+            <input type="text" name="height" placeholder="e.g. 5'10&quot;" [(ngModel)]="form.height" />
+          </label>
 
-        <label>
-          Weight <span class="hint">Pounds</span>
-          <input type="number" name="weight" min="0" [(ngModel)]="form.weight" />
-        </label>
+          <label>
+            Weight <span class="hint">Pounds</span>
+            <input type="number" name="weight" min="0" [(ngModel)]="form.weight" />
+          </label>
 
-        <label>
-          Smoker
-          <select name="smoker" [(ngModel)]="form.smoker">
-            <option [ngValue]="undefined">Select…</option>
-            <option [ngValue]="true">Yes</option>
-            <option [ngValue]="false">No</option>
-          </select>
-        </label>
+          <label>
+            Smoker
+            <app-select [options]="smokerOptions" [(ngModel)]="form.smoker" name="smoker" />
+          </label>
 
-        <label class="full">
-          Health conditions
-          <textarea name="healthConditions" rows="2" [(ngModel)]="form.healthConditions"></textarea>
-        </label>
+          <label class="full">
+            Health conditions
+            <textarea name="healthConditions" rows="2" [(ngModel)]="form.healthConditions"></textarea>
+          </label>
+        } @else {
+          <label>
+            Date of birth
+            <input type="date" name="dob" [(ngModel)]="form.dob" />
+          </label>
+
+          <label>
+            Smoker
+            <app-select [options]="smokerOptions" [(ngModel)]="form.smoker" name="smoker" />
+          </label>
+        }
       </div>
     </div>
 
-    <!-- Need & income -->
-    <div class="card">
-      <h2 class="section-title"><svg lucideWallet></svg> Need & income</h2>
+    <!-- Need & income (CPA) / Need & CPL detail (CPL) -->
+    <div class="section">
+      <h2 class="section-title"><svg lucideWallet></svg> {{ leadType() === 'CPA' ? 'Need & income' : 'Need & CPL detail' }}</h2>
       <div class="form-grid">
         <label>
           Need
-          <select name="need" [(ngModel)]="form.need">
-            <option value="">Select…</option>
-            @for (n of needOptions; track n.value) {
-              <option [value]="n.value">{{ n.label }}</option>
-            }
-          </select>
+          <app-select [options]="needOptions" [(ngModel)]="form.need" name="need" />
         </label>
 
-        <label>
-          Source of income
-          <select name="incomeSource" [(ngModel)]="form.incomeSource">
-            <option value="">Select…</option>
-            @for (s of incomeSourceOptions; track s.value) {
-              <option [value]="s.value">{{ s.label }}</option>
-            }
-          </select>
-        </label>
-
-        @if (form.incomeSource === 'RETIRED') {
+        @if (leadType() === 'CPA') {
           <label>
-            Retired income type
-            <select name="retiredIncomeType" [(ngModel)]="form.retiredIncomeType">
-              <option value="">Select…</option>
-              @for (r of retiredIncomeOptions; track r.value) {
-                <option [value]="r.value">{{ r.label }}</option>
-              }
-            </select>
+            Source of income
+            <app-select [options]="incomeSourceOptions" [(ngModel)]="form.incomeSource" name="incomeSource" />
+          </label>
+
+          @if (form.incomeSource === 'RETIRED') {
+            <label>
+              Retired income type
+              <app-select [options]="retiredIncomeOptions" [(ngModel)]="form.retiredIncomeType" name="retiredIncomeType" />
+            </label>
+          }
+
+          @if (form.retiredIncomeType === 'SSDI') {
+            <label>
+              Nature of disability
+              <input type="text" name="natureOfDisability" [(ngModel)]="form.natureOfDisability" />
+            </label>
+          }
+
+          <label>
+            Annual income <span class="hint">Whole dollars</span>
+            <input type="number" name="annualIncome" min="0" [(ngModel)]="form.annualIncome" />
+          </label>
+        } @else {
+          <label>
+            Decision maker
+            <app-select [options]="smokerOptions" [(ngModel)]="form.decisionMaker" name="decisionMaker" />
+          </label>
+
+          <label>
+            Bank account
+            <app-select [options]="smokerOptions" [(ngModel)]="form.bankAccount" name="bankAccount" />
+          </label>
+
+          <label>
+            D-code
+            <app-select [options]="dCodeOptions" [(ngModel)]="form.dCode" name="dCode" />
           </label>
         }
-
-        @if (form.retiredIncomeType === 'SSDI') {
-          <label>
-            Nature of disability
-            <input type="text" name="natureOfDisability" [(ngModel)]="form.natureOfDisability" />
-          </label>
-        }
-
-        <label>
-          Annual income <span class="hint">Whole dollars</span>
-          <input type="number" name="annualIncome" min="0" [(ngModel)]="form.annualIncome" />
-        </label>
       </div>
     </div>
 
     <!-- Notes -->
-    <div class="card">
-      <h2 class="section-title"><svg lucideNotebookPen></svg> Notes for the closer</h2>
-      <label>
-        Anything the closer should know <span class="hint">Optional</span>
-        <textarea
-          name="juniorNotes"
-          rows="4"
-          [(ngModel)]="form.juniorNotes"
-          placeholder="Best time to call, tone of the conversation, anything that didn't fit a field…"
-        ></textarea>
-      </label>
+    <div class="section">
+      @if (leadType() === 'CPA') {
+        <h2 class="section-title"><svg lucideNotebookPen></svg> Notes for the closer</h2>
+        <label>
+          Anything the closer should know <span class="hint">Optional</span>
+          <textarea
+            name="juniorNotes"
+            rows="4"
+            [(ngModel)]="form.juniorNotes"
+            placeholder="Best time to call, tone of the conversation, anything that didn't fit a field…"
+          ></textarea>
+        </label>
+      } @else {
+        <h2 class="section-title"><svg lucideNotebookPen></svg> Notes for admin</h2>
+        <label>
+          Anything admin should know <span class="hint">Optional</span>
+          <textarea
+            name="juniorNotes"
+            rows="4"
+            [(ngModel)]="form.juniorNotes"
+            placeholder="Best time to call, anything that didn't fit a field…"
+          ></textarea>
+        </label>
+      }
+    </div>
     </div>
 
     <div class="form-actions">
@@ -220,7 +278,11 @@
         @if (submitting()) {
           <span class="spinner"></span> Submitting…
         } @else {
-          <svg lucideSend></svg> Submit lead
+          @if (isCorrection) {
+            <svg lucideSend></svg> Send back to admin
+          } @else {
+            <svg lucideSend></svg> Submit lead
+          }
         }
       </button>
     </div>

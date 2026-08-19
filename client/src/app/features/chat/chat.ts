@@ -46,6 +46,7 @@ const NAME_COLORS = ['#b8952c', '#92592c', '#46586a', '#5c6a38', '#9c4f34', '#3d
 const ROOM_MEMBERS: Record<ChatRoomKey, string> = {
   CLOSERS: 'All closers + admin',
   JUNIOR_CLOSERS: 'All junior closers + admin',
+  TEAM_LEADS: 'All team leads + admin',
 };
 
 @Component({

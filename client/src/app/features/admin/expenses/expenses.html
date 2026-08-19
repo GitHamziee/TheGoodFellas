@@ -1,0 +1,156 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <p class="sub">What the business spends, and the PKR received from leads marked paid — tracked side by side.</p>
+    </div>
+    <div class="page-head-actions">
+      <button type="button" class="btn" (click)="openCreate()">
+        <svg lucidePlus></svg> New expense
+      </button>
+    </div>
+  </div>
+
+  <div class="stats-row">
+    <app-stat-tile [value]="formatPkr(totals().incomeTotal)" label="Income received" tone="tone-success">
+      <svg lucidePiggyBank></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="formatPkr(totals().expenseTotal)" label="Total expenses" tone="tone-danger">
+      <svg lucideTrendingDown></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="formatPkr(totals().net)" label="Net" [tone]="totals().net >= 0 ? 'tone-gold' : 'tone-danger'">
+      <svg lucideScale></svg>
+    </app-stat-tile>
+  </div>
+
+  @if (error() && !showCreate()) {
+    <div class="error">{{ error() }}</div>
+  }
+  @if (notice()) {
+    <div class="success"><svg lucideCircleCheck></svg>{{ notice() }}</div>
+  }
+
+  @if (loading()) {
+    <div class="card"><app-skeleton-rows [count]="5" /></div>
+  } @else {
+    <div class="card card--flush">
+      <div class="inline-head" style="padding: 1rem 1.1rem 0;">
+        <h2>Expenses</h2>
+        <span class="count">{{ pluralize(expenses().length, 'entry', 'entries') }}</span>
+      </div>
+
+      @if (expenses().length === 0) {
+        <app-empty-state title="No expenses logged" hint="Add what the business spends money on to start tracking it.">
+          <svg lucideReceipt></svg>
+        </app-empty-state>
+      } @else {
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Description</th>
+                <th class="right">Amount</th>
+                <th class="right hide-sm">Date</th>
+                <th class="right">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (expense of expenses(); track expense.id) {
+                <tr>
+                  <td><span class="cell-main">{{ expense.description }}</span></td>
+                  <td class="right num">{{ formatPkr(expense.amount) }}</td>
+                  <td class="right hide-sm">{{ formatDate(expense.date) }}</td>
+                  <td class="right">
+                    <button
+                      type="button"
+                      class="btn btn--sm btn--ghost"
+                      [disabled]="deletingId() === expense.id"
+                      (click)="deleteExpense(expense)"
+                    >
+                      @if (deletingId() === expense.id) {
+                        <span class="spinner"></span>
+                      } @else {
+                        <svg lucideTrash2></svg>
+                      }
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+
+    <div class="card card--flush">
+      <div class="inline-head" style="padding: 1rem 1.1rem 0;">
+        <h2>Income</h2>
+        <span class="count">{{ pluralize(income().length, 'payment') }}</span>
+      </div>
+
+      @if (income().length === 0) {
+        <app-empty-state title="No income recorded yet" hint="Batch-mark leads paid from the Leads page to record PKR received.">
+          <svg lucideBanknote></svg>
+        </app-empty-state>
+      } @else {
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Leads covered</th>
+                <th class="hide-sm">Note</th>
+                <th class="right">Amount</th>
+                <th class="right hide-sm">Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (payment of income(); track payment.id) {
+                <tr>
+                  <td>
+                    <span class="cell-main">{{ payment.leads.length }} lead{{ payment.leads.length === 1 ? '' : 's' }}</span>
+                    <div class="cell-sub">{{ payment.leads.map(l => l.customerName).join(', ') }}</div>
+                  </td>
+                  <td class="hide-sm">{{ payment.note || '—' }}</td>
+                  <td class="right num">{{ formatPkr(payment.pkrAmount) }}</td>
+                  <td class="right hide-sm">{{ formatDate(payment.createdAt) }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  }
+</div>
+
+@if (showCreate()) {
+  <app-modal title="New expense" (close)="showCreate.set(false)">
+    @if (error()) {
+      <div class="error">{{ error() }}</div>
+    }
+
+    <div class="form-grid">
+      <label class="full">
+        Description
+        <input type="text" [(ngModel)]="description" name="description" placeholder="e.g. Office internet" />
+      </label>
+      <label>
+        Amount (PKR)
+        <input type="number" min="0" [(ngModel)]="amount" name="amount" placeholder="0" />
+      </label>
+      <label>
+        Date
+        <input type="date" [(ngModel)]="date" name="date" />
+      </label>
+    </div>
+
+    <div footer>
+      <button type="button" class="btn" [disabled]="!canSubmitCreate() || creating()" (click)="createExpense()">
+        @if (creating()) {
+          <span class="spinner"></span> Adding…
+        } @else {
+          <svg lucidePlus></svg> Add expense
+        }
+      </button>
+    </div>
+  </app-modal>
+}

@@ -1,0 +1,121 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1>State Sheet</h1>
+      <p class="sub">Which clients cover each state, and the carriers each of them supports there.</p>
+    </div>
+  </div>
+
+  <div class="stats-row">
+    <app-stat-tile [value]="stats().statesCovered + ' / ' + stats().totalStates" label="States covered" tone="tone-gold">
+      <svg lucideMapPin></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().clients" label="Clients" tone="tone-f">
+      <svg lucideUsers></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().carriers" label="Carriers" tone="tone-c">
+      <svg lucideBuilding2></svg>
+    </app-stat-tile>
+  </div>
+
+  @if (error()) {
+    <div class="error">{{ error() }}</div>
+  }
+
+  <div class="toolbar">
+    <app-search-box
+      [value]="search()"
+      placeholder="Search by state, client, or carrier…"
+      (valueChange)="search.set($event)"
+    />
+    <div class="pills">
+      <button type="button" class="pill" [class.active]="coveredOnly()" (click)="coveredOnly.set(!coveredOnly())">
+        Covered only
+      </button>
+    </div>
+  </div>
+
+  <div class="card card--flush">
+    @if (loading()) {
+      <app-skeleton-rows [count]="8" />
+    } @else if (filteredRows().length === 0) {
+      <app-empty-state title="No states match" hint="Try a different search term or clear the filters.">
+        <svg lucideMapPin></svg>
+      </app-empty-state>
+    } @else {
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>State</th>
+              <th>Coverage</th>
+              <th>Carriers</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of filteredRows(); track row.state) {
+              <tr class="clickable state-row" (click)="toggle(row.state)">
+                <td>
+                  <span class="state-cell">
+                    <span class="state-dot" [class.state-dot--on]="row.clients.length > 0"></span>
+                    <span class="cell-main">{{ row.state }}</span>
+                  </span>
+                </td>
+                <td>
+                  @if (row.clients.length) {
+                    <span class="count-pill count-pill--clients">
+                      <svg lucideUsers></svg>{{ row.clients.length }} {{ row.clients.length === 1 ? 'client' : 'clients' }}
+                    </span>
+                  } @else {
+                    <span class="empty empty--inline">No coverage yet</span>
+                  }
+                </td>
+                <td>
+                  @if (row.carriers.length) {
+                    <span class="count-pill count-pill--carriers">
+                      <svg lucideBuilding2></svg>{{ row.carriers.length }} {{ row.carriers.length === 1 ? 'carrier' : 'carriers' }}
+                    </span>
+                  } @else {
+                    <span class="empty empty--inline">—</span>
+                  }
+                </td>
+                <td class="right">
+                  <svg lucideChevronDown class="dropdown-chevron" [class.open]="expanded() === row.state"></svg>
+                </td>
+              </tr>
+              @if (expanded() === row.state) {
+                <tr class="expand-row">
+                  <td colspan="4">
+                    @if (row.breakdown.length) {
+                      <div class="breakdown">
+                        @for (client of row.breakdown; track client.name) {
+                          <div class="breakdown-item">
+                            <span class="chip breakdown-item__client"><svg lucideUsers></svg>{{ client.name }}</span>
+                            @if (client.carriers.length) {
+                              <div class="chip-wrap">
+                                @for (carrier of client.carriers; track carrier) {
+                                  <span class="chip"><svg lucideBuilding2></svg>{{ carrier }}</span>
+                                }
+                              </div>
+                            } @else {
+                              <span class="empty empty--inline">No carriers listed for this client</span>
+                            }
+                          </div>
+                        }
+                      </div>
+                    } @else {
+                      <div class="breakdown-item">
+                        <span class="empty empty--inline">No coverage yet — add a client's licensed states on the Users page.</span>
+                      </div>
+                    }
+                  </td>
+                </tr>
+              }
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+</div>

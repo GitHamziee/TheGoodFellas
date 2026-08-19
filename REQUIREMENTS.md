@@ -51,6 +51,7 @@ Additional rule: after a client **accepts** a lead, **Admin** (not the client) h
 | State | |
 | Zipcode | |
 | Birth State | |
+| Gender | added 2026-08-14, see Implementation Status |
 | Smoker | |
 | DOB | mm/dd/yy |
 | Age | |
@@ -80,6 +81,7 @@ Personal / contact:
 | Zipcode | |
 | Email Address | optional |
 | Birth State | |
+| Gender | added 2026-08-14, see Implementation Status |
 | Yearly Income | |
 | Smoker | |
 | DOB | mm/dd/yy |
@@ -156,6 +158,65 @@ Closer then submits → lead goes to Admin.
 
 ---
 
+## Send Back for Editing (Admin → Junior Closer / Closer)
+
+From the queue an admin can return a lead to whichever role entered the bad data, with a
+required reason. Statuses `RETURNED_TO_JUNIOR` / `RETURNED_TO_CLOSER`; both resubmit to
+`SUBMITTED`, and `returnReason` is cleared on resubmit.
+
+Judgment calls made where the spec was silent:
+
+- **Resubmit goes straight back to the admin**, not back through the pipeline. The other
+  role's work is still valid and the admin is the one waiting on the correction.
+- **Only from `SUBMITTED` / `REJECTED`.** A lead out with a client, already accepted, or
+  still being worked isn't the admin's to recall.
+- **A returned lead leaves the admin queue** and reappears there once resubmitted, so it
+  can't be assigned while someone is mid-edit.
+- **Junior Closer masking is relaxed, narrowly.** The standing rule is name + phone only.
+  They cannot correct fields they cannot see, so while a lead is `RETURNED_TO_JUNIOR` they
+  see exactly the intake fields they entered themselves (`JUNIOR_EDIT_SELECT`) and nothing
+  the closer added — no SSN, bank, routing, beneficiary. This discloses nothing they didn't
+  originally type. Flag if even that is unwanted; the alternative is admin-only correction.
+- **The closer keeps full detail** on a returned lead, as they already had it while working it.
+- **Reassigning is not the junior's call** — the closer picker is hidden in correction mode.
+- Editing reuses the existing intake/enrichment forms in a correction mode rather than
+  duplicating a 30-field form; the only differences are pre-fill, submit call and return path.
+
+## Plan Types & Per-Client Lead Cost
+
+Four fixed plan types — Level, Graded, Modified, GI — picked by the Closer during enrichment
+(`planType`, now a dropdown/enum, not free text). Each CLIENT account carries its own cost
+per plan type in PKR (`levelCost` / `gradedCost` / `modifiedCost` / `giCost` on `User`), set
+on the "New account" form when creating a client and editable afterward from the account
+detail modal on Admin → Clients & Staff.
+
+Admin → Analytics → Closers now shows a **Sales by plan** section: per closer, per plan
+type, lead count and expected revenue (count × that client's cost for the plan), for leads
+that are `ACCEPTED` or `ASSIGNED_EXTERNAL`.
+
+Judgment calls made where the ask didn't specify:
+
+- **Four fixed columns on `User`, not a separate pricing table.** Plan type is a closed
+  4-value set, not admin-configurable, so `levelCost`/`gradedCost`/`modifiedCost`/`giCost`
+  are plain nullable `Int` columns rather than a `ClientPlanPricing` join table. Revisit if
+  plan types ever become admin-editable.
+- **"Sales" = revenue, not money collected.** The per-plan figures are *expected* revenue
+  (lead count × the client's price for that plan), computed live from current lead status —
+  not a record of PKR actually received. `IncomePayment` (the batch "Mark Paid" ledger)
+  records one PKR total per batch, not broken out per lead or per plan, so it can't answer
+  "how much did Level plans bring in." The two numbers can legitimately disagree.
+- **`ASSIGNED_EXTERNAL` leads count toward volume but not revenue.** They're handed to an
+  `ExternalClient`, which has no login and — so far — no plan pricing of its own (pricing
+  was only asked for on real Client accounts). A closer's Level count includes those leads;
+  the Level revenue total doesn't, since there's no price to look up. Flag if external
+  clients should get their own pricing too.
+- **Pricing fields are silently ignored for non-CLIENT roles** on account creation, rather
+  than erroring — the create form only shows them once "Client" is picked as the role.
+- **No migration for pre-existing `planType` free text** (e.g. old seed data read
+  `"Whole Life — Final Expense"`) — this project has no migration history yet (`db:push`,
+  not `prisma migrate`), so existing rows with an unmapped value just read back `null` once
+  the column becomes an enum; going forward every value is one of the four.
+
 ## Implementation Status (first full pass)
 
 Everything above is now built — schema, API, and Angular forms. Notes on judgment calls made along the way, since they weren't specified and are easy to revisit:
@@ -165,6 +226,7 @@ Everything above is now built — schema, API, and Angular forms. Notes on judgm
 - **Client-side masking on ASSIGNED leads was added beyond what was explicitly requested**, mirroring R4Referral's "masked until accepted" pattern — given the field set now includes SSN and bank account/routing numbers, sending that to a client before they've committed felt like an unacceptable default. A client's "New Leads" page only gets `{ customerName, state, zipcode, need, maritalStatus, status, closer }` until they accept; full detail (including SSN/bank info) is only returned once `status = ACCEPTED`. Flag if this isn't wanted.
 - **Analytics ("accepted vs rejected") reflect current lead status, not history.** There's no event/audit log yet, so a lead that was rejected once, reassigned, and later accepted only counts toward "accepted" — the earlier rejection isn't separately tracked. Worth a real audit table later if rejection *frequency* matters, not just current outcome.
 - **Marital Status** has no defined option list in the spec — implemented as a plain select with Single/Married/Divorced/Widowed as a placeholder set.
+- **Gender** — added 2026-08-14, prompted by the exact copy-details text format the user specified (`Gender :Female` between Birth State and Smoker). Not in the original field spec, no option list given — same placeholder-judgment-call pattern as Marital Status: plain `String?` column (not a Prisma enum), Male/Female as a placeholder set. Shared field (Junior sets it at intake, Closer can edit during enrichment) — mirrors Marital Status's position in both forms and in `SHARED_FIELDS`. Not added to the CPL intake (shorter field set, see CPL section above) or to `CLIENT_PREVIEW_SELECT` (pre-accept preview stays as narrow as before). Not added to the Admin queue's "Edit lead" quick-correction form either — that form is already a deliberately trimmed subset (missing Birth State, Smoker, DOB, etc. too), not the full field set.
 - **Height** is free text (e.g. `5'10"`), **Weight** is a plain number (lbs) — no format was specified.
 - **Income fields** (`annualIncome`, `yearlyIncome`, `coverageAmount`, `monthlyPremiums`) are stored as whole-dollar integers, not cents — this project has no payment processor requiring cents precision, unlike R4Referral.
 - **DOB / Beneficiary DOB / Draft Dates** are stored as real `DateTime` values (not raw `mm/dd/yy` strings) and formatted for display — safer than free-text dates, same information.

@@ -48,7 +48,7 @@
       </app-stat-tile>
       <app-stat-tile
         [value]="m.collectionRate === null ? '—' : m.collectionRate + '%'"
-        label="Collected (of accepted leads)"
+        label="Paid (of accepted leads)"
         tone="tone-b"
       >
         <svg lucideWallet></svg>
@@ -70,13 +70,20 @@
 
         <div class="chart">
           @for (bar of statusBars(); track bar.status) {
-            <div class="bar-col" [title]="bar.label + ' — ' + bar.count + ' leads (' + bar.share + '%)'">
-              <div class="bar-track">
-                <span [class]="bar.barCls" [style.height.%]="bar.pct"></span>
-              </div>
-              <span class="bar-label">{{ bar.label }}</span>
+            <div class="chart-row" [title]="bar.label + ' — ' + pluralize(bar.count, 'lead')">
+              <span class="chart-key">{{ bar.label }}</span>
+              <span class="chart-track">
+                <span class="chart-bar" [class]="bar.barCls" [style.width.%]="bar.pct"></span>
+              </span>
+              <span class="chart-val">{{ bar.count }}</span>
             </div>
           }
+        </div>
+
+        <div class="chart-legend">
+          <span><i class="sw--vol"></i> In flight</span>
+          <span><i class="sw--good"></i> Accepted</span>
+          <span><i class="sw--bad"></i> Rejected</span>
         </div>
 
         <div class="table-wrap stack-top">
@@ -86,7 +93,6 @@
                 <th>Status</th>
                 <th class="hide-sm">What it means</th>
                 <th class="right">Leads</th>
-                <th class="right">Share</th>
               </tr>
             </thead>
             <tbody>
@@ -97,7 +103,6 @@
                   </td>
                   <td class="hide-sm"><span class="cell-sub">{{ bar.hint }}</span></td>
                   <td class="right num">{{ bar.count }}</td>
-                  <td class="right num">{{ bar.share }}%</td>
                 </tr>
               }
             </tbody>
@@ -124,12 +129,14 @@
         }
       </div>
 
-      <div class="funnel">
+      <div class="chart">
         @for (row of roleRows(); track row.role) {
-          <div class="funnel-row">
-            <span class="fl">{{ row.label }}</span>
-            <span class="ft"><span class="fb fb--assigned" [style.width.%]="row.share"></span></span>
-            <span class="fn">{{ row.count }}</span>
+          <div class="chart-row" [title]="row.label + ' — ' + pluralize(row.count, 'account')">
+            <span class="chart-key">{{ row.label }}</span>
+            <span class="chart-track">
+              <span class="chart-bar" [style.width.%]="row.pct"></span>
+            </span>
+            <span class="chart-val">{{ row.count }}</span>
           </div>
         }
       </div>

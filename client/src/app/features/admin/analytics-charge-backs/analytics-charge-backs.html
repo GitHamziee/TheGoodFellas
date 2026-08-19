@@ -1,0 +1,130 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <p class="sub">Money clawed back after acceptance — which clients and which closers it's coming from.</p>
+    </div>
+  </div>
+
+  @if (error()) {
+    <div class="error">{{ error() }}</div>
+  }
+
+  @if (loading()) {
+    <div class="card"><app-skeleton-rows [count]="6" /></div>
+  } @else if (data(); as d) {
+    <div class="stats-row">
+      <app-stat-tile [value]="d.total" label="Total charge-backs" tone="tone-danger">
+        <svg lucideBanknoteX></svg>
+      </app-stat-tile>
+      <app-stat-tile [value]="formatPkr(d.totalPkrAmount)" label="Total PKR clawed back" tone="tone-danger">
+        <svg lucideBanknoteX></svg>
+      </app-stat-tile>
+      <app-stat-tile [value]="d.byClient.length" label="Clients involved" tone="tone-c">
+        <svg lucideUsers></svg>
+      </app-stat-tile>
+    </div>
+
+    @if (d.total === 0) {
+      <div class="card">
+        <app-empty-state title="No charge-backs recorded" hint="When an accepted, paid lead is marked charged back, it'll show up here.">
+          <svg lucideBanknoteX></svg>
+        </app-empty-state>
+      </div>
+    } @else {
+      <div class="card">
+        <div class="inline-head">
+          <h2>By client</h2>
+          <span class="count">{{ pluralize(d.byClient.length, 'client') }}</span>
+        </div>
+        <div class="chart">
+          @for (row of byClientChart(); track row.id) {
+            <div class="chart-row" [title]="row.name + ' — ' + pluralize(row.count, 'charge-back') + ', ' + formatPkr(row.pkrAmount)">
+              <span class="chart-key">
+                {{ row.name }}
+                <span class="sub">{{ formatPkr(row.pkrAmount) }}</span>
+              </span>
+              <span class="chart-track">
+                <span class="chart-bar chart-bar--bad" [style.width.%]="row.pct"></span>
+              </span>
+              <span class="chart-val">{{ row.count }}</span>
+            </div>
+          }
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="inline-head">
+          <h2>By closer</h2>
+          <span class="count">{{ pluralize(d.byCloser.length, 'closer') }}</span>
+        </div>
+        <div class="chart">
+          @for (row of byCloserChart(); track row.id) {
+            <div class="chart-row" [title]="row.name + ' — ' + pluralize(row.count, 'charge-back') + ', ' + formatPkr(row.pkrAmount)">
+              <span class="chart-key">
+                {{ row.name }}
+                <span class="sub">{{ formatPkr(row.pkrAmount) }}</span>
+              </span>
+              <span class="chart-track">
+                <span class="chart-bar chart-bar--bad" [style.width.%]="row.pct"></span>
+              </span>
+              <span class="chart-val">{{ row.count }}</span>
+            </div>
+          }
+        </div>
+      </div>
+
+      <div class="card card--flush">
+        <div class="inline-head" style="padding: 1rem 1.1rem 0;">
+          <h2>Recent charge-backs</h2>
+          <span class="count">Newest first</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Customer</th>
+                <th class="hide-md">Client</th>
+                <th class="hide-sm">Closer</th>
+                <th class="hide-md">Reason</th>
+                <th class="right">PKR</th>
+                <th class="right">When</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of d.recent; track row.id) {
+                <tr>
+                  <td><span class="cell-main">{{ row.customerName }}</span></td>
+                  <td class="hide-md">
+                    <div class="person">
+                      <span class="avatar-sm" [class]="getAvatarTone(row.client.id)">
+                        {{ getInitials(row.client.name) }}
+                      </span>
+                      <span class="nm">{{ row.client.name }}</span>
+                    </div>
+                  </td>
+                  <td class="hide-sm">
+                    @if (row.closer) {
+                      <div class="person">
+                        <span class="avatar-sm" [class]="getAvatarTone(row.closer.id)">
+                          {{ getInitials(row.closer.name) }}
+                        </span>
+                        <span class="nm">{{ row.closer.name }}</span>
+                      </div>
+                    } @else {
+                      <span class="chip">CPL</span>
+                    }
+                  </td>
+                  <td class="hide-md"><span class="cell-sub">{{ row.reason }}</span></td>
+                  <td class="right num">{{ formatPkr(row.pkrAmount) }}</td>
+                  <td class="right">
+                    <span class="chip"><svg lucideClock></svg>{{ timeAgo(row.createdAt) }}</span>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    }
+  }
+</div>

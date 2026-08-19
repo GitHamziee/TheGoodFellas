@@ -14,19 +14,47 @@ enum Role {
   CLOSER
   ADMIN
   CLIENT
+  TEAM_LEAD
 }
 
-// NEW       — submitted by junior closer, sitting with the chosen closer
-// SUBMITTED — closer added info and submitted, waiting for admin to assign
-// ASSIGNED  — admin assigned to a client, waiting for accept/reject
-// ACCEPTED  — client accepted (payment tracked separately via paymentStatus)
-// REJECTED  — client rejected, back with admin to edit/reassign
+// NEW                — submitted by junior closer, sitting with the chosen closer
+// SUBMITTED          — closer added info and submitted, waiting for admin to assign
+// ASSIGNED           — admin assigned to a client, waiting for accept/reject
+// ACCEPTED           — client accepted (payment tracked separately via paymentStatus)
+// REJECTED           — client rejected, back with admin to edit/reassign
+// RETURNED_TO_JUNIOR — admin sent it back to the junior closer to correct their intake
+// RETURNED_TO_CLOSER — admin sent it back to the closer to correct their enrichment
+// ASSIGNED_EXTERNAL  — admin handed it to an ExternalClient (no login, no accept/reject —
+//                      terminal, like ACCEPTED, and payment-trackable the same way)
+// DRAFT              — closer parked a half-baked enrichment instead of submitting; stays
+//                      out of every other role's queue until the closer resumes and submits it
+// CHARGED_BACK        — an ACCEPTED + PAID lead was clawed back by the client after the fact;
+//                      clears clientId and resets paymentStatus/closedAt like REJECTED does, so
+//                      admin can reassign it — see ChargeBack below for the money/reason record
+//
+// Both RETURNED_* states resubmit to SUBMITTED, i.e. straight back to the admin who
+// asked for the fix rather than re-walking the pipeline — the other role's work is
+// still valid, and the admin is the one waiting on the correction.
 enum LeadStatus {
   NEW
   SUBMITTED
   ASSIGNED
   ACCEPTED
   REJECTED
+  RETURNED_TO_JUNIOR
+  RETURNED_TO_CLOSER
+  ASSIGNED_EXTERNAL
+  DRAFT
+  CHARGED_BACK
+}
+
+// Why the closer parked the lead instead of finishing it — required when saving a draft.
+enum DraftReason {
+  MISSING_INFO
+  CLIENT_NOT_REACHABLE
+  NEEDS_FOLLOW_UP
+  PENDING_DOCUMENTATION
+  OTHER
 }
 
 // Secondary flag admin toggles on an ACCEPTED lead to mark it closed out.
@@ -40,6 +68,23 @@ enum LeadNeed {
   BURIAL
   CREMATION
   LEAVE_MONEY
+}
+
+// CPA = today's full pipeline (Junior -> Closer -> Admin -> Client), unchanged.
+// CPL = a lighter pipeline that skips the Closer step entirely — Junior submits it
+// straight to SUBMITTED with a shorter intake field set (see CPL intake only below).
+enum LeadType {
+  CPA
+  CPL
+}
+
+// The client's own internal classification code for a CPL lead, picked by the Junior
+// Closer at intake. Opaque to us — no business logic hangs off which value is chosen.
+enum DCode {
+  D1
+  D2
+  D3
+  D4
 }
 
 enum IncomeSource {
@@ -63,11 +108,21 @@ enum PayerType {
   SOMEONE_ELSE
 }
 
-// The two team channels. Membership is derived from Role, never stored per-user
+// The four insurance plan types the closer picks from during enrichment. Fixed set,
+// not admin-configurable — see User.levelCost etc. below for the per-client price of each.
+enum PlanType {
+  LEVEL
+  GRADED
+  MODIFIED
+  GI
+}
+
+// The team channels. Membership is derived from Role, never stored per-user
 // and never sent by the client — see server/src/lib/chat-rooms.ts.
 enum ChatRoom {
   CLOSERS
   JUNIOR_CLOSERS
+  TEAM_LEADS
 }
 
 model User {
@@ -81,20 +136,45 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  submittedLeads Lead[]        @relation("JuniorCloserLeads")
-  closerLeads    Lead[]        @relation("CloserLeads")
-  clientLeads    Lead[]        @relation("ClientLeads")
-  chatMessages   ChatMessage[]
-  chatReads      ChatRead[]
+  // Per-plan lead cost (USD) this CLIENT pays — set at account creation, editable after.
+  // Meaningless for other roles; left null for them. Four fixed columns rather than a
+  // separate pricing table since PlanType is a fixed 4-value set, not admin-configurable.
+  levelCost    Int?
+  gradedCost   Int?
+  modifiedCost Int?
+  giCost       Int?
+
+  // CLIENT accounts only — the states this client is licensed/covers and the carriers
+  // they write business through. Feeds the future State Sheet page (state -> clients ->
+  // carriers available there), viewed by Closer/Team Lead/Admin. Meaningless for other
+  // roles, left as the default empty array for them. `states` is drawn from a fixed
+  // US-states list (validated server-side); `carriers` is freehand text, no fixed list.
+  states   String[] @default([])
+  carriers String[] @default([])
+
+  submittedLeads    Lead[]        @relation("JuniorCloserLeads")
+  closerLeads       Lead[]        @relation("CloserLeads")
+  clientLeads       Lead[]        @relation("ClientLeads")
+  clientChargeBacks ChargeBack[]  @relation("ClientChargeBacks")
+  chatMessages      ChatMessage[]
+  chatReads         ChatRead[]
 
   @@index([role])
 }
 
 model Lead {
-  id             String  @id @default(cuid())
-  juniorCloserId String
-  closerId       String
-  clientId       String?
+  id               String  @id @default(cuid())
+  // Null when a Closer creates the lead from scratch (self- or AI-sourced calls) —
+  // no Junior Closer was ever involved.
+  juniorCloserId   String?
+  // Null for a CPL lead — CPL skips the Closer step entirely, forever.
+  closerId         String?
+  clientId         String?
+  externalClientId String?
+
+  // CPA = today's pipeline. CPL leads never leave this default field set — no
+  // enrichment step exists for them, not even Admin fills in Closer-only fields.
+  leadType LeadType @default(CPA)
 
   // ─── Shared personal info — set by Junior Closer at intake, editable by Closer during enrichment ───
   customerName     String
@@ -103,6 +183,9 @@ model Lead {
   state            String
   zipcode          String?
   birthState       String?
+  // No option list given in the spec — same placeholder-judgment-call pattern as
+  // maritalStatus (plain string, not a Prisma enum). See REQUIREMENTS.md.
+  gender           String?
   smoker           Boolean?
   dob              DateTime?
   age              Int?
@@ -117,6 +200,11 @@ model Lead {
   natureOfDisability String?
   annualIncome       Int?
   juniorNotes        String?
+
+  // ─── CPL intake only — set by Junior Closer, never touched by Closer or Admin ───
+  dCode         DCode?
+  decisionMaker Boolean?
+  bankAccount   Boolean?
 
   // ─── Closer enrichment — contact & identity ───
   mailingAddress String?
@@ -136,7 +224,7 @@ model Lead {
 
   // ─── Closer enrichment — policy ───
   carrierName     String?
-  planType        String?
+  planType        PlanType?
   coverageAmount  Int?
   monthlyPremiums Int?
 
@@ -153,26 +241,119 @@ model Lead {
 
   closerNotes String?
 
+  // Set when the closer parks a NEW/DRAFT lead instead of submitting it. Cleared on
+  // final submit. See DraftReason above for the enum values.
+  draftReason DraftReason?
+
   // ─── Admin ───
   rejectionReason String?
+  // What the admin wants corrected when sending a lead back to the junior closer or
+  // closer. Kept separate from rejectionReason, which is the client's reason for
+  // refusing a lead — different author, different audience, and a lead can carry both.
+  returnReason    String?
   paymentStatus   PaymentStatus @default(UNPAID)
   // Set when admin marks an ACCEPTED lead PAID — the lead is then considered closed.
   // Cleared if admin flips it back to UNPAID.
   closedAt        DateTime?
+  // Set only when marked paid through the batch "Mark Paid" action on the admin Leads
+  // page — links back to the PKR amount actually received for the batch this lead was
+  // part of. Null for leads paid via the older single-lead toggle, which doesn't
+  // record a PKR figure. See IncomePayment below.
+  incomePaymentId String?
 
   status    LeadStatus @default(NEW)
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 
-  juniorCloser User  @relation("JuniorCloserLeads", fields: [juniorCloserId], references: [id], onDelete: Cascade)
-  closer       User  @relation("CloserLeads", fields: [closerId], references: [id], onDelete: Cascade)
-  client       User? @relation("ClientLeads", fields: [clientId], references: [id], onDelete: SetNull)
+  juniorCloser   User?           @relation("JuniorCloserLeads", fields: [juniorCloserId], references: [id], onDelete: Cascade)
+  closer         User?           @relation("CloserLeads", fields: [closerId], references: [id], onDelete: Cascade)
+  client         User?           @relation("ClientLeads", fields: [clientId], references: [id], onDelete: SetNull)
+  externalClient ExternalClient? @relation("ExternalClientLeads", fields: [externalClientId], references: [id], onDelete: SetNull)
+  incomePayment  IncomePayment?  @relation(fields: [incomePaymentId], references: [id], onDelete: SetNull)
+  chargeBacks    ChargeBack[]
 
   @@index([juniorCloserId])
   @@index([closerId])
   @@index([clientId])
+  @@index([externalClientId])
   @@index([status])
   @@index([createdAt])
+  @@index([incomePaymentId])
+}
+
+// One PKR payment received against a batch of leads marked paid together via the admin
+// Leads page's "Mark Paid" bulk action — one bank transfer/cash drop can cover several
+// leads at once, so the PKR figure is recorded once per batch, not per lead. Feeds the
+// income side of the Expenses page's income-vs-expense bookkeeping view.
+model IncomePayment {
+  id        String   @id @default(cuid())
+  pkrAmount Int
+  note      String?
+  createdAt DateTime @default(now())
+
+  leads Lead[]
+
+  @@index([createdAt])
+}
+
+// One chargeback event against a lead that was ACCEPTED and PAID. Snapshots which
+// client it was assigned to at the time (clientId), because the lead's own clientId
+// gets cleared and reassigned elsewhere afterward — this is the only place that
+// history survives. Mirrors IncomePayment's shape (pkrAmount + createdAt) so the
+// analytics page can report real PKR figures, not just counts.
+model ChargeBack {
+  id        String   @id @default(cuid())
+  leadId    String
+  clientId  String
+  pkrAmount Int
+  reason    String
+  createdAt DateTime @default(now())
+
+  lead   Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  client User @relation("ClientChargeBacks", fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([clientId])
+  @@index([createdAt])
+}
+
+// Freeform bookkeeping ledger — money the business spent, tracked in PKR alongside
+// IncomePayment so the admin Expenses page can show a coherent net total. Independent
+// of the Lead pipeline; nothing else references this.
+model Expense {
+  id          String   @id @default(cuid())
+  description String
+  amount      Int
+  date        DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  @@index([date])
+}
+
+// A non-auth bookkeeping record for a lead destination outside the org — never logs
+// in, has no password/role/tokenVersion. Admin-managed roster; leads assigned here go
+// to ASSIGNED_EXTERNAL instead of the normal accept/reject-gated ASSIGNED.
+model ExternalClient {
+  id        String   @id @default(cuid())
+  name      String
+  company   String?
+  email     String?
+  phone     String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Per-plan lead cost (PKR), same shape as User.levelCost etc. above — set at creation,
+  // editable after. Lets ASSIGNED_EXTERNAL leads carry real pricing instead of the 0 they
+  // contributed to revenue analytics before this existed.
+  levelCost    Int?
+  gradedCost   Int?
+  modifiedCost Int?
+  giCost       Int?
+
+  leads Lead[] @relation("ExternalClientLeads")
+
+  @@index([name])
 }
 
 // One row per message in a team channel. Soft-deleted (deletedAt) rather than removed so

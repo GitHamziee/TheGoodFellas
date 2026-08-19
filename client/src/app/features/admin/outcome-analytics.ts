@@ -40,7 +40,6 @@ interface Row extends UserOutcomeRow {
     <div class="page">
       <div class="page-head">
         <div>
-          <h1>{{ title() }}</h1>
           <p class="sub">{{ subtitle() }}</p>
         </div>
       </div>
@@ -67,28 +66,36 @@ interface Row extends UserOutcomeRow {
         </app-stat-tile>
       </div>
 
-      @if (!loading() && rows().length > 0) {
+      @if (!loading() && chart().length > 0) {
         <div class="card">
           <div class="inline-head">
             <h2>Accepted vs rejected</h2>
-            <span class="count">Top {{ chart().length }} by volume</span>
+            <span class="count">Top {{ chart().length }} by decided leads</span>
           </div>
 
           <div class="chart">
             @for (row of chart(); track row.id) {
-              <div class="bar-col" [title]="row.name + ' — ' + row.accepted + ' accepted, ' + row.rejected + ' rejected'">
-                <div class="bar-track">
-                  <span class="bar bar--rejected" [style.height.%]="row.rejectedPct"></span>
-                  <span class="bar bar--accepted" [style.height.%]="row.acceptedPct"></span>
-                </div>
-                <span class="bar-label">{{ row.short }}</span>
+              <div
+                class="chart-row"
+                [title]="row.name + ' — ' + row.accepted + ' accepted, ' + row.rejected + ' rejected'"
+              >
+                <span class="chart-key">{{ row.name }}</span>
+                <span class="chart-track">
+                  @if (row.accepted > 0) {
+                    <span class="chart-bar chart-bar--good" [style.width.%]="row.acceptedPct"></span>
+                  }
+                  @if (row.rejected > 0) {
+                    <span class="chart-bar chart-bar--bad" [style.width.%]="row.rejectedPct"></span>
+                  }
+                </span>
+                <span class="chart-val">{{ row.decided }}</span>
               </div>
             }
           </div>
 
-          <div class="legend">
-            <span><i style="background: var(--success-600)"></i> Accepted</span>
-            <span><i style="background: var(--danger-600)"></i> Rejected</span>
+          <div class="chart-legend">
+            <span><i class="sw--good"></i> Accepted</span>
+            <span><i class="sw--bad"></i> Rejected</span>
           </div>
         </div>
       }
@@ -139,7 +146,7 @@ interface Row extends UserOutcomeRow {
                         <span class="avatar-sm" [class]="getAvatarTone(row.id)">
                           {{ getInitials(row.name) }}
                         </span>
-                        <span>
+                        <span class="who">
                           <span class="cell-main">{{ row.name }}</span>
                           <span class="cell-sub">{{ row.email }}</span>
                         </span>
@@ -176,7 +183,6 @@ interface Row extends UserOutcomeRow {
   `,
 })
 export class OutcomeAnalytics {
-  readonly title = input('Analytics');
   readonly subtitle = input('');
   readonly peopleLabel = input('People');
   readonly emptyTitle = input('Nothing to report yet');
@@ -239,13 +245,19 @@ export class OutcomeAnalytics {
     });
   });
 
-  /** Busiest handful, scaled against the largest total so bars stay comparable. */
+  /**
+   * The handful with the most decided leads, scaled against the largest decided
+   * count so the two segments of a row always sum to that row's share of the max.
+   * People with nothing decided yet are left out — an empty bar says nothing.
+   */
   readonly chart = computed(() => {
-    const top = [...this.rows()].sort((a, b) => b.total - a.total).slice(0, 8);
-    const max = Math.max(1, ...top.map((r) => r.total));
+    const top = [...this.rows()]
+      .filter((r) => r.decided > 0)
+      .sort((a, b) => b.decided - a.decided)
+      .slice(0, 8);
+    const max = Math.max(1, ...top.map((r) => r.decided));
     return top.map((r) => ({
       ...r,
-      short: r.name.split(' ')[0],
       acceptedPct: (r.accepted / max) * 100,
       rejectedPct: (r.rejected / max) * 100,
     }));

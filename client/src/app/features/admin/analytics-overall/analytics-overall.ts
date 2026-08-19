@@ -18,6 +18,7 @@ import {
 import { LeadStatus } from '../../../core/models/lead.model';
 import { Role } from '../../../core/models/user.model';
 import { ROLE_LABEL } from '../../../core/nav-config';
+import { pluralize } from '../../../core/format-utils';
 import { EmptyState, SkeletonRows, StatTile } from '../../../shared/ui/ui';
 
 const STATUS_ORDER: { status: LeadStatus; label: string; hint: string }[] = [
@@ -26,15 +27,17 @@ const STATUS_ORDER: { status: LeadStatus; label: string; hint: string }[] = [
   { status: 'ASSIGNED', label: 'Assigned', hint: 'Offered to a client, awaiting their decision' },
   { status: 'ACCEPTED', label: 'Accepted', hint: 'Taken on by a client' },
   { status: 'REJECTED', label: 'Rejected', hint: 'Sent back — needs fixing and reassignment' },
+  { status: 'ASSIGNED_EXTERNAL', label: 'Assigned — External', hint: 'Handed off to an external client (no accept/reject step)' },
 ];
 
-const ROLE_ORDER: Role[] = ['JUNIOR_CLOSER', 'CLOSER', 'ADMIN', 'CLIENT'];
+const ROLE_ORDER: Role[] = ['JUNIOR_CLOSER', 'CLOSER', 'TEAM_LEAD', 'ADMIN', 'CLIENT'];
 
 const ROLE_TONE: Record<Role, string> = {
   ADMIN: 'tone-b',
   CLOSER: 'tone-c',
   JUNIOR_CLOSER: 'tone-d',
   CLIENT: 'tone-f',
+  TEAM_LEAD: 'tone-e',
 };
 
 @Component({
@@ -64,6 +67,7 @@ export class AnalyticsOverall implements OnInit {
   readonly error = signal<string | null>(null);
 
   readonly roleLabel = ROLE_LABEL;
+  readonly pluralize = pluralize;
   readonly roleTone = ROLE_TONE;
   readonly roleOrder = ROLE_ORDER;
 
@@ -83,41 +87,44 @@ export class AnalyticsOverall implements OnInit {
       unpaid: o.unpaidAcceptedCount,
       // Share of decided leads that were accepted.
       acceptRate: decided ? Math.round((accepted / decided) * 100) : null,
-      // Share of accepted leads that have been marked paid.
-      collectionRate: accepted ? Math.round((o.closedCount / accepted) * 100) : null,
+      // Share of accepted leads that have been marked paid. A count ratio, not a
+      // dollar figure — we bill per lead, so summing coverage amounts means nothing.
+      // Every ACCEPTED lead is either PAID or UNPAID, so accepted-and-paid = accepted -
+      // unpaidAcceptedCount. o.closedCount is the wrong numerator here: it counts PAID
+      // leads platform-wide (including ASSIGNED_EXTERNAL ones), not just accepted ones.
+      collectionRate: accepted ? Math.round(((accepted - o.unpaidAcceptedCount) / accepted) * 100) : null,
     };
   });
 
-  /** Status counts scaled to the largest bucket for the bar chart. */
+  /**
+   * Status counts scaled to the largest bucket. Bars carry one of the three
+   * chart colour slots: the two decided statuses get accepted/rejected, the
+   * in-flight ones share the default volume colour.
+   */
   readonly statusBars = computed(() => {
     const o = this.overall();
     if (!o) return [];
     const rows = STATUS_ORDER.map((s) => ({
       ...s,
       count: o.statusCounts[s.status] ?? 0,
-      cls: `fb fb--${s.status.toLowerCase()}`,
-      barCls: `bar bar--${s.status === 'ACCEPTED' ? 'accepted' : s.status === 'REJECTED' ? 'rejected' : 'other'}`,
+      barCls:
+        s.status === 'ACCEPTED' ? 'chart-bar--good' : s.status === 'REJECTED' ? 'chart-bar--bad' : '',
     }));
     const max = Math.max(1, ...rows.map((r) => r.count));
-    const total = rows.reduce((sum, r) => sum + r.count, 0);
-    return rows.map((r) => ({
-      ...r,
-      pct: Math.round((r.count / max) * 100),
-      share: total ? Math.round((r.count / total) * 100) : 0,
-    }));
+    return rows.map((r) => ({ ...r, pct: Math.round((r.count / max) * 100) }));
   });
 
   readonly roleRows = computed(() => {
     const o = this.overall();
     if (!o) return [];
-    const total = ROLE_ORDER.reduce((sum, r) => sum + (o.roleCounts[r] ?? 0), 0);
-    return ROLE_ORDER.map((role) => ({
+    const counts = ROLE_ORDER.map((role) => ({
       role,
       label: ROLE_LABEL[role],
       tone: ROLE_TONE[role],
       count: o.roleCounts[role] ?? 0,
-      share: total ? Math.round(((o.roleCounts[role] ?? 0) / total) * 100) : 0,
     }));
+    const max = Math.max(1, ...counts.map((c) => c.count));
+    return counts.map((c) => ({ ...c, pct: Math.round((c.count / max) * 100) }));
   });
 
   async ngOnInit(): Promise<void> {

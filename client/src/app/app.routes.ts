@@ -21,10 +21,6 @@ export const routes: Routes = [
     path: 'login',
     loadComponent: () => import('./features/auth/login/login').then((m) => m.Login),
   },
-  {
-    path: 'register',
-    loadComponent: () => import('./features/auth/register/register').then((m) => m.Register),
-  },
 
   {
     path: 'junior',
@@ -45,13 +41,21 @@ export const routes: Routes = [
         loadComponent: () => import('./features/junior-closer/my-leads/my-leads').then((m) => m.MyLeads),
       },
       {
+        path: 'returned',
+        loadComponent: () => import('./features/junior-closer/returned/returned').then((m) => m.JuniorReturned),
+      },
+      {
+        // Correction mode of the intake form — same component as submit-lead.
+        path: 'leads/:id/edit',
+        loadComponent: () => import('./features/junior-closer/submit-lead/submit-lead').then((m) => m.SubmitLead),
+      },
+      {
         path: 'chat',
         loadComponent: () => import('./features/chat/chat').then((m) => m.Chat),
       },
-      {
-        path: 'settings',
-        loadComponent: () => import('./features/settings/settings').then((m) => m.Settings),
-      },
+      // Settings removed from this portal's nav — redirect stray bookmarks/links rather
+      // than letting them 404 all the way out to the public marketing site.
+      { path: 'settings', redirectTo: 'dashboard' },
     ],
   },
 
@@ -70,6 +74,14 @@ export const routes: Routes = [
         loadComponent: () => import('./features/closer/inbox/inbox').then((m) => m.CloserInbox),
       },
       {
+        path: 'new-lead',
+        loadComponent: () => import('./features/closer/new-lead/new-lead').then((m) => m.NewLead),
+      },
+      {
+        path: 'drafts',
+        loadComponent: () => import('./features/closer/drafts/drafts').then((m) => m.CloserDrafts),
+      },
+      {
         path: 'leads/:id',
         loadComponent: () => import('./features/closer/enrich-lead/enrich-lead').then((m) => m.EnrichLead),
       },
@@ -78,13 +90,20 @@ export const routes: Routes = [
         loadComponent: () => import('./features/closer/history/history').then((m) => m.CloserHistory),
       },
       {
+        path: 'state-sheet',
+        loadComponent: () => import('./features/admin/state-sheet/state-sheet').then((m) => m.StateSheet),
+      },
+      {
+        path: 'returned',
+        loadComponent: () => import('./features/closer/returned/returned').then((m) => m.CloserReturned),
+      },
+      {
         path: 'chat',
         loadComponent: () => import('./features/chat/chat').then((m) => m.Chat),
       },
-      {
-        path: 'settings',
-        loadComponent: () => import('./features/settings/settings').then((m) => m.Settings),
-      },
+      // Settings removed from this portal's nav — redirect stray bookmarks/links rather
+      // than letting them 404 all the way out to the public marketing site.
+      { path: 'settings', redirectTo: 'dashboard' },
     ],
   },
 
@@ -107,8 +126,29 @@ export const routes: Routes = [
         loadComponent: () => import('./features/admin/leads/leads').then((m) => m.AdminLeads),
       },
       {
+        path: 'charge-backs',
+        loadComponent: () => import('./features/admin/charge-backs/charge-backs').then((m) => m.AdminChargeBacks),
+      },
+      {
+        path: 'cpl-leads',
+        loadComponent: () => import('./features/admin/cpl-leads/cpl-leads').then((m) => m.AdminCplLeads),
+      },
+      {
         path: 'users',
         loadComponent: () => import('./features/admin/users/users').then((m) => m.AdminUsers),
+      },
+      {
+        path: 'external-clients',
+        loadComponent: () =>
+          import('./features/admin/external-clients/external-clients').then((m) => m.AdminExternalClients),
+      },
+      {
+        path: 'state-sheet',
+        loadComponent: () => import('./features/admin/state-sheet/state-sheet').then((m) => m.StateSheet),
+      },
+      {
+        path: 'expenses',
+        loadComponent: () => import('./features/admin/expenses/expenses').then((m) => m.AdminExpenses),
       },
       {
         path: 'analytics/junior-closers',
@@ -119,8 +159,21 @@ export const routes: Routes = [
         loadComponent: () => import('./features/admin/analytics-closer/analytics-closer').then((m) => m.AnalyticsCloser),
       },
       {
+        path: 'analytics/clients',
+        loadComponent: () => import('./features/admin/analytics-client/analytics-client').then((m) => m.AnalyticsClient),
+      },
+      {
         path: 'analytics/overall',
         loadComponent: () => import('./features/admin/analytics-overall/analytics-overall').then((m) => m.AnalyticsOverall),
+      },
+      {
+        path: 'analytics/drafts',
+        loadComponent: () => import('./features/admin/analytics-drafts/analytics-drafts').then((m) => m.AnalyticsDrafts),
+      },
+      {
+        path: 'analytics/charge-backs',
+        loadComponent: () =>
+          import('./features/admin/analytics-charge-backs/analytics-charge-backs').then((m) => m.AnalyticsChargeBacks),
       },
       {
         path: 'chat',
@@ -155,6 +208,43 @@ export const routes: Routes = [
         path: 'settings',
         loadComponent: () => import('./features/settings/settings').then((m) => m.Settings),
       },
+    ],
+  },
+
+  {
+    path: 'team-lead',
+    canMatch: [authGuard, roleGuard('TEAM_LEAD')],
+    loadComponent: () => import('./layout/portal-shell/portal-shell').then((m) => m.PortalShell),
+    children: [
+      { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
+      {
+        path: 'dashboard',
+        loadComponent: () => import('./features/team-lead/dashboard/dashboard').then((m) => m.TeamLeadDashboard),
+      },
+      {
+        path: 'submitted-leads',
+        loadComponent: () =>
+          import('./features/team-lead/submitted-leads/submitted-leads').then((m) => m.TeamLeadSubmittedLeads),
+      },
+      {
+        path: 'state-sheet',
+        loadComponent: () => import('./features/admin/state-sheet/state-sheet').then((m) => m.StateSheet),
+      },
+      {
+        path: 'analytics/junior-closers',
+        loadComponent: () => import('./features/admin/analytics-junior/analytics-junior').then((m) => m.AnalyticsJunior),
+      },
+      {
+        path: 'analytics/closers',
+        loadComponent: () => import('./features/admin/analytics-closer/analytics-closer').then((m) => m.AnalyticsCloser),
+      },
+      {
+        path: 'chat',
+        loadComponent: () => import('./features/chat/chat').then((m) => m.Chat),
+      },
+      // Settings removed from this portal's nav — redirect stray bookmarks/links rather
+      // than letting them 404 all the way out to the public marketing site.
+      { path: 'settings', redirectTo: 'dashboard' },
     ],
   },
 

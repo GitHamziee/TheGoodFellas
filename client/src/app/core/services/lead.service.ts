@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { API_BASE_URL } from '../config';
-import { Lead, LeadHistoryRow, LeadPreview, PaymentStatus } from '../models/lead.model';
+import { Lead, LeadHistoryRow, LeadInboxPreview, LeadIntakeEdit, LeadPreview, TeamLeadLeadRow } from '../models/lead.model';
 
 interface ApiSuccess<T> {
   data: T;
@@ -12,7 +12,7 @@ interface ApiSuccess<T> {
 const BASE = `${API_BASE_URL}/leads`;
 
 const SHARED_KEYS = [
-  'customerName', 'maritalStatus', 'phone', 'state', 'zipcode', 'birthState',
+  'customerName', 'maritalStatus', 'phone', 'state', 'zipcode', 'birthState', 'gender',
   'smoker', 'dob', 'age', 'height', 'weight', 'healthConditions',
 ] as const;
 
@@ -20,6 +20,12 @@ export type JuniorLeadInput = Partial<Pick<Lead, (typeof SHARED_KEYS)[number]>> 
   Partial<Pick<Lead, 'need' | 'incomeSource' | 'retiredIncomeType' | 'natureOfDisability' | 'annualIncome' | 'juniorNotes'>> & {
     closerId: string;
   };
+
+const CPL_SHARED_KEYS = ['customerName', 'phone', 'state', 'zipcode', 'smoker', 'dob'] as const;
+
+/** CPL's own, deliberately shorter intake — no closerId, no enrichment step ever follows. */
+export type CplLeadInput = Partial<Pick<Lead, (typeof CPL_SHARED_KEYS)[number]>> &
+  Partial<Pick<Lead, 'need' | 'juniorNotes' | 'decisionMaker' | 'bankAccount' | 'dCode'>>;
 
 export type CloserLeadInput = Partial<Pick<Lead, (typeof SHARED_KEYS)[number]>> &
   Partial<
@@ -49,10 +55,17 @@ export type CloserLeadInput = Partial<Pick<Lead, (typeof SHARED_KEYS)[number]>> 
       | 'routingNumber'
       | 'accountNumber'
       | 'closerNotes'
+      | 'draftReason'
     >
   >;
 
-export type AdminLeadEditInput = CloserLeadInput & Partial<Omit<JuniorLeadInput, 'closerId'>>;
+export type AdminLeadEditInput = CloserLeadInput &
+  Partial<Omit<JuniorLeadInput, 'closerId'>> &
+  Partial<Pick<Lead, 'decisionMaker' | 'bankAccount' | 'dCode'>>;
+
+/** Closer building a lead from scratch — junior intake + closer enrichment together,
+ *  no CPL-only fields, no closerId (the caller is implicit). */
+export type CloserCreateLeadInput = CloserLeadInput & Partial<Omit<JuniorLeadInput, 'closerId'>>;
 
 @Injectable({ providedIn: 'root' })
 export class LeadService {
@@ -64,14 +77,40 @@ export class LeadService {
     return res.data.lead;
   }
 
+  /** CPL submission — skips the closer entirely, lands straight in the admin's queue. */
+  async submitCplLead(input: CplLeadInput): Promise<Lead> {
+    const res = await firstValueFrom(this.http.post<ApiSuccess<{ lead: Lead }>>(`${BASE}/cpl`, input));
+    return res.data.lead;
+  }
+
   async myLeads(): Promise<LeadHistoryRow[]> {
     const res = await firstValueFrom(this.http.get<ApiSuccess<{ leads: LeadHistoryRow[] }>>(`${BASE}/mine`));
     return res.data.leads;
   }
 
+  /** Leads the admin sent back to this junior closer to correct. */
+  async myReturnedLeads(): Promise<LeadIntakeEdit[]> {
+    const res = await firstValueFrom(
+      this.http.get<ApiSuccess<{ leads: LeadIntakeEdit[] }>>(`${BASE}/returned/mine`)
+    );
+    return res.data.leads;
+  }
+
+  /** Corrects the intake and sends it back to the admin — same endpoint for CPA and CPL,
+   *  the server picks the right field set from the lead's own leadType. */
+  async resubmitIntake(
+    id: string,
+    input: Omit<JuniorLeadInput, 'closerId'> & Partial<Pick<Lead, 'decisionMaker' | 'bankAccount' | 'dCode'>>
+  ): Promise<LeadHistoryRow> {
+    const res = await firstValueFrom(
+      this.http.patch<ApiSuccess<{ lead: LeadHistoryRow }>>(`${BASE}/${id}/resubmit-intake`, input)
+    );
+    return res.data.lead;
+  }
+
   // ─── Closer ─────────────────────────────────────────────────
-  async inbox(): Promise<Lead[]> {
-    const res = await firstValueFrom(this.http.get<ApiSuccess<{ leads: Lead[] }>>(`${BASE}/inbox`));
+  async inbox(): Promise<LeadInboxPreview[]> {
+    const res = await firstValueFrom(this.http.get<ApiSuccess<{ leads: LeadInboxPreview[] }>>(`${BASE}/inbox`));
     return res.data.leads;
   }
 
@@ -82,6 +121,39 @@ export class LeadService {
 
   async enrichLead(id: string, input: CloserLeadInput): Promise<Lead> {
     const res = await firstValueFrom(this.http.patch<ApiSuccess<{ lead: Lead }>>(`${BASE}/${id}/enrich`, input));
+    return res.data.lead;
+  }
+
+  /** Leads this closer has parked as a draft — full detail, resumable only by them. */
+  async drafts(): Promise<Lead[]> {
+    const res = await firstValueFrom(this.http.get<ApiSuccess<{ leads: Lead[] }>>(`${BASE}/drafts`));
+    return res.data.leads;
+  }
+
+  /** Parks a NEW or already-drafted lead instead of submitting it — draftReason is required. */
+  async saveDraft(id: string, input: CloserLeadInput): Promise<Lead> {
+    const res = await firstValueFrom(this.http.patch<ApiSuccess<{ lead: Lead }>>(`${BASE}/${id}/draft`, input));
+    return res.data.lead;
+  }
+
+  /** Leads the admin sent back to this closer to correct. */
+  async closerReturnedLeads(): Promise<Lead[]> {
+    const res = await firstValueFrom(this.http.get<ApiSuccess<{ leads: Lead[] }>>(`${BASE}/returned/closer`));
+    return res.data.leads;
+  }
+
+  /** Corrects the enrichment and sends it back to the admin. */
+  async resubmitEnrichment(id: string, input: CloserLeadInput): Promise<Lead> {
+    const res = await firstValueFrom(
+      this.http.patch<ApiSuccess<{ lead: Lead }>>(`${BASE}/${id}/resubmit-enrichment`, input)
+    );
+    return res.data.lead;
+  }
+
+  /** Closer builds a lead from scratch — self-/AI-sourced calls with no junior closer
+   *  involved. Lands straight in the admin queue as SUBMITTED. */
+  async createLeadAsCloser(input: CloserCreateLeadInput): Promise<Lead> {
+    const res = await firstValueFrom(this.http.post<ApiSuccess<{ lead: Lead }>>(`${BASE}/closer`, input));
     return res.data.lead;
   }
 
@@ -96,8 +168,35 @@ export class LeadService {
     return res.data.leads;
   }
 
+  /** All CPL leads, any status — feeds the dedicated Admin "CPL Leads" page. */
+  async cplLeads(): Promise<Lead[]> {
+    const res = await firstValueFrom(this.http.get<ApiSuccess<{ leads: Lead[] }>>(`${BASE}/cpl`));
+    return res.data.leads;
+  }
+
+  /** Charged-back leads waiting to be reassigned to a different client/external client. */
+  async chargeBacks(): Promise<Lead[]> {
+    const res = await firstValueFrom(this.http.get<ApiSuccess<{ leads: Lead[] }>>(`${BASE}/charge-backs`));
+    return res.data.leads;
+  }
+
+  /** Records a chargeback against an ACCEPTED + PAID lead — frees it up for reassignment. */
+  async chargeBackLead(id: string, pkrAmount: number, reason: string): Promise<Lead> {
+    const res = await firstValueFrom(
+      this.http.patch<ApiSuccess<{ lead: Lead }>>(`${BASE}/${id}/charge-back`, { pkrAmount, reason })
+    );
+    return res.data.lead;
+  }
+
   async assignLead(id: string, clientId: string): Promise<Lead> {
     const res = await firstValueFrom(this.http.patch<ApiSuccess<{ lead: Lead }>>(`${BASE}/${id}/assign`, { clientId }));
+    return res.data.lead;
+  }
+
+  async assignLeadExternal(id: string, externalClientId: string): Promise<Lead> {
+    const res = await firstValueFrom(
+      this.http.patch<ApiSuccess<{ lead: Lead }>>(`${BASE}/${id}/assign-external`, { externalClientId })
+    );
     return res.data.lead;
   }
 
@@ -106,9 +205,29 @@ export class LeadService {
     return res.data.lead;
   }
 
-  async setPaymentStatus(id: string, paymentStatus: PaymentStatus): Promise<Lead> {
-    const res = await firstValueFrom(this.http.patch<ApiSuccess<{ lead: Lead }>>(`${BASE}/${id}/payment-status`, { paymentStatus }));
+  /** Sends a queued lead back to whichever role entered the bad data. */
+  async returnLead(id: string, target: 'JUNIOR_CLOSER' | 'CLOSER', reason: string): Promise<Lead> {
+    const res = await firstValueFrom(
+      this.http.patch<ApiSuccess<{ lead: Lead }>>(`${BASE}/${id}/return`, { target, reason })
+    );
     return res.data.lead;
+  }
+
+  /** Reverts a mistaken PAID back to UNPAID. Marking a lead PAID only happens via batchMarkPaid,
+   *  so the amount received is always recorded — this never sets PAID. */
+  async markUnpaid(id: string): Promise<Lead> {
+    const res = await firstValueFrom(
+      this.http.patch<ApiSuccess<{ lead: Lead }>>(`${BASE}/${id}/payment-status`, { paymentStatus: 'UNPAID' })
+    );
+    return res.data.lead;
+  }
+
+  /** Marks a batch of leads paid at once, recording one PKR amount for the whole batch. */
+  async batchMarkPaid(leadIds: string[], pkrAmount: number, note?: string): Promise<{ count: number }> {
+    const res = await firstValueFrom(
+      this.http.patch<ApiSuccess<{ count: number }>>(`${BASE}/batch-payment`, { leadIds, pkrAmount, note })
+    );
+    return res.data;
   }
 
   // ─── Client ─────────────────────────────────────────────────
@@ -132,6 +251,15 @@ export class LeadService {
   async rejectLead(id: string, reason?: string): Promise<Lead> {
     const res = await firstValueFrom(this.http.patch<ApiSuccess<{ lead: Lead }>>(`${BASE}/${id}/reject`, { reason }));
     return res.data.lead;
+  }
+
+  // ─── Team Lead ────────────────────────────────────────────────
+  /** Masked, read-only view of the admin's SUBMITTED queue. */
+  async teamLeadSubmitted(): Promise<TeamLeadLeadRow[]> {
+    const res = await firstValueFrom(
+      this.http.get<ApiSuccess<{ leads: TeamLeadLeadRow[] }>>(`${BASE}/team-lead/submitted`)
+    );
+    return res.data.leads;
   }
 
   // ─── Shared ─────────────────────────────────────────────────

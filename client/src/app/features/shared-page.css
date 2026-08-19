@@ -9,6 +9,13 @@
   animation: fade-up 0.35s ease both;
 }
 
+/* Narrower cap for single-record entry forms (intake/enrichment) — the full 1200px page
+ * width stretches a 2-column form-grid into uncomfortably wide input boxes. List/table
+ * pages keep the wide `.page` default; this is opt-in per page. */
+.page.page--narrow {
+  max-width: 760px;
+}
+
 /* ---------- Page header ---------- */
 .page-head {
   display: flex;
@@ -166,6 +173,39 @@ label {
   color: var(--gray-400);
 }
 
+/* Inline auto-save status (e.g. the state-sheet coverage editor) — empty and silent
+   until there's something to report, so it never reserves layout space at rest. */
+.save-status {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.7rem 0 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--success-700);
+  min-height: 1.1rem;
+  animation: save-status-in 0.15s ease both;
+}
+
+.save-status:empty {
+  margin: 0;
+  min-height: 0;
+}
+
+.save-status svg {
+  width: 13px;
+  height: 13px;
+}
+
+.save-status--saving {
+  color: var(--gray-500);
+}
+
+@keyframes save-status-in {
+  from { opacity: 0; transform: translateY(-2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 input,
 select,
 textarea {
@@ -192,6 +232,13 @@ select.invalid {
   border-color: var(--danger-600);
 }
 
+/* Calculated, non-editable field (e.g. annual premium derived from monthly premium). */
+input[readonly] {
+  background: var(--gray-50);
+  color: var(--gray-600);
+  cursor: default;
+}
+
 .field-error {
   font-size: 0.75rem;
   font-weight: 600;
@@ -204,6 +251,130 @@ select.invalid {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--gold-700);
+}
+
+/* ---------- Custom dropdown — styled alternative to native <select>, whose
+   option list can't be restyled cross-browser (native menu, OS-controlled). ---------- */
+.dropdown {
+  position: relative;
+  min-width: 150px;
+}
+
+.dropdown-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-family: inherit;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.dropdown-trigger:hover {
+  border-color: var(--gold-500);
+}
+
+.dropdown-trigger.open,
+.dropdown-trigger:focus-visible {
+  border-color: var(--gold-500);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.18);
+}
+
+.dropdown-trigger.invalid {
+  border-color: var(--danger-600);
+}
+
+.dropdown-trigger:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.dropdown-trigger .placeholder {
+  color: var(--gray-400);
+  font-weight: 400;
+}
+
+.dropdown-chevron {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  color: var(--gray-400);
+  transition: transform 0.15s ease;
+}
+
+.dropdown-trigger.open .dropdown-chevron {
+  transform: rotate(180deg);
+}
+
+/* Positioned via inline [style] (position: fixed + computed top/left/width), not static
+   CSS — the app-select component portals this to <body> on open, so it never inherits
+   an ancestor's overflow: hidden or backdrop-filter (both of which would otherwise clip
+   or mis-root it when opened from inside app-modal). See shared/ui/select.ts. */
+.dropdown-menu {
+  z-index: 200;
+  margin: 0;
+  padding: 0.35rem;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg);
+  max-height: 240px;
+  overflow-y: auto;
+  animation: dropdown-pop 0.12s ease both;
+}
+
+.dropdown-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.87rem;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.dropdown-option:hover {
+  background: var(--gold-50);
+}
+
+.dropdown-option.selected {
+  background: var(--gold-50);
+  color: var(--gold-800);
+  font-weight: 700;
+}
+
+.dropdown-option.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.dropdown-option svg {
+  width: 14px;
+  height: 14px;
+  color: var(--gold-600);
+}
+
+@keyframes dropdown-pop {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dropdown-menu { animation: none; }
 }
 
 /* Back link above a page title */
@@ -410,6 +581,7 @@ textarea {
   font-weight: 700;
   font-size: 0.85rem;
   font-family: inherit;
+  text-decoration: none;
   cursor: pointer;
   white-space: nowrap;
   transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
@@ -442,6 +614,14 @@ textarea {
   padding: 0.38rem 0.7rem;
   font-size: 0.78rem;
   border-radius: var(--radius-sm);
+}
+
+/* Icon-only button — for row actions where several actions must fit in one cell */
+.btn--icon {
+  padding: 0.4rem;
+  width: 1.9rem;
+  height: 1.9rem;
+  flex-shrink: 0;
 }
 
 .btn--danger {
@@ -536,14 +716,6 @@ textarea {
 .search-box input {
   width: 100%;
   padding-left: 2.1rem;
-}
-
-.filter-select {
-  min-width: 150px;
-  font-size: 0.82rem;
-  padding: 0.5rem 0.7rem;
-  font-weight: 600;
-  color: var(--gray-700);
 }
 
 /* Segmented status pills */
@@ -678,6 +850,18 @@ thead tr {
   border-bottom: 1px solid var(--border);
 }
 
+.checkbox-col {
+  width: 2.2rem;
+  padding-right: 0;
+}
+
+.checkbox-col input[type='checkbox'] {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--gold-500);
+  cursor: pointer;
+}
+
 th {
   color: var(--gray-500);
   font-weight: 700;
@@ -709,6 +893,19 @@ td.num {
 td.right,
 th.right {
   text-align: right;
+}
+
+/* Marks a column (or group of columns) as a distinct metric from its neighbors — e.g.
+   a total computed a different way, in a different currency, or from a different data
+   source. A plain border-left blends into the grid at this row height, so this pairs a
+   stronger divider with a faint tint that runs the full column, not just the header. */
+.col-group-divider {
+  border-left: 2px solid var(--border);
+  background: var(--gray-50);
+}
+
+th.col-group-divider {
+  color: var(--gray-600);
 }
 
 tbody tr {
@@ -790,6 +987,17 @@ tbody tr.clickable:hover {
   text-overflow: ellipsis;
 }
 
+/* Stacked name + muted secondary line (.cell-main / .cell-sub) inside a `.person` cell.
+   Both are plain <span>s so they need this to break onto separate lines — without it
+   they render inline as one run-together string. `.pick-row`/`.pick-card` scopes already
+   redeclare the same flex-column locally; this is the shared baseline for everywhere else
+   (e.g. the analytics "Closer"/"Client" table columns) so new usages don't need to. */
+.who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 .chip {
   display: inline-flex;
   align-items: center;
@@ -806,6 +1014,176 @@ tbody tr.clickable:hover {
 .chip svg {
   width: 12px;
   height: 12px;
+}
+
+/* ---------- Multi-select pill grid (e.g. licensed states) ---------- */
+.pill-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  max-height: 190px;
+  overflow-y: auto;
+  padding: 0.6rem;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--gray-50);
+}
+
+.pill-grid .pill {
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.pill-grid .pill.active {
+  background: var(--ink-900);
+  border-color: var(--ink-900);
+  color: var(--gold-300);
+}
+
+/* Wraps a run of .chip elements inside a table cell — no outer margin, unlike .tag-list. */
+.chip-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+/* Standalone rotation trigger for a chevron that isn't inside .dropdown-trigger
+   (e.g. an expandable table row) — mirrors .dropdown-trigger.open .dropdown-chevron. */
+.dropdown-chevron.open {
+  transform: rotate(180deg);
+}
+
+/* ---------- State sheet: state cell, coverage/carrier pills ---------- */
+.state-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.state-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--gray-300);
+  flex-shrink: 0;
+}
+
+.state-dot--on {
+  background: var(--success-600);
+  box-shadow: 0 0 0 3px var(--success-50);
+}
+
+.count-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.28rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.count-pill svg {
+  width: 12px;
+  height: 12px;
+}
+
+.count-pill--clients {
+  background: var(--gold-50);
+  color: var(--gold-800);
+}
+
+.count-pill--carriers {
+  background: var(--info-50);
+  color: var(--info-600);
+}
+
+/* Compact variant of .empty for use inside a table cell rather than a whole panel. */
+.empty--inline {
+  padding: 0;
+}
+
+/* ---------- Expandable state-sheet row: per-client carrier breakdown ---------- */
+.state-row td {
+  transition: background 0.12s ease;
+}
+
+tr.expand-row {
+  animation: expand-row-in 0.15s ease both;
+}
+
+tr.expand-row td {
+  background: var(--gray-50);
+  padding: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.breakdown {
+  display: flex;
+  flex-direction: column;
+}
+
+.breakdown-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.8rem 1.1rem;
+}
+
+.breakdown-item + .breakdown-item {
+  border-top: 1px solid var(--border);
+}
+
+.breakdown-item__client {
+  background: var(--gold-50);
+  color: var(--gold-800);
+  flex-shrink: 0;
+  min-width: 10rem;
+}
+
+@keyframes expand-row-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ---------- Manual tag entry (e.g. carriers) ---------- */
+.tag-input {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.tag-input input {
+  flex: 1;
+}
+
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.7rem;
+}
+
+.tag-list .chip {
+  background: var(--gold-50);
+  color: var(--gold-800);
+}
+
+.tag-list .chip button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+
+.tag-list .chip button svg {
+  width: 11px;
+  height: 11px;
 }
 
 /* ---------- Profile header (account detail) ---------- */
@@ -867,6 +1245,35 @@ tbody tr.clickable:hover {
 .badge--assigned  { background: var(--gold-100);   color: var(--gold-800); }
 .badge--accepted  { background: var(--success-50); color: var(--success-700); }
 .badge--rejected  { background: var(--danger-50);  color: var(--danger-700); }
+/* Sent back for correction — amber like SUBMITTED (it's mid-pipeline, not a failure),
+   but outlined so it's distinguishable at a glance in a mixed list. */
+.badge--returned_to_junior,
+.badge--returned_to_closer {
+  background: var(--warning-50);
+  color: var(--warning-700);
+  box-shadow: inset 0 0 0 1px var(--warning-600);
+}
+/* Handed off to an external client — terminal like ACCEPTED, but outlined gold to
+   distinguish "we're done" from "waiting on a real client's decision". */
+.badge--assigned_external {
+  background: var(--gold-50);
+  color: var(--gold-700);
+  box-shadow: inset 0 0 0 1px var(--gold-600);
+}
+/* Parked, not yet submitted — neutral and outlined so it reads as "unfinished", not a
+   pipeline stage like SUBMITTED. */
+.badge--draft {
+  background: var(--gray-100);
+  color: var(--gray-600);
+  box-shadow: inset 0 0 0 1px var(--gray-400);
+}
+/* Money clawed back after acceptance — same red family as REJECTED but outlined, so a
+   mixed list distinguishes "client changed their mind" from "we had to give it back". */
+.badge--charged_back {
+  background: var(--danger-50);
+  color: var(--danger-700);
+  box-shadow: inset 0 0 0 1px var(--danger-600);
+}
 .badge--paid      { background: var(--success-50); color: var(--success-700); }
 .badge--unpaid    { background: var(--gray-100);   color: var(--gray-600); }
 .badge--neutral   { background: var(--gray-100);   color: var(--gray-600); }
@@ -992,6 +1399,29 @@ tbody tr.clickable:hover {
   width: 15px;
   height: 15px;
   flex-shrink: 0;
+}
+
+/* Bulk-selection action bar (e.g. Admin → Leads "N leads selected… Mark Paid"). Sticky
+ * rather than static — it sits above a long, scrollable table, and pinning it to the top
+ * of the scroll container (`.content` in portal-shell) means the action stays reachable
+ * without scrolling back up, no matter how far down the list the selection was made. */
+.batch-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  background: var(--warning-50);
+  color: var(--warning-700);
+  border: 1px solid #fde68a;
+  border-radius: var(--radius-sm);
+  padding: 0.65rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-bottom: 1rem;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  box-shadow: 0 6px 16px -8px rgba(0, 0, 0, 0.18);
 }
 
 /* ---------- Selectable list (assign-to dialogs) ---------- */
@@ -1155,149 +1585,149 @@ tbody tr.clickable:hover {
   margin-top: 0.1rem;
 }
 
-/* ---------- Bar chart (analytics) ---------- */
+/* ============================================================
+   Charts — ONE vocabulary, used by every chart in the app.
+
+   Every chart is horizontal bars growing from a single left baseline with
+   the value printed at the end of the row. Three colour slots only:
+   gold = volume/in-flight, green = accepted, red = rejected. The trio is
+   validated for colour-blind separation (worst adjacent pair ΔE 8.6 under
+   deuteranopia) — do not swap a slot for an untested hue. Gold sits just
+   under 3:1 against white, which is why every bar is directly labelled and
+   every chart is backed by a table.
+
+   Markup contract:
+     .chart > .chart-row > .chart-key + .chart-track(> .chart-bar…) + .chart-val
+   ============================================================ */
+:root {
+  --chart-vol: var(--gold-600);
+  --chart-good: var(--success-700);
+  --chart-bad: var(--danger-600);
+  --chart-idle: var(--gray-300);
+}
+
 .chart {
   display: flex;
-  align-items: flex-end;
-  gap: 0.5rem;
-  height: 190px;
-  padding-top: 0.5rem;
+  flex-direction: column;
+  gap: 0.1rem;
 }
 
-.chart .bar-col {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
+.chart-row {
+  display: grid;
+  grid-template-columns: 8.5rem 1fr 3.25rem;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.9rem;
+  padding: 0.42rem 0.5rem;
+  border-radius: var(--radius-sm);
+  transition: background 0.12s ease;
+}
+
+.chart-row:hover { background: var(--gray-50); }
+
+.chart-key {
   min-width: 0;
-  height: 100%;
-}
-
-.chart .bar-track {
-  flex: 1;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  gap: 2px;
-}
-
-.chart .bar {
-  width: 100%;
-  border-radius: 3px 3px 0 0;
-  min-height: 2px;
-  transition: opacity 0.15s ease;
-}
-
-.chart .bar--accepted { background: linear-gradient(180deg, var(--success-600), #22c55e); }
-.chart .bar--rejected { background: linear-gradient(180deg, #f87171, var(--danger-600)); }
-.chart .bar--other    { background: linear-gradient(180deg, var(--gold-400), var(--gold-600)); }
-
-.chart .bar-col:hover .bar {
-  opacity: 0.82;
-}
-
-.chart .bar-label {
-  font-size: 0.68rem;
-  color: var(--gray-500);
+  font-size: 0.79rem;
   font-weight: 600;
+  color: var(--gray-600);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 100%;
 }
 
-.legend {
+/* Second line under a row label (a person's email, a stage's owner). */
+.chart-key .sub {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: var(--gray-400);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The plot area. No track pill — the row's own width is the scale. */
+.chart-track {
   display: flex;
-  gap: 1rem;
+  align-items: center;
+  gap: 2px; /* the surface gap; never a border around a mark */
+  min-width: 0;
+  height: 10px;
+}
+
+.chart-bar {
+  height: 100%;
+  min-width: 2px;
+  /* square at the baseline, 4px rounded at the data end */
+  border-radius: 0 4px 4px 0;
+  background: var(--chart-vol);
+  transition: width 0.4s ease;
+}
+
+/* Interior segments of a stack keep square ends; only the last one rounds. */
+.chart-bar:not(:last-child) { border-radius: 0; }
+
+.chart-bar--good { background: var(--chart-good); }
+.chart-bar--bad  { background: var(--chart-bad); }
+.chart-bar--idle { background: var(--chart-idle); }
+
+.chart-val {
+  text-align: right;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-legend {
+  display: flex;
+  gap: 1.1rem;
   flex-wrap: wrap;
-  margin-top: 0.9rem;
+  margin-top: 0.85rem;
+  padding-left: 0.5rem;
   font-size: 0.76rem;
   color: var(--gray-600);
 }
 
-.legend span {
+.chart-legend span {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.4rem;
 }
 
-.legend i {
-  width: 9px;
-  height: 9px;
+.chart-legend i {
+  width: 10px;
+  height: 10px;
   border-radius: 2px;
   display: inline-block;
+  flex-shrink: 0;
 }
 
-/* Inline proportion meter used in analytics tables */
+.chart-legend .sw--vol  { background: var(--chart-vol); }
+.chart-legend .sw--good { background: var(--chart-good); }
+.chart-legend .sw--bad  { background: var(--chart-bad); }
+.chart-legend .sw--idle { background: var(--chart-idle); }
+
+/* Inline proportion meter used in analytics tables — same colours, same
+   2px surface gap, just shrunk to fit a table cell. */
 .meter {
   display: flex;
+  gap: 2px;
   height: 6px;
-  border-radius: 999px;
-  overflow: hidden;
-  background: var(--gray-100);
   min-width: 80px;
 }
 
 .meter i {
   display: block;
   height: 100%;
+  border-radius: 0 3px 3px 0;
 }
 
-.meter .ok   { background: var(--success-600); }
-.meter .bad  { background: var(--danger-600); }
+.meter i:not(:last-child) { border-radius: 0; }
 
-/* ---------- Pipeline funnel (dashboards) ---------- */
-.funnel {
-  display: flex;
-  flex-direction: column;
-  gap: 0.7rem;
-}
+.meter .ok  { background: var(--chart-good); }
+.meter .bad { background: var(--chart-bad); }
 
-.funnel-row {
-  display: grid;
-  grid-template-columns: 8.5rem 1fr 2.5rem;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.funnel-row .fl {
-  font-size: 0.79rem;
-  font-weight: 600;
-  color: var(--gray-600);
-}
-
-.funnel-row .ft {
-  height: 8px;
-  border-radius: 999px;
-  background: var(--gray-100);
-  overflow: hidden;
-}
-
-.funnel-row .fb {
-  display: block;
-  height: 100%;
-  border-radius: 999px;
-  transition: width 0.4s ease;
-}
-
-.funnel-row .fn {
-  text-align: right;
-  font-size: 0.82rem;
-  font-weight: 800;
-  color: var(--text);
-  font-variant-numeric: tabular-nums;
-}
-
-.fb--new       { background: var(--info-600); }
-.fb--submitted { background: var(--warning-600); }
-.fb--assigned  { background: var(--gold-500); }
-.fb--accepted  { background: var(--success-600); }
-.fb--rejected  { background: var(--danger-600); }
-
-@media (max-width: 520px) {
-  .funnel-row { grid-template-columns: 6.5rem 1fr 2.2rem; }
+@media (max-width: 620px) {
+  .chart-row { grid-template-columns: 6rem 1fr 2.6rem; gap: 0.6rem; }
 }
 
 /* ---------- Recent-activity list (dashboards) ---------- */

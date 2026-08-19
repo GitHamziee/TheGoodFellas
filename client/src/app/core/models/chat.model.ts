@@ -1,6 +1,6 @@
 import { Role } from './user.model';
 
-export type ChatRoomKey = 'CLOSERS' | 'JUNIOR_CLOSERS';
+export type ChatRoomKey = 'CLOSERS' | 'JUNIOR_CLOSERS' | 'TEAM_LEADS';
 
 export interface ChatSender {
   id: string;
@@ -33,6 +33,7 @@ export interface TypingUser {
 export const CHAT_ROOM_LABEL: Record<ChatRoomKey, string> = {
   CLOSERS: 'Closers',
   JUNIOR_CLOSERS: 'Junior Closers',
+  TEAM_LEADS: 'Team Leads',
 };
 
 /**
@@ -42,6 +43,7 @@ export const CHAT_ROOM_LABEL: Record<ChatRoomKey, string> = {
 export const CHAT_ROOMS_BY_ROLE: Record<Role, ChatRoomKey[]> = {
   CLOSER: ['CLOSERS'],
   JUNIOR_CLOSER: ['JUNIOR_CLOSERS'],
-  ADMIN: ['CLOSERS', 'JUNIOR_CLOSERS'],
+  TEAM_LEAD: ['TEAM_LEADS'],
+  ADMIN: ['CLOSERS', 'JUNIOR_CLOSERS', 'TEAM_LEADS'],
   CLIENT: [],
 };

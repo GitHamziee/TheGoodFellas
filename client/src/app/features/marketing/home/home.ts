@@ -46,12 +46,12 @@ export class Home {
     headline: { value: '186', label: 'live transfers today' },
     kpis: [
       { value: '1,240', label: 'Inbound calls' },
-      { value: '31', label: 'Policies closed' },
+      { value: '31', label: 'Transfers completed' },
     ],
     meter: { label: 'AI clear rate', display: '89%', pct: 89 },
     feed: [
       { vertical: 'Final Expense', state: 'TX', status: 'Transferring', tone: 'gold' },
-      { vertical: 'Medicare', state: 'FL', status: 'With Closer', tone: 'green' },
+      { vertical: 'Medicare', state: 'FL', status: 'With Compliance', tone: 'green' },
       { vertical: 'Auto Insurance', state: 'OH', status: 'AI verifying', tone: 'muted' },
       { vertical: 'Health Insurance', state: 'AZ', status: 'Cleared', tone: 'green' },
     ],
@@ -101,11 +101,11 @@ export class Home {
     },
     {
       title: 'Live transfer',
-      desc: 'Warm-transferred to a licensed Closer on the same call. No callbacks.',
+      desc: 'Warm-transferred to Compliance on the same call. No callbacks.',
     },
     {
-      title: 'Close the policy',
-      desc: 'The Closer presents, handles objections and writes the application end to end.',
+      title: 'Compliance takes the call',
+      desc: 'Compliance presents the plan, handles objections and writes the application end to end.',
     },
   ];
 
@@ -133,12 +133,12 @@ export class Home {
     },
     {
       name: 'Verifiers',
-      desc: 'Confirm intent and eligibility on the phone, then hand the caller straight to a Closer.',
+      desc: 'Confirm intent and eligibility on the phone, then hand the caller straight to Compliance.',
       icon: 'userCheck',
     },
     {
-      name: 'Closers',
-      desc: 'Take the live transfer, present the plan, handle objections and close the policy.',
+      name: 'Compliance',
+      desc: 'Take the live transfer, present the plan and handle objections end to end.',
       icon: 'handshake',
     },
     {
@@ -156,7 +156,7 @@ export class Home {
     },
     {
       title: 'Verified before it rings',
-      desc: 'AI screening plus a live Verifier means the call that reaches your Closer is a real, qualified, in-market buyer.',
+      desc: 'AI screening plus a live Verifier means the call that reaches Compliance is a real, qualified, in-market buyer.',
       icon: 'message',
     },
     {

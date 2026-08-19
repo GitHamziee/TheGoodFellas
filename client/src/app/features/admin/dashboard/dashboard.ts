@@ -2,10 +2,10 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
   LucideArrowRight,
-  LucideBanknote,
   LucideCircleCheck,
   LucideCircleX,
   LucideInbox,
+  LucideLayers,
   LucideTrendingUp,
   LucideTriangleAlert,
   LucideUserCheck,
@@ -14,13 +14,7 @@ import {
 import { LeadService } from '../../../core/services/lead.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { Lead, LeadStatus } from '../../../core/models/lead.model';
-import {
-  formatMoney,
-  getAvatarTone,
-  getInitials,
-  isThisMonth,
-  timeAgo,
-} from '../../../core/format-utils';
+import { getAvatarTone, getInitials, isThisMonth, timeAgo } from '../../../core/format-utils';
 import { EmptyState, SkeletonRows, StatusBadge } from '../../../shared/ui/ui';
 
 /** A lead sitting in an admin-owned status longer than this is called out as stalled. */
@@ -42,10 +36,10 @@ const FLOW: { status: LeadStatus; label: string; owner: string; mine: boolean }[
     EmptyState,
     SkeletonRows,
     LucideArrowRight,
-    LucideBanknote,
     LucideCircleCheck,
     LucideCircleX,
     LucideInbox,
+    LucideLayers,
     LucideTrendingUp,
     LucideTriangleAlert,
     LucideUserCheck,
@@ -64,7 +58,6 @@ export class AdminDashboard implements OnInit {
   readonly staleAfterDays = STALE_AFTER_DAYS;
   readonly firstName = computed(() => this.auth.user()?.name?.split(' ')[0] ?? '');
   readonly timeAgo = timeAgo;
-  readonly formatMoney = formatMoney;
   readonly getInitials = getInitials;
   readonly getAvatarTone = getAvatarTone;
 
@@ -81,37 +74,44 @@ export class AdminDashboard implements OnInit {
       total: toAssign.length + toFix.length + toCollect.length,
       /** Assignment work that has been waiting too long — the reason to act today rather than tomorrow. */
       stalled: toAssign.filter((l) => this.ageInDays(l.updatedAt) >= STALE_AFTER_DAYS).length,
-      outstanding: toCollect.reduce((sum, l) => sum + (l.coverageAmount ?? 0), 0),
     };
   });
 
-  /** Lead counts per journey stage, plus the rejected side-branch. */
+  /** Lead counts per journey stage. The rejected side-branch hangs off it separately. */
   readonly flow = computed(() => {
     const rows = this.leads();
-    const counts = FLOW.map((stage) => ({
+    return FLOW.map((stage) => ({
       ...stage,
       count: rows.filter((l) => l.status === stage.status).length,
     }));
-    const max = Math.max(1, ...counts.map((c) => c.count));
-    return counts.map((c) => ({ ...c, pct: Math.round((c.count / max) * 100) }));
   });
 
   readonly rejectedCount = computed(() => this.leads().filter((l) => l.status === 'REJECTED').length);
 
-  readonly money = computed(() => {
+  /**
+   * How the pipeline is converting, in leads. Deliberately count-based: a lead's
+   * `coverageAmount` is the customer's policy size, not what we bill the client
+   * for the lead, so it is never totalled up and shown as money owed.
+   */
+  readonly conversion = computed(() => {
     const rows = this.leads();
     const accepted = rows.filter((l) => l.status === 'ACCEPTED');
-    const paid = accepted.filter((l) => l.paymentStatus === 'PAID');
-    const written = accepted.reduce((sum, l) => sum + (l.coverageAmount ?? 0), 0);
-    const collected = paid.reduce((sum, l) => sum + (l.coverageAmount ?? 0), 0);
-    const decided = accepted.length + rows.filter((l) => l.status === 'REJECTED').length;
+    const rejected = rows.filter((l) => l.status === 'REJECTED');
+    const decided = accepted.length + rejected.length;
+    const pending = rows.length - decided;
+    const max = Math.max(1, accepted.length, rejected.length, pending);
     return {
-      written,
-      collected,
-      collectedPct: written ? Math.round((collected / written) * 100) : 0,
-      acceptRate: decided ? Math.round((accepted.length / decided) * 100) : null,
-      thisMonth: rows.filter((l) => isThisMonth(l.createdAt)).length,
       total: rows.length,
+      thisMonth: rows.filter((l) => isThisMonth(l.createdAt)).length,
+      accepted: accepted.length,
+      rejected: rejected.length,
+      pending,
+      acceptedPct: Math.round((accepted.length / max) * 100),
+      rejectedPct: Math.round((rejected.length / max) * 100),
+      pendingPct: Math.round((pending / max) * 100),
+      acceptRate: decided ? Math.round((accepted.length / decided) * 100) : null,
+      paid: accepted.filter((l) => l.paymentStatus === 'PAID').length,
+      unpaid: accepted.filter((l) => l.paymentStatus === 'UNPAID').length,
     };
   });
 
@@ -119,7 +119,9 @@ export class AdminDashboard implements OnInit {
   readonly leaderboard = computed(() => {
     const byCloser = new Map<string, { id: string; name: string; total: number; accepted: number }>();
 
+    // CPL leads have no closer to rank — leaderboard is closer performance specifically.
     for (const lead of this.leads()) {
+      if (!lead.closer) continue;
       const row = byCloser.get(lead.closer.id) ?? {
         id: lead.closer.id,
         name: lead.closer.name,

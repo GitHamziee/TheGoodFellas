@@ -1,7 +1,6 @@
 <div class="page">
   <div class="page-head">
     <div>
-      <h1>Assigned Leads</h1>
       <p class="sub">Leads junior closers routed to you. Add the full detail, then submit to the admin team.</p>
     </div>
   </div>
@@ -28,7 +27,7 @@
   <div class="toolbar">
     <app-search-box
       [value]="view.search()"
-      placeholder="Search by name, phone, state, or junior closer…"
+      placeholder="Search by name, state, or junior closer…"
       (valueChange)="view.setSearch($event)"
     />
   </div>
@@ -67,10 +66,7 @@
               <tr class="clickable" (click)="selected.set(lead)">
                 <td>
                   <div class="cell-main">{{ lead.customerName }}</div>
-                  <div class="cell-sub">
-                    {{ formatPhone(lead.phone) }} · {{ lead.state }}
-                    @if (lead.age) { · {{ lead.age }} yrs }
-                  </div>
+                  <div class="cell-sub">{{ lead.state }}</div>
                 </td>
                 <td class="hide-sm">
                   @if (lead.need) {
@@ -99,11 +95,11 @@
                 <td>
                   <div class="row-actions">
                     <a
-                      class="btn btn--sm"
+                      class="btn btn--sm btn--ghost"
                       [routerLink]="['/closer/leads', lead.id]"
                       (click)="$event.stopPropagation()"
                     >
-                      <svg lucideSquarePen></svg> Work this lead
+                      <svg lucideSquarePen></svg> Continue
                     </a>
                   </div>
                 </td>
@@ -127,21 +123,22 @@
   <app-modal
     title="Lead intake"
     [subtitle]="'Submitted by ' + lead.juniorCloser.name"
-    [wide]="true"
     (close)="selected.set(null)"
   >
-    @if (lead.juniorNotes) {
-      <div class="locked" style="border-style: solid;">
-        <svg lucideNotebookPen></svg>
-        <span><strong>Junior closer's notes:</strong> {{ lead.juniorNotes }}</span>
-      </div>
-    }
+    <div class="locked">
+      <svg lucideNotebookPen></svg>
+      <span>Full details open once you continue — this keeps customer contact info from being browsed before it's actually being worked.</span>
+    </div>
 
-    <app-lead-detail [lead]="lead" />
+    <div class="detail-grid" style="margin-top: 1rem;">
+      <app-detail label="Customer" [value]="lead.customerName" />
+      <app-detail label="State" [value]="lead.state" />
+      <app-detail label="Need" [value]="lead.need ? humanizeEnum(lead.need) : '—'" />
+    </div>
 
     <div footer>
-      <a class="btn" [routerLink]="['/closer/leads', lead.id]" (click)="selected.set(null)">
-        <svg lucideArrowRight></svg> Work this lead
+      <a class="btn btn--ghost" [routerLink]="['/closer/leads', lead.id]" (click)="selected.set(null)">
+        <svg lucideArrowRight></svg> Continue
       </a>
     </div>
   </app-modal>

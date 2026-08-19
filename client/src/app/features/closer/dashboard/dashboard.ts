@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 import {
   LucideCircleCheck,
   LucideClock,
+  LucideHourglass,
   LucideInbox,
   LucideSend,
   LucideTarget,
@@ -10,15 +11,8 @@ import {
 } from '@lucide/angular';
 import { LeadService } from '../../../core/services/lead.service';
 import { AuthService } from '../../../core/services/auth.service';
-import { Lead, LeadHistoryRow } from '../../../core/models/lead.model';
-import {
-  formatPhone,
-  getAvatarTone,
-  getInitials,
-  humanizeEnum,
-  isThisMonth,
-  timeAgo,
-} from '../../../core/format-utils';
+import { LeadHistoryRow, LeadInboxPreview } from '../../../core/models/lead.model';
+import { getAvatarTone, getInitials, humanizeEnum, isThisMonth, timeAgo } from '../../../core/format-utils';
 import { EmptyState, SkeletonRows, StatTile, StatusBadge } from '../../../shared/ui/ui';
 
 const STALE_AFTER_DAYS = 3;
@@ -37,6 +31,7 @@ const STALE_AFTER_DAYS = 3;
     LucideSend,
     LucideCircleCheck,
     LucideTarget,
+    LucideHourglass,
   ],
   templateUrl: './dashboard.html',
 })
@@ -44,13 +39,12 @@ export class CloserDashboard implements OnInit {
   private readonly leadService = inject(LeadService);
   private readonly auth = inject(AuthService);
 
-  readonly inbox = signal<Lead[]>([]);
+  readonly inbox = signal<LeadInboxPreview[]>([]);
   readonly history = signal<LeadHistoryRow[]>([]);
   readonly loading = signal(true);
 
   readonly firstName = computed(() => this.auth.user()?.name?.split(' ')[0] ?? '');
   readonly timeAgo = timeAgo;
-  readonly formatPhone = formatPhone;
   readonly humanizeEnum = humanizeEnum;
   readonly getInitials = getInitials;
   readonly getAvatarTone = getAvatarTone;
@@ -101,7 +95,7 @@ export class CloserDashboard implements OnInit {
     return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
   }
 
-  isStale(lead: Lead): boolean {
+  isStale(lead: LeadInboxPreview): boolean {
     return this.ageInDays(lead.createdAt) >= STALE_AFTER_DAYS;
   }
 }

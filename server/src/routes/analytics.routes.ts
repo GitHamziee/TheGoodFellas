@@ -5,10 +5,13 @@ import { authenticate, requireRole } from '../middleware/auth';
 import * as analyticsService from '../services/analytics.service';
 
 const router = Router();
-router.use(authenticate, requireRole('ADMIN'));
+router.use(authenticate);
 
+// Team Lead gets performance analytics for both roles it oversees — no revenue/expenses
+// data lives in these two endpoints anyway, so no masking is needed beyond the role gate.
 router.get(
   '/junior-closers',
+  requireRole('ADMIN', 'TEAM_LEAD'),
   asyncHandler(async (_req, res) => {
     const rows = await analyticsService.juniorCloserAnalytics();
     return apiSuccess(res, { rows });
@@ -17,17 +20,61 @@ router.get(
 
 router.get(
   '/closers',
+  requireRole('ADMIN', 'TEAM_LEAD'),
   asyncHandler(async (_req, res) => {
     const rows = await analyticsService.closerAnalytics();
     return apiSuccess(res, { rows });
   })
 );
 
+// Admin-only — revenue by plan type, same "business totals" category as /overall, so
+// kept out of the Team Lead's module even though /closers itself is shared with them.
+router.get(
+  '/closers/plans',
+  requireRole('ADMIN'),
+  asyncHandler(async (_req, res) => {
+    const rows = await analyticsService.closerPlanAnalytics();
+    return apiSuccess(res, { rows });
+  })
+);
+
+// Admin-only — revenue by plan type, same "business totals" category as /overall.
+router.get(
+  '/clients/plans',
+  requireRole('ADMIN'),
+  asyncHandler(async (_req, res) => {
+    const rows = await analyticsService.clientPlanAnalytics();
+    return apiSuccess(res, { rows });
+  })
+);
+
+// Admin-only — includes payment/business totals, out of scope for Team Lead's module.
 router.get(
   '/overall',
+  requireRole('ADMIN'),
   asyncHandler(async (_req, res) => {
     const overall = await analyticsService.overallAnalytics();
     return apiSuccess(res, { overall });
+  })
+);
+
+// Admin-only — visibility into parked closer drafts, not part of Team Lead's oversight scope.
+router.get(
+  '/drafts',
+  requireRole('ADMIN'),
+  asyncHandler(async (_req, res) => {
+    const drafts = await analyticsService.draftsAnalytics();
+    return apiSuccess(res, { drafts });
+  })
+);
+
+// Admin-only — chargeback/revenue-loss reporting, same "business totals" category as /overall.
+router.get(
+  '/charge-backs',
+  requireRole('ADMIN'),
+  asyncHandler(async (_req, res) => {
+    const chargeBacks = await analyticsService.chargeBackAnalytics();
+    return apiSuccess(res, { chargeBacks });
   })
 );
 

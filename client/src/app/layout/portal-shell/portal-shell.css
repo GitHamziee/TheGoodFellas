@@ -20,7 +20,7 @@
 .brand {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
+  justify-content: center;
   padding: 1.35rem 1.25rem 1.1rem;
 }
 
@@ -196,12 +196,6 @@
   font-size: 0.8rem;
 }
 
-.avatar--sm {
-  width: 1.85rem;
-  height: 1.85rem;
-  font-size: 0.68rem;
-}
-
 .user-meta {
   flex: 1;
   min-width: 0;
@@ -298,25 +292,6 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.topbar-right {
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
-  flex-shrink: 0;
-}
-
-.role-chip {
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  padding: 0.3rem 0.6rem;
-  border-radius: 999px;
-  background: var(--gold-50);
-  color: var(--gold-800);
-  border: 1px solid var(--gold-200);
 }
 
 .content {

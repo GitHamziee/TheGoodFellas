@@ -1,0 +1,138 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <p class="sub">Leads you parked instead of submitting. Resume any of these to finish and send them on.</p>
+    </div>
+  </div>
+
+  <div class="stats-row">
+    <app-stat-tile [value]="stats().total" label="Parked" tone="tone-gold">
+      <svg lucideFileText></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().states" label="States covered" tone="tone-f">
+      <svg lucideMapPin></svg>
+    </app-stat-tile>
+  </div>
+
+  @if (error()) {
+    <div class="error">{{ error() }}</div>
+  }
+
+  <div class="toolbar">
+    <app-search-box
+      [value]="view.search()"
+      placeholder="Search by name, state, or reason…"
+      (valueChange)="view.setSearch($event)"
+    />
+  </div>
+
+  <div class="card card--flush">
+    @if (loading()) {
+      <app-skeleton-rows [count]="4" />
+    } @else if (view.total() === 0) {
+      @if (view.isFiltered()) {
+        <app-empty-state title="No drafts match" hint="Try a different search term.">
+          <svg lucideFileText></svg>
+        </app-empty-state>
+      } @else {
+        <app-empty-state title="No drafts parked" hint="Leads you save as a draft while enriching them will show up here.">
+          <svg lucideFileText></svg>
+        </app-empty-state>
+      }
+    } @else {
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="sortable" (click)="view.toggleSort('customerName')">
+                Customer <span class="arrow">{{ sortArrow('customerName') }}</span>
+              </th>
+              <th class="hide-sm">Reason</th>
+              <th class="hide-md">From</th>
+              <th class="sortable hide-sm" (click)="view.toggleSort('updatedAt')">
+                Last touched <span class="arrow">{{ sortArrow('updatedAt') }}</span>
+              </th>
+              <th class="right">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (lead of view.rows(); track lead.id) {
+              <tr class="clickable" (click)="selected.set(lead)">
+                <td>
+                  <div class="cell-main">{{ lead.customerName }}</div>
+                  <div class="cell-sub">
+                    {{ formatPhone(lead.phone) }} · {{ lead.state }}
+                  </div>
+                </td>
+                <td class="hide-sm">
+                  @if (lead.draftReason) {
+                    <span class="chip">{{ humanizeEnum(lead.draftReason) }}</span>
+                  } @else {
+                    <span class="empty">—</span>
+                  }
+                </td>
+                <td class="hide-md">
+                  @if (lead.juniorCloser; as junior) {
+                    <div class="person">
+                      <span class="avatar-sm" [class]="getAvatarTone(junior.id)">
+                        {{ getInitials(junior.name) }}
+                      </span>
+                      <span class="nm">{{ junior.name }}</span>
+                    </div>
+                  } @else {
+                    <span class="empty">Entered by you</span>
+                  }
+                </td>
+                <td class="hide-sm">
+                  <span class="chip"><svg lucideClock></svg>{{ timeAgo(lead.updatedAt) }}</span>
+                </td>
+                <td>
+                  <div class="row-actions">
+                    <a
+                      class="btn btn--sm"
+                      [routerLink]="['/closer/leads', lead.id]"
+                      (click)="$event.stopPropagation()"
+                    >
+                      <svg lucideSquarePen></svg> Resume
+                    </a>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <app-pagination
+        [page]="view.page()"
+        [totalPages]="view.totalPages()"
+        [total]="view.total()"
+        (pageChange)="view.page.set($event)"
+      />
+    }
+  </div>
+</div>
+
+@if (selected(); as lead) {
+  <app-modal
+    title="Draft"
+    [subtitle]="lead.customerName"
+    [wide]="true"
+    (close)="selected.set(null)"
+  >
+    @if (lead.draftReason) {
+      <div class="locked" style="border-style: solid;">
+        <svg lucideNotebookPen></svg>
+        <span><strong>Draft reason:</strong> {{ humanizeEnum(lead.draftReason) }}</span>
+      </div>
+    }
+
+    <app-lead-detail [lead]="lead" />
+
+    <div footer>
+      <a class="btn" [routerLink]="['/closer/leads', lead.id]" (click)="selected.set(null)">
+        <svg lucideArrowRight></svg> Resume
+      </a>
+    </div>
+  </app-modal>
+}

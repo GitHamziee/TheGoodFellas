@@ -44,12 +44,6 @@ export class AuthService {
     return res.data.user;
   }
 
-  async register(input: { name: string; email: string; password: string; phone?: string }): Promise<AppUser> {
-    const res = await firstValueFrom(this.http.post<AuthResponse>(`${API_BASE_URL}/auth/register`, input));
-    this.persistSession(res.data.token, res.data.user);
-    return res.data.user;
-  }
-
   /** Bumps tokenVersion server-side, invalidating the current session — caller should log out after. */
   async changePassword(currentPassword: string, newPassword: string): Promise<void> {
     await firstValueFrom(
@@ -75,6 +69,8 @@ export class AuthService {
         return '/admin/dashboard';
       case 'CLIENT':
         return '/client/dashboard';
+      case 'TEAM_LEAD':
+        return '/team-lead/dashboard';
     }
   }
 }

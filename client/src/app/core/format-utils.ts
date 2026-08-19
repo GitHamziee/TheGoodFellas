@@ -69,6 +69,13 @@ export function formatMoney(amount: number | null | undefined): string {
   return `$${amount.toLocaleString('en-US')}`;
 }
 
+/** Whole PKR — local bookkeeping currency for the Expenses page, separate from the USD
+ * lead-cost fields elsewhere. */
+export function formatPkr(amount: number | null | undefined): string {
+  if (amount === null || amount === undefined) return '—';
+  return `PKR ${amount.toLocaleString('en-US')}`;
+}
+
 /** LEAVE_MONEY → "Leave money", SELF_EMPLOYED → "Self employed" */
 export function humanizeEnum(value: string | null | undefined): string {
   if (!value) return '—';
@@ -102,6 +109,11 @@ export function maskAccount(value: string | null | undefined): string {
   return `••••${value.slice(-4)}`;
 }
 
+/** "1 closer" / "3 closers" — pass an already-pluralized noun as `plural` for irregular cases. */
+export function pluralize(count: number, singular: string, plural: string = `${singular}s`): string {
+  return `${count.toLocaleString('en-US')} ${count === 1 ? singular : plural}`;
+}
+
 export function orDash(value: string | number | null | undefined): string {
   if (value === null || value === undefined || value === '') return '—';
   return String(value);
@@ -116,6 +128,16 @@ export function isToday(dateStr: string): boolean {
     d.getMonth() === now.getMonth() &&
     d.getFullYear() === now.getFullYear()
   );
+}
+
+/** True when the date falls within the current calendar week (Sunday–Saturday). */
+export function isThisWeek(dateStr: string): boolean {
+  const d = new Date(dateStr);
+  const now = new Date();
+  const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
+  const endOfWeek = new Date(startOfWeek);
+  endOfWeek.setDate(startOfWeek.getDate() + 7);
+  return d >= startOfWeek && d < endOfWeek;
 }
 
 /** True when the date falls in the current calendar month. */

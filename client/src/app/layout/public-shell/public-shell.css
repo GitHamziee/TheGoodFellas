@@ -24,6 +24,19 @@
   box-shadow: var(--shadow-sm);
 }
 
+/* With the drawer open the bar and the panel below it are one surface, so the
+   bar has to be opaque. Left transparent it showed the gold hero wash through,
+   sitting directly above a solid white panel — a hard two-tone seam.
+   Declared after .scrolled so it also wins mid-page, where .scrolled's 85%
+   translucent white would otherwise let content show through the bar. */
+.pub-nav.menu-open {
+  background: var(--surface);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-bottom-color: transparent;
+  box-shadow: none;
+}
+
 .pub-nav__inner {
   display: flex;
   align-items: center;

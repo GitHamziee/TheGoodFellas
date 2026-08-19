@@ -1,16 +1,20 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
+  LucideBuilding2,
   LucideCircleCheck,
   LucideCircleX,
   LucideClock,
   LucideListChecks,
   LucideSend,
   LucideSquarePen,
+  LucideUndo2,
   LucideUserCheck,
 } from '@lucide/angular';
 import { LeadService } from '../../../core/services/lead.service';
 import { UserService } from '../../../core/services/user.service';
+import { ExternalClientService } from '../../../core/services/external-client.service';
+import { ExternalClient } from '../../../core/models/external-client.model';
 import { Lead } from '../../../core/models/lead.model';
 import { createListView } from '../../../core/list-view';
 import { formatPhone, getAvatarTone, getInitials, timeAgo } from '../../../core/format-utils';
@@ -60,16 +64,20 @@ interface EditDraft {
     LucideCircleCheck,
     LucideUserCheck,
     LucideSquarePen,
+    LucideUndo2,
     LucideClock,
+    LucideBuilding2,
   ],
   templateUrl: './queue.html',
 })
 export class AdminQueue implements OnInit {
   private readonly leadService = inject(LeadService);
   private readonly userService = inject(UserService);
+  private readonly externalClientService = inject(ExternalClientService);
 
   readonly leads = signal<Lead[]>([]);
   readonly clients = signal<LookupUser[]>([]);
+  readonly externalClients = signal<ExternalClient[]>([]);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
   readonly notice = signal<string | null>(null);
@@ -78,11 +86,19 @@ export class AdminQueue implements OnInit {
   /** Which lead each modal is acting on — only one is ever open at a time. */
   readonly detailLead = signal<Lead | null>(null);
   readonly assignLead = signal<Lead | null>(null);
+  readonly assignExternalLead = signal<Lead | null>(null);
   readonly editLead = signal<Lead | null>(null);
+  readonly returnLead = signal<Lead | null>(null);
 
   readonly clientSearch = signal('');
   readonly chosenClientId = signal('');
+  readonly externalClientSearch = signal('');
+  readonly chosenExternalClientId = signal('');
   readonly draft = signal<EditDraft | null>(null);
+
+  /** Who to send the lead back to, and what they need to fix. */
+  readonly returnTarget = signal<'JUNIOR_CLOSER' | 'CLOSER'>('CLOSER');
+  readonly returnReason = signal('');
 
   readonly statusFilters = [
     { label: 'All', value: '' },
@@ -134,9 +150,26 @@ export class AdminQueue implements OnInit {
     );
   });
 
+  /** External client dropdown, narrowed by the search box inside the assign-external modal. */
+  readonly filteredExternalClients = computed(() => {
+    const term = this.externalClientSearch().trim().toLowerCase();
+    if (!term) return this.externalClients();
+    return this.externalClients().filter(
+      (c) =>
+        c.name.toLowerCase().includes(term) ||
+        (c.company ?? '').toLowerCase().includes(term) ||
+        (c.email ?? '').toLowerCase().includes(term),
+    );
+  });
+
   async ngOnInit(): Promise<void> {
-    const [clients] = await Promise.all([this.userService.listClients(), this.refresh()]);
+    const [clients, externalClients] = await Promise.all([
+      this.userService.listClients(),
+      this.externalClientService.list(),
+      this.refresh(),
+    ]);
     this.clients.set(clients);
+    this.externalClients.set(externalClients);
   }
 
   async refresh(): Promise<void> {
@@ -180,6 +213,65 @@ export class AdminQueue implements OnInit {
       this.notice.set(`${lead.customerName} assigned to ${client?.name ?? 'client'}.`);
     } catch (err: any) {
       this.error.set(err?.error?.error ?? 'Could not assign the lead.');
+    } finally {
+      this.busyId.set(null);
+    }
+  }
+
+  // ─── Assign external ──────────────────────────────────────
+  openAssignExternal(lead: Lead, event?: Event): void {
+    event?.stopPropagation();
+    this.error.set(null);
+    this.externalClientSearch.set('');
+    this.chosenExternalClientId.set('');
+    this.assignExternalLead.set(lead);
+  }
+
+  async confirmAssignExternal(): Promise<void> {
+    const lead = this.assignExternalLead();
+    const externalClientId = this.chosenExternalClientId();
+    if (!lead || !externalClientId) return;
+
+    this.error.set(null);
+    this.busyId.set(lead.id);
+    try {
+      await this.leadService.assignLeadExternal(lead.id, externalClientId);
+      const externalClient = this.externalClients().find((c) => c.id === externalClientId);
+      this.leads.update((rows) => rows.filter((l) => l.id !== lead.id));
+      this.assignExternalLead.set(null);
+      this.notice.set(`${lead.customerName} assigned to ${externalClient?.name ?? 'external client'}.`);
+    } catch (err: any) {
+      this.error.set(err?.error?.error ?? 'Could not assign the lead.');
+    } finally {
+      this.busyId.set(null);
+    }
+  }
+
+  // ─── Send back for correction ──────────────────────────────
+  openReturn(lead: Lead, event?: Event): void {
+    event?.stopPropagation();
+    this.error.set(null);
+    this.returnTarget.set(lead.leadType === 'CPL' ? 'JUNIOR_CLOSER' : 'CLOSER');
+    this.returnReason.set('');
+    this.returnLead.set(lead);
+  }
+
+  async confirmReturn(): Promise<void> {
+    const lead = this.returnLead();
+    const reason = this.returnReason().trim();
+    if (!lead || !reason) return;
+
+    this.error.set(null);
+    this.busyId.set(lead.id);
+    try {
+      await this.leadService.returnLead(lead.id, this.returnTarget(), reason);
+      // It's now with the junior closer or closer, so it leaves the admin queue.
+      this.leads.update((rows) => rows.filter((l) => l.id !== lead.id));
+      this.returnLead.set(null);
+      const who = this.returnTarget() === 'JUNIOR_CLOSER' ? lead.juniorCloser?.name : lead.closer?.name;
+      this.notice.set(`${lead.customerName} sent back to ${who ?? 'the team'} to fix.`);
+    } catch (err: any) {
+      this.error.set(err?.error?.error ?? 'Could not send the lead back.');
     } finally {
       this.busyId.set(null);
     }

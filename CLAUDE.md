@@ -53,9 +53,32 @@ CLIENT accepts                                 →  status ACCEPTED
 CLIENT rejects → back to ADMIN (edit/reassign)  →  status REJECTED → ASSIGNED (on reassign)
 ```
 
-After ACCEPTED, Admin can toggle `paymentStatus: UNPAID | PAID` independently of the main status (`PATCH /api/leads/:id/payment-status`). Marking PAID stamps `closedAt`; the lead is then considered closed. This does not gate any workflow transition — it's a secondary admin-only flag.
+From its own queue (`SUBMITTED` / `REJECTED`) the Admin can also send a lead **back for
+correction** to whichever role entered the bad data:
 
-Self-registration (`/api/auth/register`) always creates a `CLIENT` account. `JUNIOR_CLOSER`, `CLOSER`, and additional `ADMIN` accounts are created by an existing Admin via `POST /api/users`.
+```
+ADMIN sends back → RETURNED_TO_JUNIOR → junior fixes intake     → SUBMITTED
+ADMIN sends back → RETURNED_TO_CLOSER → closer fixes enrichment → SUBMITTED
+```
+
+From the same queue, Admin can instead hand a lead to an **External Client** — an
+outside party tracked for bookkeeping only, with no login (`ExternalClient` is not a
+`User`, has no password/role). This is a separate action from "assign to client" and
+the two never share a dropdown: `ASSIGNED` = offered to a real `CLIENT` account awaiting
+accept/reject; `ASSIGNED_EXTERNAL` = handed off, terminal, no further workflow step.
+Admin manages the `ExternalClient` roster at `/admin/external-clients` and can still
+toggle `paymentStatus` on an `ASSIGNED_EXTERNAL` lead exactly like an `ACCEPTED` one.
+
+Both resubmit straight to `SUBMITTED` rather than re-walking the pipeline — the other
+role's work is still valid and the admin is the one waiting. `returnReason` carries what
+needs fixing and is cleared on resubmit. This is the one case where a **Junior Closer sees
+more than name + phone**: `JUNIOR_EDIT_SELECT` exposes only the intake fields they typed
+themselves, never closer-added SSN/bank/beneficiary data, and only while the lead sits in
+`RETURNED_TO_JUNIOR`.
+
+After ACCEPTED, `paymentStatus: UNPAID | PAID` is independent of the main status and does not gate any workflow transition — it's a secondary admin-only flag. The two directions are asymmetric on purpose: marking a lead PAID **only** happens through `PATCH /api/leads/batch-payment` (even for a single lead), because that's the one path that requires entering the PKR amount received and creates the matching `IncomePayment` row. `PATCH /api/leads/:id/payment-status` only accepts `{ paymentStatus: 'UNPAID' }` — it exists solely to undo a mistaken PAID, clearing `closedAt`; it rejects `'PAID'` outright so a quick-toggle can never mark a lead paid without recording income.
+
+There is no self-registration. Every account — `CLIENT` included — is created by an existing Admin via `POST /api/users`, role picked from a dropdown at creation time. There is likewise no self-service "forgot password" flow; a locked-out account is recovered by an Admin via `PATCH /api/users/:id/reset-password`, which sets the password directly (no current-password check) and bumps `tokenVersion` to force re-login, same as a role change. The login page just tells the user to contact their admin.
 
 ---
 
@@ -66,7 +89,7 @@ Convention: **routes are thin** (parse request, call service, map result to HTTP
 | Path | Purpose |
 |---|---|
 | `middleware/auth.ts` | `authenticate` (verifies JWT + tokenVersion against DB), `requireRole(...roles)` |
-| `services/auth.service.ts` | register (CLIENT only), login, admin-created staff accounts, change password |
+| `services/auth.service.ts` | login, admin-created accounts (any role), self-service change-password, admin-driven reset-password |
 | `services/lead.service.ts` | All lead state transitions **and all response-shape masking** — see below |
 | `services/user.service.ts` | Closer/client lookups for dropdowns, admin user management |
 | `services/analytics.service.ts` | Per-junior-closer and per-closer accepted/rejected counts, overall totals — all derived from *current* lead status, no audit log |
@@ -80,7 +103,7 @@ Convention: **routes are thin** (parse request, call service, map result to HTTP
 ### Masking — enforced in `lead.service.ts`, not the client
 Three different Prisma `select` fragments, chosen per role/status combination:
 - `FULL_INCLUDE` — everything. Used by ADMIN always; by CLOSER while a lead is still `NEW` (theirs to work); by CLIENT once `ACCEPTED`.
-- `JUNIOR_VIEW_SELECT` — `{ customerName, phone, status, createdAt, closer }` only. Used for **every** JUNIOR_CLOSER read, list or single, regardless of lead status — the requirement was about the risk of a junior closer stealing customer data, so it's a role-wide rule, not a "history page only" rule.
+- `JUNIOR_VIEW_SELECT` — `{ customerName, status, createdAt, closer }` only, phone deliberately excluded. Used for **every** JUNIOR_CLOSER read, list or single, regardless of lead status — the requirement was about the risk of a junior closer stealing customer data (phone number included), so it's a role-wide rule, not a "history page only" rule.
 - `CLOSER_HISTORY_SELECT` — same shape as the junior view (plus `client` instead of `closer`). Used for CLOSER reads once a lead has moved past `NEW`.
 - `CLIENT_PREVIEW_SELECT` — `{ customerName, state, zipcode, need, maritalStatus, status, createdAt, closer }`. Used for CLIENT reads while `status = ASSIGNED` (not yet accepted) — added beyond the original ask, because the field set now includes SSN and bank/routing numbers and sending that pre-acceptance seemed like the wrong default. Flag if unwanted.
 
@@ -89,12 +112,12 @@ Three different Prisma `select` fragments, chosen per role/status combination:
 ### API Routes
 | Route | Method | Role | Purpose |
 |---|---|---|---|
-| `/api/auth/register` | POST | public | Create CLIENT account |
-| `/api/auth/login` | POST | public | |
+| `/api/auth/login` | POST | public | No `/register` — see the no-self-registration note above |
 | `/api/auth/me` | GET | any | |
 | `/api/auth/change-password` | POST | any | Bumps tokenVersion — invalidates current token, client must re-login |
-| `/api/users` | GET/POST | ADMIN | List/create staff+client accounts (Admin creates Junior Closer / Closer accounts here) |
+| `/api/users` | GET/POST | ADMIN | List/create any account, role included (Admin creates every account here, Client included) |
 | `/api/users/:id/role` | PATCH | ADMIN | Role switch (bumps tokenVersion) |
+| `/api/users/:id/reset-password` | PATCH | ADMIN | `{ newPassword }` — sets it directly, no current-password check, bumps tokenVersion |
 | `/api/users/closers` | GET | JUNIOR_CLOSER, ADMIN | Dropdown source |
 | `/api/users/clients` | GET | ADMIN | Dropdown source |
 | `/api/leads` | POST | JUNIOR_CLOSER | Submit lead (full intake field set) |
@@ -105,12 +128,24 @@ Three different Prisma `select` fragments, chosen per role/status combination:
 | `/api/leads/queue` | GET | ADMIN | SUBMITTED + REJECTED |
 | `/api/leads/all` | GET | ADMIN | |
 | `/api/leads/:id/assign` | PATCH | ADMIN | → ASSIGNED |
+| `/api/leads/:id/assign-external` | PATCH | ADMIN | → ASSIGNED_EXTERNAL, `{ externalClientId }` |
 | `/api/leads/:id` | PATCH/GET | ADMIN / any (ownership+masking enforced) | Edit only permitted while REJECTED, any field |
-| `/api/leads/:id/payment-status` | PATCH | ADMIN | ACCEPTED only — `{ paymentStatus: 'PAID' \| 'UNPAID' }`, stamps/clears `closedAt` |
+| `/api/leads/:id/payment-status` | PATCH | ADMIN | ACCEPTED/ASSIGNED_EXTERNAL only — `{ paymentStatus: 'UNPAID' }` **only**, reverts a mistaken PAID and clears `closedAt`; rejects `'PAID'` |
+| `/api/leads/batch-payment` | PATCH | ADMIN | `{ leadIds, pkrAmount, note? }` — the only path to PAID, one or many leads; one PKR total for the batch; creates an `IncomePayment`, ineligible ids silently skipped |
+| `/api/leads/:id/return` | PATCH | ADMIN | SUBMITTED/REJECTED only — `{ target: 'JUNIOR_CLOSER' \| 'CLOSER', reason }` |
+| `/api/leads/returned/mine` | GET | JUNIOR_CLOSER | Leads sent back to them — intake fields only |
+| `/api/leads/:id/resubmit-intake` | PATCH | JUNIOR_CLOSER | RETURNED_TO_JUNIOR → SUBMITTED |
+| `/api/leads/returned/closer` | GET | CLOSER | Leads sent back to them, full detail |
+| `/api/leads/:id/resubmit-enrichment` | PATCH | CLOSER | RETURNED_TO_CLOSER → SUBMITTED |
 | `/api/leads/assigned` | GET | CLIENT | "New Leads" — ASSIGNED, masked preview |
 | `/api/leads/client-history` | GET | CLIENT | "Lead History" — ACCEPTED, full detail |
 | `/api/leads/:id/accept` | PATCH | CLIENT | ASSIGNED → ACCEPTED |
 | `/api/leads/:id/reject` | PATCH | CLIENT | ASSIGNED → REJECTED, clears clientId |
+| `/api/external-clients` | GET/POST | ADMIN | List/create external clients (no login) |
+| `/api/external-clients/:id` | PATCH | ADMIN | Edit an external client |
+| `/api/expenses` | GET/POST | ADMIN | List/add PKR expense entries (description, amount, date) |
+| `/api/expenses/:id` | DELETE | ADMIN | No edit-in-place — delete and re-add to correct a mistake |
+| `/api/expenses/income` | GET | ADMIN | Read-only list of `IncomePayment` records — write path is `/api/leads/batch-payment` above |
 | `/api/admin/analytics/junior-closers` | GET | ADMIN | Per-junior-closer total/accepted/rejected |
 | `/api/admin/analytics/closers` | GET | ADMIN | Per-closer total/accepted/rejected |
 | `/api/admin/analytics/overall` | GET | ADMIN | Totals, status breakdown, closed/unpaid counts, role counts |
@@ -176,9 +211,9 @@ shared/
 layout/
   portal-shell/        ONE shared shell for all 4 roles — black/gold sidebar with @lucide/angular icons, slim topbar showing the active page title, off-canvas drawer below 880px
 features/
-  auth/                 login, register
-  junior-closer/          dashboard, submit-lead (full intake form, conditional Retired/SSDI), my-leads (masked)
-  closer/                  dashboard, inbox (list, links out per-lead), enrich-lead (full form at /closer/leads/:id, conditional Payer section), history (masked)
+  auth/                 login only — no self-registration, see the no-self-registration note above
+  junior-closer/          dashboard, submit-lead (full intake form, conditional Retired/SSDI), my-leads (masked), returned ("Sent Back to Me")
+  closer/                  dashboard, inbox (list, links out per-lead), enrich-lead (full form at /closer/leads/:id, conditional Payer section), history (masked), returned ("Sent Back to Me")
   admin/                    dashboard, queue (assign + edit-on-reject), leads (all, + Paid/Unpaid toggle), users (create + role switch), analytics-junior, analytics-closer, analytics-overall
   client/                    dashboard, assigned-leads ("New Leads", masked preview, accept/reject), lead-history (full detail, accepted only)
   settings/                 ONE shared component, mounted at /{role}/settings in all 4 route trees — password change only
@@ -223,3 +258,4 @@ Per-page stat tiles are likewise `computed()` over the same loaded array, not a 
 - No Stripe, no billing — do not reintroduce
 - Chat access rules change in `lib/chat-rooms.ts` only — never by adding a role check in a route, a component, or the socket handler
 - No auto-commits unless explicitly asked
+- **Currency scope: PKR is Expenses-page bookkeeping only** — `Expense.amount`, `IncomePayment.pkrAmount` (written via `/api/leads/batch-payment`), and `ChargeBack.pkrAmount`. Every other money field — lead fields (`coverageAmount`, `monthlyPremiums`, `annualIncome`, `yearlyIncome`), the per-plan client/external-client pricing (`levelCost`/`gradedCost`/`modifiedCost`/`giCost`), and anything derived from them (e.g. Analytics' `annualPremiumRevenue`) — is USD (`formatMoney`), not PKR (`formatPkr`). Don't mix the two formatters or sum across them.

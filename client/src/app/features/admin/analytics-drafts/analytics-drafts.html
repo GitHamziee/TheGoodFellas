@@ -1,0 +1,124 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <p class="sub">Leads closers have parked instead of submitting — who's holding them, why, and for how long.</p>
+    </div>
+  </div>
+
+  @if (error()) {
+    <div class="error">{{ error() }}</div>
+  }
+
+  @if (loading()) {
+    <div class="card"><app-skeleton-rows [count]="6" /></div>
+  } @else if (data(); as d) {
+    <div class="stats-row">
+      <app-stat-tile [value]="d.total" label="Drafts parked" tone="tone-gold">
+        <svg lucideFileText></svg>
+      </app-stat-tile>
+      <app-stat-tile [value]="d.avgAgeDays + ' d'" label="Average age" tone="tone-c">
+        <svg lucideClock></svg>
+      </app-stat-tile>
+      <app-stat-tile [value]="d.oldestDays + ' d'" label="Oldest draft" tone="tone-warning">
+        <svg lucideTriangleAlert></svg>
+      </app-stat-tile>
+      <app-stat-tile [value]="d.byCloser.length" label="Closers holding drafts" tone="tone-f">
+        <svg lucideUsers></svg>
+      </app-stat-tile>
+    </div>
+
+    @if (d.total === 0) {
+      <div class="card">
+        <app-empty-state title="No drafts parked" hint="When a closer saves a lead as a draft, it'll show up here.">
+          <svg lucideChartColumn></svg>
+        </app-empty-state>
+      </div>
+    } @else {
+      <div class="card">
+        <div class="inline-head">
+          <h2>By closer</h2>
+          <span class="count">{{ pluralize(d.byCloser.length, 'closer') }}</span>
+        </div>
+        <div class="chart">
+          @for (row of byCloserChart(); track row.id) {
+            <div class="chart-row" [title]="row.name + ' — ' + pluralize(row.count, 'draft')">
+              <span class="chart-key">{{ row.name }}</span>
+              <span class="chart-track">
+                <span class="chart-bar" [style.width.%]="row.pct"></span>
+              </span>
+              <span class="chart-val">{{ row.count }}</span>
+            </div>
+          }
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="inline-head">
+          <h2>By reason</h2>
+          <span class="count">{{ pluralize(byReasonChart().length, 'reason') }} in use</span>
+        </div>
+        <div class="chart">
+          @for (row of byReasonChart(); track row.reason) {
+            <div class="chart-row" [title]="humanizeEnum(row.reason) + ' — ' + pluralize(row.count, 'draft')">
+              <span class="chart-key">{{ humanizeEnum(row.reason) }}</span>
+              <span class="chart-track">
+                <span class="chart-bar" [style.width.%]="row.pct"></span>
+              </span>
+              <span class="chart-val">{{ row.count }}</span>
+            </div>
+          }
+        </div>
+      </div>
+
+      <div class="card card--flush">
+        <div class="inline-head" style="padding: 1rem 1.1rem 0;">
+          <h2>All drafts</h2>
+          <span class="count">Oldest first</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Customer</th>
+                <th class="hide-md">Closer</th>
+                <th class="hide-sm">Reason</th>
+                <th class="right">Age</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of rows(); track row.id) {
+                <tr>
+                  <td><span class="cell-main">{{ row.customerName }}</span></td>
+                  <td class="hide-md">
+                    <div class="person">
+                      <span class="avatar-sm" [class]="getAvatarTone(row.closer.id)">
+                        {{ getInitials(row.closer.name) }}
+                      </span>
+                      <span class="nm">{{ row.closer.name }}</span>
+                    </div>
+                  </td>
+                  <td class="hide-sm">
+                    @if (row.draftReason) {
+                      <span class="chip">{{ humanizeEnum(row.draftReason) }}</span>
+                    } @else {
+                      <span class="empty">—</span>
+                    }
+                  </td>
+                  <td class="right">
+                    @if (row.ageDays >= 3) {
+                      <span class="badge badge--submitted">
+                        <svg lucideTriangleAlert></svg>{{ timeAgo(row.updatedAt) }}
+                      </span>
+                    } @else {
+                      <span class="chip"><svg lucideClock></svg>{{ timeAgo(row.updatedAt) }}</span>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    }
+  }
+</div>

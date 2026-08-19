@@ -1,5 +1,5 @@
 <div class="public-shell">
-  <header class="pub-nav" [class.scrolled]="scrolled()">
+  <header class="pub-nav" [class.scrolled]="scrolled()" [class.menu-open]="menuOpen()">
     <div class="pub-nav__inner mkt-container">
       <a class="pub-nav__brand" routerLink="/" (click)="closeMenu()">
         <img class="brand-logo" src="logo.png" alt="The Good Fellas" />
@@ -20,8 +20,7 @@
             <svg lucideArrowRight></svg>
           </a>
         } @else {
-          <a class="pub-nav__signin" routerLink="/login">Sign In</a>
-          <a class="btn-hero" routerLink="/register">Get Started</a>
+          <a class="btn-hero" routerLink="/login">Client Portal</a>
         }
       </div>
 
@@ -54,8 +53,7 @@
           @if (isAuthenticated()) {
             <a class="btn-hero" [routerLink]="homeUrl()" (click)="closeMenu()">Go to Dashboard</a>
           } @else {
-            <a class="btn-hero btn-hero--outline" routerLink="/login" (click)="closeMenu()">Sign In</a>
-            <a class="btn-hero" routerLink="/register" (click)="closeMenu()">Get Started</a>
+            <a class="btn-hero" routerLink="/login" (click)="closeMenu()">Client Portal</a>
           }
         </div>
       </div>
@@ -72,7 +70,7 @@
         <div class="pub-nav__brand">
           <img class="brand-logo" src="logo.png" alt="The Good Fellas" />
         </div>
-        <p>Inbound insurance leads, AI-verified and live-transferred to licensed closers — generated, verified and closed by our in-house team.</p>
+        <p>Inbound insurance leads, AI-verified and live-transferred to Compliance — generated and verified by our in-house team.</p>
         <a class="pub-footer__email" href="mailto:thegoodfellasbpo@gmail.com">
           <svg lucideMail></svg>
           thegoodfellasbpo&#64;gmail.com
@@ -84,7 +82,7 @@
         <span>Inbound Lead Generation</span>
         <span>AI Verification</span>
         <span>Live Transfers</span>
-        <span>Policy Closing</span>
+        <span>Compliance Handoff</span>
       </div>
 
       <div class="pub-footer__col">
@@ -96,8 +94,7 @@
 
       <div class="pub-footer__col">
         <div class="pub-footer__heading">Account</div>
-        <a routerLink="/login">Sign In</a>
-        <a routerLink="/register">Create Account</a>
+        <a routerLink="/login">Client Portal</a>
       </div>
     </div>
 

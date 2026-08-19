@@ -19,9 +19,6 @@
     <app-stat-tile [value]="stats().thisMonth" label="This month" tone="tone-c">
       <svg lucideClock></svg>
     </app-stat-tile>
-    <app-stat-tile [value]="stats().inFlight" label="Still in progress" tone="tone-warning">
-      <svg lucideFileText></svg>
-    </app-stat-tile>
     <app-stat-tile [value]="stats().accepted" label="Accepted" tone="tone-success">
       <svg lucideCircleCheck></svg>
     </app-stat-tile>
@@ -34,63 +31,36 @@
     </app-stat-tile>
   </div>
 
-  <div class="split">
-    <div class="card">
-      <div class="inline-head">
-        <h2>Where your leads are</h2>
-        <span class="count">{{ stats().total }} total</span>
-      </div>
-
-      @if (loading()) {
-        <app-skeleton-rows [count]="5" />
-      } @else if (stats().total === 0) {
-        <app-empty-state title="No leads yet" hint="Submit your first lead and you'll be able to track it here.">
-          <svg lucideSend></svg>
-        </app-empty-state>
-      } @else {
-        <div class="funnel">
-          @for (step of pipeline(); track step.status) {
-            <div class="funnel-row">
-              <span class="fl">{{ step.label }}</span>
-              <span class="ft"><span [class]="step.cls" [style.width.%]="step.pct"></span></span>
-              <span class="fn">{{ step.count }}</span>
-            </div>
-          }
-        </div>
-      }
+  <div class="card">
+    <div class="inline-head">
+      <h2>Recent submissions</h2>
+      <a class="count" routerLink="/junior/my-leads">View all</a>
     </div>
 
-    <div class="card">
-      <div class="inline-head">
-        <h2>Recent submissions</h2>
-        <a class="count" routerLink="/junior/my-leads">View all</a>
+    @if (loading()) {
+      <app-skeleton-rows [count]="4" />
+    } @else if (recent().length === 0) {
+      <app-empty-state title="Nothing yet" hint="Your most recent submissions will show up here.">
+        <svg lucideFileText></svg>
+      </app-empty-state>
+    } @else {
+      <div class="feed">
+        @for (lead of recent(); track lead.id) {
+          <div class="feed-row">
+            <span class="avatar-sm" [class]="getAvatarTone(lead.id)">
+              {{ getInitials(lead.customerName) }}
+            </span>
+            <span class="who">
+              <span class="nm">{{ lead.customerName }}</span>
+              <span class="mt">
+                @if (lead.closer) { {{ lead.closer.name }} · }{{ timeAgo(lead.createdAt) }}
+              </span>
+            </span>
+            <app-status-badge [status]="lead.status" />
+          </div>
+        }
       </div>
-
-      @if (loading()) {
-        <app-skeleton-rows [count]="4" />
-      } @else if (recent().length === 0) {
-        <app-empty-state title="Nothing yet" hint="Your most recent submissions will show up here.">
-          <svg lucideFileText></svg>
-        </app-empty-state>
-      } @else {
-        <div class="feed">
-          @for (lead of recent(); track lead.id) {
-            <div class="feed-row">
-              <span class="avatar-sm" [class]="getAvatarTone(lead.id)">
-                {{ getInitials(lead.customerName) }}
-              </span>
-              <span class="who">
-                <span class="nm">{{ lead.customerName }}</span>
-                <span class="mt">
-                  @if (lead.closer) { {{ lead.closer.name }} · }{{ timeAgo(lead.createdAt) }}
-                </span>
-              </span>
-              <app-status-badge [status]="lead.status" />
-            </div>
-          }
-        </div>
-      }
-    </div>
+    }
   </div>
 
 </div>

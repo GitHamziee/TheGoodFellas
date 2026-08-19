@@ -9,7 +9,8 @@ import type { ChatRoom, Role } from "@prisma/client";
  *
  *   CLOSER        → CLOSERS only
  *   JUNIOR_CLOSER → JUNIOR_CLOSERS only
- *   ADMIN         → both (this is how each group talks to admin)
+ *   TEAM_LEAD     → TEAM_LEADS only (its own channel — not CLOSERS/JUNIOR_CLOSERS)
+ *   ADMIN         → all three (this is how each group talks to admin)
  *   CLIENT        → none (clients are outside the org, no chat access at all)
  */
 export function roomsFor(role: Role): ChatRoom[] {
@@ -18,8 +19,10 @@ export function roomsFor(role: Role): ChatRoom[] {
       return ["CLOSERS"];
     case "JUNIOR_CLOSER":
       return ["JUNIOR_CLOSERS"];
+    case "TEAM_LEAD":
+      return ["TEAM_LEADS"];
     case "ADMIN":
-      return ["CLOSERS", "JUNIOR_CLOSERS"];
+      return ["CLOSERS", "JUNIOR_CLOSERS", "TEAM_LEADS"];
     case "CLIENT":
       return [];
   }
@@ -29,7 +32,7 @@ export function canAccessRoom(role: Role, room: ChatRoom): boolean {
   return roomsFor(role).includes(room);
 }
 
-const ROOM_VALUES: readonly string[] = ["CLOSERS", "JUNIOR_CLOSERS"];
+const ROOM_VALUES: readonly string[] = ["CLOSERS", "JUNIOR_CLOSERS", "TEAM_LEADS"];
 
 /** Narrows an untrusted route/socket param to a real ChatRoom. */
 export function parseRoom(value: unknown): ChatRoom | null {
@@ -39,6 +42,7 @@ export function parseRoom(value: unknown): ChatRoom | null {
 export const ROOM_LABEL: Record<ChatRoom, string> = {
   CLOSERS: "Closers",
   JUNIOR_CLOSERS: "Junior Closers",
+  TEAM_LEADS: "Team Leads",
 };
 
 /** Socket.IO room name — namespaced so it can't collide with any future per-user room. */

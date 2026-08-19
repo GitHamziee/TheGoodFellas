@@ -22,13 +22,34 @@
     <app-stat-tile [value]="stats().rejected" label="Rejected" tone="tone-danger">
       <svg lucideCircleX></svg>
     </app-stat-tile>
+    <app-stat-tile [value]="stats().assignedExternal" label="Assigned — external" tone="tone-a">
+      <svg lucideInbox></svg>
+    </app-stat-tile>
     <app-stat-tile [value]="stats().unpaid" label="Accepted, unpaid" tone="tone-neutral">
       <svg lucideWallet></svg>
     </app-stat-tile>
+    <app-stat-tile [value]="stats().chargedBack" label="Charged back" tone="tone-danger">
+      <svg lucideBanknoteX></svg>
+    </app-stat-tile>
   </div>
 
-  @if (error()) {
+  @if (error() && !batchModalOpen() && !chargeBackLead()) {
     <div class="error">{{ error() }}</div>
+  }
+  @if (notice()) {
+    <div class="success"><svg lucideCircleCheck></svg>{{ notice() }}</div>
+  }
+
+  @if (selectedCount() > 0) {
+    <div class="batch-bar">
+      <span><strong>{{ selectedCount() }}</strong> lead{{ selectedCount() === 1 ? '' : 's' }} selected</span>
+      <div class="row-actions">
+        <button type="button" class="btn btn--sm btn--ghost" (click)="clearSelection()">Clear</button>
+        <button type="button" class="btn btn--sm btn--success" (click)="openBatchModal()">
+          <svg lucideBanknote></svg> Mark Paid
+        </button>
+      </div>
+    </div>
   }
 
   <div class="toolbar">
@@ -38,17 +59,12 @@
       (valueChange)="view.setSearch($event)"
     />
 
-    <select
-      class="filter-select"
-      [value]="closerFilter()"
-      (change)="setCloserFilter($any($event.target).value)"
-      aria-label="Filter by closer"
-    >
-      <option value="">All closers</option>
-      @for (closer of closers(); track closer.id) {
-        <option [value]="closer.id">{{ closer.name }}</option>
-      }
-    </select>
+    <app-select
+      [options]="closerOptions()"
+      [ngModel]="closerFilter()"
+      (ngModelChange)="setCloserFilter($event)"
+      ariaLabel="Filter by closer"
+    />
 
     <div class="pills">
       @for (filter of statusFilters; track filter.value) {
@@ -83,6 +99,14 @@
         <table>
           <thead>
             <tr>
+              <th class="checkbox-col">
+                <input
+                  type="checkbox"
+                  [checked]="allVisibleEligibleSelected()"
+                  (change)="toggleSelectAllVisible()"
+                  aria-label="Select all eligible leads on this page"
+                />
+              </th>
               <th class="sortable" (click)="view.toggleSort('customerName')">
                 Customer <span class="arrow">{{ sortArrow('customerName') }}</span>
               </th>
@@ -100,17 +124,30 @@
           <tbody>
             @for (lead of view.rows(); track lead.id) {
               <tr class="clickable" (click)="selected.set(lead)">
+                <td class="checkbox-col" (click)="$event.stopPropagation()">
+                  <input
+                    type="checkbox"
+                    [checked]="isSelected(lead)"
+                    [disabled]="!isEligibleForBatchPaid(lead)"
+                    (change)="toggleSelect(lead, $event)"
+                    [attr.aria-label]="'Select ' + lead.customerName"
+                  />
+                </td>
                 <td>
                   <div class="cell-main">{{ lead.customerName }}</div>
                   <div class="cell-sub">{{ formatPhone(lead.phone) }} · {{ lead.state }}</div>
                 </td>
                 <td class="hide-sm">
-                  <div class="person">
-                    <span class="avatar-sm" [class]="getAvatarTone(lead.closer.id)">
-                      {{ getInitials(lead.closer.name) }}
-                    </span>
-                    <span class="nm">{{ lead.closer.name }}</span>
-                  </div>
+                  @if (lead.closer) {
+                    <div class="person">
+                      <span class="avatar-sm" [class]="getAvatarTone(lead.closer.id)">
+                        {{ getInitials(lead.closer.name) }}
+                      </span>
+                      <span class="nm">{{ lead.closer.name }}</span>
+                    </div>
+                  } @else {
+                    <span class="chip">CPL @if (lead.dCode) { · {{ lead.dCode }} }</span>
+                  }
                 </td>
                 <td class="hide-md">
                   @if (lead.client) {
@@ -120,28 +157,21 @@
                       </span>
                       <span class="nm">{{ lead.client.name }}</span>
                     </div>
+                  } @else if (lead.externalClient) {
+                    <div class="person">
+                      <span class="avatar-sm" [class]="getAvatarTone(lead.externalClient.id)">
+                        {{ getInitials(lead.externalClient.name) }}
+                      </span>
+                      <span class="nm">{{ lead.externalClient.name }} <span class="cell-sub">(external)</span></span>
+                    </div>
                   } @else {
                     <span class="empty">Unassigned</span>
                   }
                 </td>
                 <td><app-status-badge [status]="lead.status" /></td>
                 <td class="hide-md">
-                  @if (lead.status === 'ACCEPTED') {
-                    <button
-                      type="button"
-                      class="btn btn--sm"
-                      [class.btn--ghost]="lead.paymentStatus === 'UNPAID'"
-                      [class.btn--success]="lead.paymentStatus === 'PAID'"
-                      [disabled]="busyId() === lead.id"
-                      (click)="togglePayment(lead, $event)"
-                    >
-                      @if (busyId() === lead.id) {
-                        <span class="spinner"></span>
-                      } @else {
-                        <svg lucideBanknote></svg>
-                      }
-                      {{ lead.paymentStatus === 'PAID' ? 'Paid' : 'Mark paid' }}
-                    </button>
+                  @if (lead.status === 'ACCEPTED' || lead.status === 'ASSIGNED_EXTERNAL') {
+                    <app-payment-badge [status]="lead.paymentStatus" />
                   } @else {
                     <span class="empty">—</span>
                   }
@@ -175,23 +205,92 @@
     <app-lead-detail [lead]="lead" />
 
     <div footer>
-      @if (lead.status === 'ACCEPTED') {
-        <button
-          type="button"
-          class="btn"
-          [class.btn--ghost]="lead.paymentStatus === 'UNPAID'"
-          [class.btn--success]="lead.paymentStatus === 'PAID'"
-          [disabled]="busyId() === lead.id"
-          (click)="togglePayment(lead, $event)"
-        >
-          @if (busyId() === lead.id) {
-            <span class="spinner"></span>
-          } @else {
-            <svg lucideBanknote></svg>
+      @if (lead.status === 'ACCEPTED' || lead.status === 'ASSIGNED_EXTERNAL') {
+        @if (lead.paymentStatus === 'PAID') {
+          @if (lead.status === 'ACCEPTED') {
+            <button type="button" class="btn btn--danger" (click)="openChargeBack(lead, $event)">
+              <svg lucideBanknoteX></svg> Charge back
+            </button>
           }
-          {{ lead.paymentStatus === 'PAID' ? 'Mark unpaid' : 'Mark paid' }}
-        </button>
+          <button
+            type="button"
+            class="btn btn--ghost"
+            [disabled]="busyId() === lead.id"
+            (click)="revertToUnpaid(lead, $event)"
+          >
+            @if (busyId() === lead.id) {
+              <span class="spinner"></span>
+            } @else {
+              <svg lucideBanknote></svg>
+            }
+            Mark unpaid
+          </button>
+        } @else {
+          <span class="hint">Select this lead in the list and use "Mark Paid" to record the amount received.</span>
+        }
       }
+    </div>
+  </app-modal>
+}
+
+@if (chargeBackLead(); as lead) {
+  <app-modal title="Charge back this lead" [subtitle]="lead.customerName" (close)="closeChargeBackModal()">
+    @if (error()) {
+      <div class="error">{{ error() }}</div>
+    }
+
+    <div class="form-grid">
+      <label>
+        PKR clawed back <span class="hint">Amount charged back</span>
+        <input type="number" min="0" [(ngModel)]="chargeBackPkrAmount" name="chargeBackPkrAmount" placeholder="0" />
+      </label>
+      <label class="full">
+        Reason <span class="req">Required</span>
+        <input type="text" [(ngModel)]="chargeBackReason" name="chargeBackReason" placeholder="e.g. Client cancelled the policy" />
+      </label>
+    </div>
+
+    <div footer>
+      <button type="button" class="btn btn--danger" [disabled]="chargeBackSubmitting()" (click)="confirmChargeBack()">
+        @if (chargeBackSubmitting()) {
+          <span class="spinner"></span> Saving…
+        } @else {
+          <svg lucideBanknoteX></svg> Confirm charge back
+        }
+      </button>
+    </div>
+  </app-modal>
+}
+
+@if (batchModalOpen()) {
+  <app-modal
+    title="Mark leads paid"
+    [subtitle]="selectedCount() + ' lead' + (selectedCount() === 1 ? '' : 's') + ' selected'"
+    (close)="closeBatchModal()"
+  >
+    @if (error()) {
+      <div class="error">{{ error() }}</div>
+    }
+
+    <div class="form-grid">
+      <label>
+        PKR received <span class="hint">Total for this batch</span>
+        <input type="number" min="0" [(ngModel)]="batchPkrAmount" name="batchPkrAmount" placeholder="0" />
+      </label>
+      <label class="full">
+        Note <span class="hint">Optional</span>
+        <input type="text" [(ngModel)]="batchNote" name="batchNote" placeholder="e.g. Bank transfer ref #1234" />
+      </label>
+    </div>
+
+    <div footer>
+      <button type="button" class="btn btn--success" [disabled]="batchSubmitting()" (click)="confirmBatchMarkPaid()">
+        @if (batchSubmitting()) {
+          <span class="spinner"></span> Saving…
+        } @else {
+          <svg lucideBanknote></svg> Confirm
+        }
+      </button>
     </div>
   </app-modal>
 }

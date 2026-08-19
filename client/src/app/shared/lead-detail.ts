@@ -1,6 +1,8 @@
 import { Component, computed, input, signal } from '@angular/core';
 import {
   LucideBanknote,
+  LucideCheck,
+  LucideClipboardCopy,
   LucideEye,
   LucideHeartPulse,
   LucideLock,
@@ -21,6 +23,7 @@ import {
   maskSsn,
   timeAgo,
 } from '../core/format-utils';
+import { PLAN_TYPE_LABEL } from '../core/lead-options';
 import { Detail, PaymentBadge, StatusBadge } from './ui/ui';
 
 interface Row {
@@ -48,6 +51,8 @@ interface Row {
     LucideNotebookPen,
     LucideEye,
     LucideLock,
+    LucideClipboardCopy,
+    LucideCheck,
   ],
   template: `
     <div class="ld">
@@ -63,6 +68,13 @@ interface Row {
           @if (lead().status === 'ACCEPTED') {
             <app-payment-badge [status]="lead().paymentStatus" />
           }
+          <button type="button" class="copy-btn" (click)="copyDetails()">
+            @if (copied()) {
+              <svg lucideCheck></svg> Copied
+            } @else {
+              <svg lucideClipboardCopy></svg> Copy details
+            }
+          </button>
         </div>
       </div>
 
@@ -113,7 +125,25 @@ interface Row {
 
     .nm { font-size: 1.05rem; font-weight: 800; color: var(--text); }
     .mt { font-size: 0.76rem; color: var(--gray-500); margin-top: 0.15rem; }
-    .badges { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+    .badges { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+
+    .copy-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.3rem 0.6rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface);
+      color: var(--gray-600);
+      font-family: inherit;
+      font-size: 0.72rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .copy-btn:hover { background: var(--gray-50); color: var(--text); }
+    .copy-btn svg { width: 12px; height: 12px; }
 
     .reveal {
       display: inline-flex;
@@ -154,6 +184,7 @@ interface Row {
 export class LeadDetail {
   readonly lead = input.required<Lead>();
   readonly revealed = signal(false);
+  readonly copied = signal(false);
 
   readonly timeAgo = timeAgo;
   readonly formatDateTime = formatDateTime;
@@ -181,6 +212,7 @@ export class LeadDetail {
           row('Phone', l.phone, formatPhone(l.phone)),
           row('Email', l.email),
           row('Marital status', l.maritalStatus, humanizeEnum(l.maritalStatus)),
+          row('Gender', l.gender),
           row('Mailing address', l.mailingAddress),
           row('State', l.state),
           row('Zipcode', l.zipcode),
@@ -229,7 +261,7 @@ export class LeadDetail {
         icon: 'policy',
         rows: keep([
           row('Carrier', l.carrierName),
-          row('Plan type', l.planType),
+          row('Plan type', l.planType, l.planType ? PLAN_TYPE_LABEL[l.planType] : undefined),
           row('Coverage amount', l.coverageAmount, formatMoney(l.coverageAmount)),
           row('Monthly premium', l.monthlyPremiums, formatMoney(l.monthlyPremiums)),
         ]),
@@ -259,10 +291,79 @@ export class LeadDetail {
           row('Junior closer', l.juniorCloser?.name),
           row('Closer', l.closer?.name),
           row('Client', l.client?.name),
+          row(
+            'External client',
+            l.externalClient?.name,
+            l.externalClient
+              ? l.externalClient.name + (l.externalClient.company ? ' · ' + l.externalClient.company : '')
+              : undefined,
+          ),
+          row(
+            'Charge-backs',
+            l.chargeBacks.length || null,
+            l.chargeBacks.length
+              ? `${l.chargeBacks.length} · ${formatMoney(l.chargeBacks.reduce((sum, c) => sum + c.pkrAmount, 0))} total`
+              : undefined,
+          ),
           row('Last updated', l.updatedAt, formatDateTime(l.updatedAt)),
           row('Closed at', l.closedAt, formatDateTime(l.closedAt)),
         ]),
       },
     ];
   });
+
+  /**
+   * A fixed field list/order/grouping given directly by the user — a condensed
+   * carrier-submission cheat-sheet, not the full lead. Deliberately narrower than
+   * `sections()` above (no state/zipcode/need/income/plan-type/notes/status/etc.) and
+   * blank fields are kept as empty lines rather than dropped, unlike `sections()`'s
+   * `row()` helper which omits anything unset.
+   */
+  copyDetails(): void {
+    const l = this.lead();
+    const show = this.revealed();
+    const s = (v: unknown): string => (v === null || v === undefined || v === '' ? '' : String(v));
+    const date = (v: string | null | undefined): string => (v ? formatDate(v) : '');
+    const money = (v: number | null | undefined): string => (v === null || v === undefined ? '' : formatMoney(v));
+
+    const lines = [
+      `Customer's Name :${s(l.customerName)}`,
+      `Phone Number :${l.phone ? formatPhone(l.phone) : ''}`,
+      `Email:${s(l.email)}`,
+      `Marital Status :${s(l.maritalStatus)}`,
+      `Mailing Address:${s(l.mailingAddress)}`,
+      `Birth State :${s(l.birthState)}`,
+      `Gender :${s(l.gender)}`,
+      `Smoker :${l.smoker === null || l.smoker === undefined ? '' : formatBool(l.smoker)}`,
+      `DOB :${date(l.dob)}`,
+      `Age :${s(l.age)}`,
+      `Height :${s(l.height)}`,
+      `Weight :${s(l.weight)}`,
+      `Social :${s(l.ssn) ? (show ? l.ssn! : maskSsn(l.ssn)) : ''}`,
+      `Driving license :${s(l.dlStateId)}`,
+      '____________',
+      `Beneficiary Relation :${s(l.beneficiaryRelation)}`,
+      `Beneficiary Name :${s(l.beneficiaryName)}`,
+      `Beneficiary DOB :${date(l.beneficiaryDob)}`,
+      '____________',
+      `Health Conditions :${s(l.healthConditions)}`,
+      `Medications :${s(l.medications)}`,
+      '____________',
+      `Carrier Name :${s(l.carrierName)}`,
+      `Coverage Amount :${money(l.coverageAmount)}`,
+      `Monthly Premiums :${money(l.monthlyPremiums)}`,
+      '____________',
+      `Initial Draft Date :${date(l.initialDraftDate)}`,
+      `Future Draft Date :${date(l.futureDraftDate)}`,
+      `Bank Name:${s(l.bankName)}`,
+      `Account Type:${s(l.accountType) ? humanizeEnum(l.accountType) : ''}`,
+      `Routing Number:${s(l.routingNumber) ? (show ? l.routingNumber! : maskAccount(l.routingNumber)) : ''}`,
+      `Account Number:${s(l.accountNumber) ? (show ? l.accountNumber! : maskAccount(l.accountNumber)) : ''}`,
+    ];
+
+    void navigator.clipboard.writeText(lines.join('\n')).then(() => {
+      this.copied.set(true);
+      setTimeout(() => this.copied.set(false), 1500);
+    });
+  }
 }

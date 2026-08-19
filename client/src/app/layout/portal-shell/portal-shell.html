@@ -4,9 +4,6 @@
   <aside class="sidebar">
     <div class="brand">
       <img class="brand-logo" src="logo.png" alt="The Good Fellas" />
-      <div class="brand-text">
-        <div class="tagline">Lead Routing</div>
-      </div>
       <button class="drawer-close" type="button" (click)="closeDrawer()" aria-label="Close menu">
         <svg lucideX></svg>
       </button>
@@ -47,8 +44,15 @@
               @case ('inbox') { <svg lucideInbox></svg> }
               @case ('users') { <svg lucideUsers></svg> }
               @case ('queue') { <svg lucideListChecks></svg> }
+              @case ('returned') { <svg lucideUndo2></svg> }
               @case ('leads') { <svg lucideFileText></svg> }
+              @case ('drafts') { <svg lucideClipboardList></svg> }
+              @case ('chargeback') { <svg lucideBanknoteArrowUp></svg> }
+              @case ('cpl') { <svg lucideTag></svg> }
+              @case ('building') { <svg lucideBuilding2></svg> }
               @case ('analytics') { <svg lucideChartColumn></svg> }
+              @case ('expenses') { <svg lucideWallet></svg> }
+              @case ('states') { <svg lucideMapPin></svg> }
               @case ('chat') { <svg lucideMessageSquare></svg> }
               @case ('settings') { <svg lucideSettings></svg> }
             }
@@ -80,10 +84,6 @@
           <svg lucideMenu></svg>
         </button>
         <div class="page-title">{{ pageTitle() }}</div>
-      </div>
-      <div class="topbar-right">
-        <span class="role-chip">{{ roleLabel() }}</span>
-        <div class="avatar avatar--sm">{{ initials() }}</div>
       </div>
     </div>
 

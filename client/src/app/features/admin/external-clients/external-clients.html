@@ -1,0 +1,222 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <p class="sub">Outside parties who receive leads for record-keeping only — no login.</p>
+    </div>
+    <div class="page-head-actions">
+      <button type="button" class="btn" (click)="openCreate()">
+        <svg lucideUserPlus></svg> New External Client
+      </button>
+    </div>
+  </div>
+
+  <div class="stats-row">
+    <app-stat-tile [value]="stats().total" label="Total external clients" tone="tone-gold">
+      <svg lucideBuilding2></svg>
+    </app-stat-tile>
+  </div>
+
+  @if (error() && !showCreate() && !selected()) {
+    <div class="error">{{ error() }}</div>
+  }
+  @if (notice()) {
+    <div class="success"><svg lucideCircleCheck></svg>{{ notice() }}</div>
+  }
+
+  <div class="toolbar">
+    <app-search-box
+      [value]="view.search()"
+      placeholder="Search by name, company, email, or phone…"
+      (valueChange)="view.setSearch($event)"
+    />
+  </div>
+
+  <div class="card card--flush">
+    @if (loading()) {
+      <app-skeleton-rows [count]="6" />
+    } @else if (view.total() === 0) {
+      @if (view.isFiltered()) {
+        <app-empty-state title="No external clients match" hint="Try a different search term or clear the filters.">
+          <svg lucideBuilding2></svg>
+        </app-empty-state>
+      } @else {
+        <app-empty-state title="No external clients yet" hint="Create one to start assigning leads to them from the Queue.">
+          <svg lucideBuilding2></svg>
+        </app-empty-state>
+      }
+    } @else {
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="sortable" (click)="view.toggleSort('name')">
+                Name <span class="arrow">{{ sortArrow('name') }}</span>
+              </th>
+              <th class="sortable hide-sm" (click)="view.toggleSort('company')">
+                Company <span class="arrow">{{ sortArrow('company') }}</span>
+              </th>
+              <th class="hide-md">Email</th>
+              <th class="hide-md">Phone</th>
+              <th class="sortable right hide-sm" (click)="view.toggleSort('createdAt')">
+                Added <span class="arrow">{{ sortArrow('createdAt') }}</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (client of view.rows(); track client.id) {
+              <tr class="clickable" (click)="openDetail(client)">
+                <td>
+                  <div class="person">
+                    <span class="avatar-sm" [class]="getAvatarTone(client.id)">{{ getInitials(client.name) }}</span>
+                    <span class="cell-main">{{ client.name }}</span>
+                  </div>
+                </td>
+                <td class="hide-sm">{{ client.company || '—' }}</td>
+                <td class="hide-md">{{ client.email || '—' }}</td>
+                <td class="hide-md">{{ client.phone || '—' }}</td>
+                <td class="right hide-sm">{{ formatDate(client.createdAt) }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <app-pagination
+        [page]="view.page()"
+        [totalPages]="view.totalPages()"
+        [total]="view.total()"
+        (pageChange)="view.page.set($event)"
+      />
+    }
+  </div>
+</div>
+
+<!-- Create -->
+@if (showCreate()) {
+  <app-modal title="New External Client" subtitle="Bookkeeping only — this person never logs in." (close)="showCreate.set(false)">
+    @if (error()) {
+      <div class="error">{{ error() }}</div>
+    }
+
+    <div class="form-grid">
+      <label class="full">
+        Name
+        <input type="text" [(ngModel)]="name" name="name" placeholder="Jane Doe" />
+      </label>
+      <label>
+        Company <span class="hint">Optional</span>
+        <input type="text" [(ngModel)]="company" name="company" />
+      </label>
+      <label>
+        Email <span class="hint">Optional</span>
+        <input type="email" [(ngModel)]="email" name="email" />
+      </label>
+      <label>
+        Phone <span class="hint">Optional</span>
+        <input type="tel" [(ngModel)]="phone" name="phone" />
+      </label>
+      <label class="full">
+        Notes <span class="hint">Optional</span>
+        <textarea rows="3" [(ngModel)]="notes" name="notes"></textarea>
+      </label>
+    </div>
+
+    <div class="section">
+      <h4 class="section-title">Lead cost by plan <span class="hint">$, optional</span></h4>
+      <div class="form-grid">
+        <label>
+          Level
+          <input type="number" min="0" [(ngModel)]="levelCost" name="levelCost" placeholder="0" />
+        </label>
+        <label>
+          Graded
+          <input type="number" min="0" [(ngModel)]="gradedCost" name="gradedCost" placeholder="0" />
+        </label>
+        <label>
+          Modified
+          <input type="number" min="0" [(ngModel)]="modifiedCost" name="modifiedCost" placeholder="0" />
+        </label>
+        <label>
+          GI
+          <input type="number" min="0" [(ngModel)]="giCost" name="giCost" placeholder="0" />
+        </label>
+      </div>
+    </div>
+
+    <div footer>
+      <button type="button" class="btn" [disabled]="!canSubmitCreate() || creating()" (click)="createExternalClient()">
+        @if (creating()) {
+          <span class="spinner"></span> Creating…
+        } @else {
+          <svg lucideUserPlus></svg> Create
+        }
+      </button>
+    </div>
+  </app-modal>
+}
+
+<!-- Detail / edit -->
+@if (selected(); as client) {
+  @if (draft(); as d) {
+    <app-modal title="External Client" [subtitle]="client.name" (close)="selected.set(null)">
+      @if (error()) {
+        <div class="error">{{ error() }}</div>
+      }
+
+      <div class="form-grid">
+        <label class="full">
+          Name
+          <input type="text" [ngModel]="d.name" (ngModelChange)="updateDraft('name', $event)" name="name" />
+        </label>
+        <label>
+          Company
+          <input type="text" [ngModel]="d.company" (ngModelChange)="updateDraft('company', $event)" name="company" />
+        </label>
+        <label>
+          Email
+          <input type="email" [ngModel]="d.email" (ngModelChange)="updateDraft('email', $event)" name="email" />
+        </label>
+        <label>
+          Phone
+          <input type="tel" [ngModel]="d.phone" (ngModelChange)="updateDraft('phone', $event)" name="phone" />
+        </label>
+        <label class="full">
+          Notes
+          <textarea rows="3" [ngModel]="d.notes" (ngModelChange)="updateDraft('notes', $event)" name="notes"></textarea>
+        </label>
+      </div>
+
+      <div class="section">
+        <h4 class="section-title">Lead cost by plan <span class="hint">$, optional</span></h4>
+        <div class="form-grid">
+          <label>
+            Level
+            <input type="number" min="0" [(ngModel)]="levelCost" name="detailLevelCost" placeholder="0" />
+          </label>
+          <label>
+            Graded
+            <input type="number" min="0" [(ngModel)]="gradedCost" name="detailGradedCost" placeholder="0" />
+          </label>
+          <label>
+            Modified
+            <input type="number" min="0" [(ngModel)]="modifiedCost" name="detailModifiedCost" placeholder="0" />
+          </label>
+          <label>
+            GI
+            <input type="number" min="0" [(ngModel)]="giCost" name="detailGiCost" placeholder="0" />
+          </label>
+        </div>
+      </div>
+
+      <div footer>
+        <button type="button" class="btn" [disabled]="saving()" (click)="saveEdit()">
+          @if (saving()) {
+            <span class="spinner"></span> Saving…
+          } @else {
+            Save changes
+          }
+        </button>
+      </div>
+    </app-modal>
+  }
+}

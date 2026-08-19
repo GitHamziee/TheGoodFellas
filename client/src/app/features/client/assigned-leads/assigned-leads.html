@@ -1,7 +1,6 @@
 <div class="page">
   <div class="page-head">
     <div>
-      <h1>New Leads</h1>
       <p class="sub">Leads the admin team has offered you. Accept to unlock full contact and policy details.</p>
     </div>
   </div>
@@ -89,12 +88,16 @@
                   }
                 </td>
                 <td class="hide-md">
-                  <div class="person">
-                    <span class="avatar-sm" [class]="getAvatarTone(lead.closer.id)">
-                      {{ getInitials(lead.closer.name) }}
-                    </span>
-                    <span class="nm">{{ lead.closer.name }}</span>
-                  </div>
+                  @if (lead.closer) {
+                    <div class="person">
+                      <span class="avatar-sm" [class]="getAvatarTone(lead.closer.id)">
+                        {{ getInitials(lead.closer.name) }}
+                      </span>
+                      <span class="nm">{{ lead.closer.name }}</span>
+                    </div>
+                  } @else {
+                    <span class="empty">—</span>
+                  }
                 </td>
                 <td class="hide-md">
                   <span class="chip"><svg lucideClock></svg>{{ timeAgo(lead.createdAt) }}</span>
@@ -154,7 +157,7 @@
       <app-detail label="Zipcode" [value]="lead.zipcode" />
       <app-detail label="Need" [value]="humanizeEnum(lead.need)" />
       <app-detail label="Marital status" [value]="humanizeEnum(lead.maritalStatus)" />
-      <app-detail label="Closer" [value]="lead.closer.name" />
+      <app-detail label="Closer" [value]="lead.closer?.name" />
       <app-detail label="Received" [value]="timeAgo(lead.createdAt)" />
     </div>
 

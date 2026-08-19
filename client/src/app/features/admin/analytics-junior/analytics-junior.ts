@@ -7,7 +7,6 @@ import { OutcomeAnalytics } from '../outcome-analytics';
   imports: [OutcomeAnalytics],
   template: `
     <app-outcome-analytics
-      title="Analytics — Junior Closers"
       subtitle="How each junior closer's submitted leads end up, once a client has decided."
       peopleLabel="Junior closers"
       emptyTitle="No junior closers yet"

@@ -4,16 +4,19 @@ import { Prisma, PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
+const PLAN_TYPES = ["LEVEL", "GRADED", "MODIFIED", "GI"] as const;
+
 async function upsertUser(
   email: string,
   name: string,
-  role: "JUNIOR_CLOSER" | "CLOSER" | "ADMIN" | "CLIENT",
+  role: "JUNIOR_CLOSER" | "CLOSER" | "ADMIN" | "CLIENT" | "TEAM_LEAD",
+  pricing?: { levelCost: number; gradedCost: number; modifiedCost: number; giCost: number },
 ) {
   const password = await bcrypt.hash("Password1", 10);
   return prisma.user.upsert({
     where: { email },
-    update: {},
-    create: { email, name, password, role },
+    update: pricing ?? {},
+    create: { email, name, password, role, ...pricing },
   });
 }
 
@@ -24,7 +27,7 @@ function daysAgo(days: number): Date {
 
 type DemoLead = {
   n: number;
-  status: "NEW" | "SUBMITTED" | "ASSIGNED" | "ACCEPTED" | "REJECTED";
+  status: "NEW" | "SUBMITTED" | "ASSIGNED" | "ACCEPTED" | "REJECTED" | "ASSIGNED_EXTERNAL";
   customerName: string;
   phone: string;
   state: string;
@@ -34,6 +37,7 @@ type DemoLead = {
   junior: number;
   closer: number;
   client?: number;
+  externalClient?: number;
   createdDaysAgo: number;
   /** Backdated separately — drives the dashboard's "waiting too long" warning. */
   updatedDaysAgo: number;
@@ -75,6 +79,10 @@ const DEMO_LEADS: DemoLead[] = [
   { n: 19, status: "ACCEPTED", customerName: "Priscilla Gage", phone: "6125550342", state: "MN", zipcode: "55401", age: 69, need: "CREMATION", junior: 1, closer: 1, client: 1, createdDaysAgo: 9, updatedDaysAgo: 6, coverage: 10000, premium: 58, carrier: "Gerber Life" },
   { n: 20, status: "ACCEPTED", customerName: "Hollis Barrett", phone: "5025550356", state: "KY", zipcode: "40203", age: 71, need: "BURIAL", junior: 0, closer: 2, client: 2, createdDaysAgo: 7, updatedDaysAgo: 4, coverage: 22000, premium: 108, carrier: "Mutual of Omaha" },
 
+  // — ASSIGNED_EXTERNAL: handed off to an external client, no login/accept-reject —
+  { n: 23, status: "ASSIGNED_EXTERNAL", customerName: "Vernon Cade", phone: "3145550399", state: "MO", zipcode: "63101", age: 72, need: "BURIAL", junior: 0, closer: 1, externalClient: 0, createdDaysAgo: 10, updatedDaysAgo: 6, coverage: 15000, premium: 82, carrier: "Mutual of Omaha", paid: true },
+  { n: 24, status: "ASSIGNED_EXTERNAL", customerName: "Opal Bridges", phone: "9185550402", state: "OK", zipcode: "74103", age: 67, need: "CREMATION", junior: 1, closer: 2, externalClient: 1, createdDaysAgo: 4, updatedDaysAgo: 2, coverage: 10000, premium: 51, carrier: "Gerber Life" },
+
   // — REJECTED: sent back to admin to fix and reassign —
   { n: 21, status: "REJECTED", customerName: "Sylvia Monroe", phone: "2145550368", state: "TX", zipcode: "75201", age: 79, need: "BURIAL", junior: 0, closer: 1, createdDaysAgo: 8, updatedDaysAgo: 3, coverage: 15000, premium: 132, carrier: "Foresters", rejectionReason: "Age outside our underwriting band for this carrier." },
   { n: 22, status: "REJECTED", customerName: "Grady Lawson", phone: "9045550371", state: "FL", zipcode: "32202", age: 62, need: "LEAVE_MONEY", junior: 1, closer: 0, createdDaysAgo: 5, updatedDaysAgo: 2, coverage: 40000, premium: 175, carrier: "Aetna", rejectionReason: "Bank details incomplete — routing number failed validation." },
@@ -88,16 +96,62 @@ async function main() {
   const closer = await upsertUser("closer@thegoodfellas.dev", "Casey Closer", "CLOSER");
   const closer2 = await upsertUser("closer2@thegoodfellas.dev", "Bilal Ahmed", "CLOSER");
   const closer3 = await upsertUser("closer3@thegoodfellas.dev", "Dana Reyes", "CLOSER");
-  const client = await upsertUser("client@thegoodfellas.dev", "Charlie Client", "CLIENT");
-  const client2 = await upsertUser("client2@thegoodfellas.dev", "Sunrise Insurance", "CLIENT");
-  const client3 = await upsertUser("client3@thegoodfellas.dev", "Legacy Life Group", "CLIENT");
+  // Per-plan lead cost (USD) — each client pays a different rate per plan type.
+  const client = await upsertUser("client@thegoodfellas.dev", "Charlie Client", "CLIENT", {
+    levelCost: 5_000,
+    gradedCost: 4_000,
+    modifiedCost: 3_500,
+    giCost: 3_000,
+  });
+  const client2 = await upsertUser("client2@thegoodfellas.dev", "Sunrise Insurance", "CLIENT", {
+    levelCost: 6_000,
+    gradedCost: 4_500,
+    modifiedCost: 4_000,
+    giCost: 3_200,
+  });
+  const client3 = await upsertUser("client3@thegoodfellas.dev", "Legacy Life Group", "CLIENT", {
+    levelCost: 5_500,
+    gradedCost: 4_200,
+    modifiedCost: 3_800,
+    giCost: 3_100,
+  });
+  await upsertUser("teamlead@thegoodfellas.dev", "Taylor Lead", "TEAM_LEAD");
 
-  console.log(`Seeded ${9} users — password for all: Password1`);
+  console.log(`Seeded ${10} users — password for all: Password1`);
   console.log(`  admin: ${admin.email}`);
 
   const juniors = [junior, junior2];
   const closers = [closer, closer2, closer3];
   const clients = [client, client2, client3];
+
+  // ─── External clients ───
+  const external1 = await prisma.externalClient.upsert({
+    where: { id: "external-client-01" },
+    update: {},
+    create: {
+      id: "external-client-01",
+      name: "Frank Odom",
+      company: "Heritage Trust Partners",
+      email: "frank@heritagetrustpartners.com",
+      phone: "6155550410",
+      notes: "Handles overflow burial leads in TN/MO. Pays by check, net 15.",
+    },
+  });
+  const external2 = await prisma.externalClient.upsert({
+    where: { id: "external-client-02" },
+    update: {},
+    create: {
+      id: "external-client-02",
+      name: "Dana Whitcomb",
+      company: "Whitcomb Family Insurance",
+      email: "dana@whitcombfamily.com",
+      phone: "9185550423",
+      notes: "Independent broker, referred by Legacy Life Group.",
+    },
+  });
+  const externalClients = [external1, external2];
+
+  console.log(`Seeded 2 external clients`);
 
   // ─── Demo leads ───
   // Deterministic ids so re-running the seed replaces these rows rather than
@@ -110,6 +164,7 @@ async function main() {
       juniorCloserId: juniors[l.junior].id,
       closerId: closers[l.closer].id,
       clientId: l.client !== undefined ? clients[l.client].id : null,
+      externalClientId: l.externalClient !== undefined ? externalClients[l.externalClient].id : null,
 
       customerName: l.customerName,
       phone: l.phone,
@@ -134,7 +189,7 @@ async function main() {
         healthConditions: l.n % 3 === 0 ? "Type 2 diabetes, controlled" : "None reported",
         medications: l.n % 3 === 0 ? "Metformin 500mg" : "None",
         carrierName: l.carrier,
-        planType: "Whole Life — Final Expense",
+        planType: PLAN_TYPES[l.n % PLAN_TYPES.length],
         coverageAmount: l.coverage,
         monthlyPremiums: l.premium,
         payer: "SELF" as const,

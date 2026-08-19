@@ -9,7 +9,7 @@ import {
 } from '@lucide/angular';
 import { LeadService } from '../../../core/services/lead.service';
 import { AuthService } from '../../../core/services/auth.service';
-import { LeadHistoryRow, LeadStatus } from '../../../core/models/lead.model';
+import { LeadHistoryRow } from '../../../core/models/lead.model';
 import {
   formatPhone,
   getAvatarTone,
@@ -19,14 +19,6 @@ import {
   timeAgo,
 } from '../../../core/format-utils';
 import { EmptyState, SkeletonRows, StatTile, StatusBadge } from '../../../shared/ui/ui';
-
-const PIPELINE: { status: LeadStatus; label: string }[] = [
-  { status: 'NEW', label: 'With closer' },
-  { status: 'SUBMITTED', label: 'With admin' },
-  { status: 'ASSIGNED', label: 'With client' },
-  { status: 'ACCEPTED', label: 'Accepted' },
-  { status: 'REJECTED', label: 'Rejected' },
-];
 
 @Component({
   selector: 'app-junior-dashboard',
@@ -66,21 +58,9 @@ export class JuniorDashboard implements OnInit {
       total: rows.length,
       thisMonth: rows.filter((l) => isThisMonth(l.createdAt)).length,
       today: rows.filter((l) => isToday(l.createdAt)).length,
-      inFlight: rows.filter((l) => l.status === 'NEW' || l.status === 'SUBMITTED').length,
       accepted,
       acceptRate: decided ? Math.round((accepted / decided) * 100) : null,
     };
-  });
-
-  readonly pipeline = computed(() => {
-    const rows = this.leads();
-    const counts = PIPELINE.map((step) => ({
-      ...step,
-      count: rows.filter((l) => l.status === step.status).length,
-      cls: `fb fb--${step.status.toLowerCase()}`,
-    }));
-    const max = Math.max(1, ...counts.map((c) => c.count));
-    return counts.map((c) => ({ ...c, pct: Math.round((c.count / max) * 100) }));
   });
 
   readonly recent = computed(() =>

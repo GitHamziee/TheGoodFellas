@@ -75,7 +75,7 @@ export class Services {
       tag: 'Core product',
       highlight: true,
       title: 'Live Transfers',
-      desc: 'A human Verifier confirms what the AI found, then warm-transfers the caller straight to a licensed Closer — on the same call.',
+      desc: 'A human Verifier confirms what the AI found, then warm-transfers the caller straight to Compliance — on the same call.',
       icon: 'phoneForwarded',
       checklist: [
         'Warm handoff while the caller is still engaged',
@@ -88,13 +88,13 @@ export class Services {
       num: '04',
       tag: 'Where it ends',
       highlight: false,
-      title: 'Policy Closing',
-      desc: 'Our Closers take the transfer, present the plan, handle objections and write the application end to end.',
+      title: 'Compliance Handoff',
+      desc: 'Our Compliance team takes the transfer, presents the plan, handles objections and writes the application end to end.',
       icon: 'handshake',
       checklist: [
-        'Licensed closers who know the product',
+        'Licensed Compliance specialists who know the product',
         'Beneficiary, health and billing detail captured in full',
-        'Application submitted close-ready, nothing missing',
+        'Application submitted complete, nothing missing',
         'Delivered to your portal with a live status',
       ],
     },
@@ -156,7 +156,7 @@ export class Services {
     },
     {
       title: 'A channel for every team',
-      desc: 'Verifiers and Closers each stay in constant contact with Admin over real-time chat, so no transfer sits waiting on a handoff.',
+      desc: 'Verifiers and Compliance each stay in constant contact with Admin over real-time chat, so no transfer sits waiting on a handoff.',
       icon: 'message',
     },
     {

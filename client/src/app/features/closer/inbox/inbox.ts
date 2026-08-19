@@ -10,19 +10,11 @@ import {
   LucideTriangleAlert,
 } from '@lucide/angular';
 import { LeadService } from '../../../core/services/lead.service';
-import { Lead } from '../../../core/models/lead.model';
+import { LeadInboxPreview } from '../../../core/models/lead.model';
 import { createListView } from '../../../core/list-view';
-import {
-  formatPhone,
-  getAvatarTone,
-  getInitials,
-  humanizeEnum,
-  isToday,
-  timeAgo,
-} from '../../../core/format-utils';
+import { getAvatarTone, getInitials, humanizeEnum, isToday, timeAgo } from '../../../core/format-utils';
 import { Modal } from '../../../shared/ui/modal';
-import { EmptyState, Pagination, SearchBox, SkeletonRows, StatTile } from '../../../shared/ui/ui';
-import { LeadDetail } from '../../../shared/lead-detail';
+import { Detail, EmptyState, Pagination, SearchBox, SkeletonRows, StatTile } from '../../../shared/ui/ui';
 
 /** A lead sitting in the inbox longer than this is flagged as ageing. */
 const STALE_AFTER_DAYS = 3;
@@ -32,7 +24,7 @@ const STALE_AFTER_DAYS = 3;
   imports: [
     RouterLink,
     Modal,
-    LeadDetail,
+    Detail,
     StatTile,
     SearchBox,
     Pagination,
@@ -51,20 +43,19 @@ const STALE_AFTER_DAYS = 3;
 export class CloserInbox implements OnInit {
   private readonly leadService = inject(LeadService);
 
-  readonly leads = signal<Lead[]>([]);
+  readonly leads = signal<LeadInboxPreview[]>([]);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
-  readonly selected = signal<Lead | null>(null);
+  readonly selected = signal<LeadInboxPreview | null>(null);
 
-  readonly formatPhone = formatPhone;
   readonly humanizeEnum = humanizeEnum;
   readonly timeAgo = timeAgo;
   readonly getInitials = getInitials;
   readonly getAvatarTone = getAvatarTone;
 
-  readonly view = createListView<Lead>({
+  readonly view = createListView<LeadInboxPreview>({
     source: this.leads,
-    searchFields: (l) => [l.customerName, l.phone, l.state, l.need, l.juniorCloser?.name],
+    searchFields: (l) => [l.customerName, l.state, l.need, l.juniorCloser?.name],
     sorters: {
       customerName: (l) => l.customerName,
       createdAt: (l) => new Date(l.createdAt).getTime(),
@@ -94,11 +85,11 @@ export class CloserInbox implements OnInit {
     }
   }
 
-  ageInDays(lead: Lead): number {
+  ageInDays(lead: LeadInboxPreview): number {
     return Math.floor((Date.now() - new Date(lead.createdAt).getTime()) / 86400000);
   }
 
-  isStale(lead: Lead): boolean {
+  isStale(lead: LeadInboxPreview): boolean {
     return this.ageInDays(lead) >= STALE_AFTER_DAYS;
   }
 

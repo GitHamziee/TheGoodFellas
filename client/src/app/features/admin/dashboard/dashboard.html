@@ -57,7 +57,7 @@
               <span class="act__n">{{ actions().toCollect }}</span>
               <span class="act__body">
                 <span class="act__t">To collect</span>
-                <span class="act__h">{{ formatMoney(actions().outstanding) }} outstanding</span>
+                <span class="act__h">Accepted — not yet marked paid</span>
               </span>
               <svg lucideArrowRight></svg>
             </a>
@@ -66,7 +66,7 @@
       }
     </section>
 
-    @if (money().total === 0) {
+    @if (conversion().total === 0) {
       <div class="card">
         <app-empty-state
           title="No leads in the pipeline yet"
@@ -86,9 +86,6 @@
         <div class="flow">
           @for (stage of flow(); track stage.status; let last = $last) {
             <div class="flow-stage" [class.flow-stage--mine]="stage.mine">
-              <div class="flow-stage__bar">
-                <span class="flow-stage__fill" [style.height.%]="stage.pct"></span>
-              </div>
               <div class="flow-stage__n">{{ stage.count }}</div>
               <div class="flow-stage__label">{{ stage.label }}</div>
               <div class="flow-stage__owner">{{ stage.owner }}</div>
@@ -109,25 +106,41 @@
       </section>
 
       <div class="split">
-        <!-- ---------- Money ---------- -->
+        <!-- ---------- How leads are converting (counts, never dollars) ---------- -->
         <section class="card">
           <div class="inline-head">
-            <h2>Book value</h2>
-            <span class="count">{{ money().thisMonth }} new this month</span>
+            <h2>Conversion</h2>
+            <span class="count">{{ conversion().thisMonth }} new this month</span>
           </div>
 
-          <div class="money">
-            <div class="money__main">
-              <span class="money__label">Coverage written</span>
-              <span class="money__value">{{ formatMoney(money().written) }}</span>
-            </div>
+          <div class="headline">
+            <span class="headline__v">
+              {{ conversion().acceptRate === null ? '—' : conversion().acceptRate + '%' }}
+            </span>
+            <span class="headline__l">of decided leads accepted</span>
+          </div>
 
-            <div class="money__meter">
-              <span class="money__meter-fill" [style.width.%]="money().collectedPct"></span>
+          <div class="chart">
+            <div class="chart-row" [title]="conversion().accepted + ' accepted'">
+              <span class="chart-key">Accepted</span>
+              <span class="chart-track">
+                <span class="chart-bar chart-bar--good" [style.width.%]="conversion().acceptedPct"></span>
+              </span>
+              <span class="chart-val">{{ conversion().accepted }}</span>
             </div>
-            <div class="money__legend">
-              <span><i class="dot dot--paid"></i> {{ formatMoney(money().collected) }} collected</span>
-              <span class="money__pct">{{ money().collectedPct }}%</span>
+            <div class="chart-row" [title]="conversion().rejected + ' rejected'">
+              <span class="chart-key">Rejected</span>
+              <span class="chart-track">
+                <span class="chart-bar chart-bar--bad" [style.width.%]="conversion().rejectedPct"></span>
+              </span>
+              <span class="chart-val">{{ conversion().rejected }}</span>
+            </div>
+            <div class="chart-row" [title]="conversion().pending + ' still moving through the pipeline'">
+              <span class="chart-key">Undecided</span>
+              <span class="chart-track">
+                <span class="chart-bar" [style.width.%]="conversion().pendingPct"></span>
+              </span>
+              <span class="chart-val">{{ conversion().pending }}</span>
             </div>
           </div>
 
@@ -135,21 +148,21 @@
             <div class="mini">
               <span class="mini__ico tone-success"><svg lucideTrendingUp></svg></span>
               <span>
-                <span class="mini__v">{{ money().acceptRate === null ? '—' : money().acceptRate + '%' }}</span>
-                <span class="mini__l">Accept rate</span>
+                <span class="mini__v">{{ conversion().paid }}</span>
+                <span class="mini__l">Paid</span>
               </span>
             </div>
             <div class="mini">
               <span class="mini__ico tone-gold"><svg lucideWallet></svg></span>
               <span>
-                <span class="mini__v">{{ formatMoney(actions().outstanding) }}</span>
-                <span class="mini__l">Outstanding</span>
+                <span class="mini__v">{{ conversion().unpaid }}</span>
+                <span class="mini__l">Unpaid</span>
               </span>
             </div>
             <div class="mini">
-              <span class="mini__ico tone-neutral"><svg lucideBanknote></svg></span>
+              <span class="mini__ico tone-neutral"><svg lucideLayers></svg></span>
               <span>
-                <span class="mini__v">{{ money().total }}</span>
+                <span class="mini__v">{{ conversion().total }}</span>
                 <span class="mini__l">Total leads</span>
               </span>
             </div>
@@ -201,7 +214,7 @@
               <span class="who">
                 <span class="nm">{{ lead.customerName }}</span>
                 <span class="mt">
-                  {{ lead.closer.name }}
+                  @if (lead.closer) { {{ lead.closer.name }} } @else { CPL }
                   @if (lead.client) { → {{ lead.client.name }} }
                   · {{ timeAgo(lead.updatedAt) }}
                 </span>

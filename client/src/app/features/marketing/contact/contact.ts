@@ -12,6 +12,7 @@ import {
   LucideSparkles,
 } from '@lucide/angular';
 import { Reveal } from '../../../shared/reveal.directive';
+import { Select } from '../../../shared/ui/select';
 
 @Component({
   selector: 'app-contact',
@@ -19,6 +20,7 @@ import { Reveal } from '../../../shared/reveal.directive';
     FormsModule,
     RouterLink,
     Reveal,
+    Select,
     LucideArrowRight,
     LucideCheck,
     LucideMail,
@@ -46,6 +48,9 @@ export class Contact {
   readonly verticals = ['Final Expense', 'Medicare', 'Health Insurance', 'Auto Insurance', 'More than one'];
 
   readonly volumes = ['1–10 / day', '10–25 / day', '25–50 / day', '50+ / day', 'Not sure yet'];
+
+  readonly verticalOptions = this.verticals.map((v) => ({ value: v, label: v }));
+  readonly volumeOptions = this.volumes.map((v) => ({ value: v, label: v }));
 
   /** Enough to scope a campaign — everything else can come on the call. */
   readonly required = computed(() => ({
@@ -79,7 +84,7 @@ export class Contact {
     },
     {
       q: 'What counts as a live transfer?',
-      a: 'A caller who came in through our own campaign, cleared AI verification, was confirmed by a human Verifier against your criteria, and is warm-transferred to your licensed closer on that same call — not a callback.',
+      a: 'A caller who came in through our own campaign, cleared AI verification, was confirmed by a human Verifier against your criteria, and is warm-transferred to Compliance on that same call — not a callback.',
     },
     {
       q: 'Which verticals do you run?',

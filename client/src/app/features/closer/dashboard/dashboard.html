@@ -5,13 +5,14 @@
       <p class="sub">Your workload and how your submitted leads are landing.</p>
     </div>
     <div class="page-head-actions">
+      <a class="btn btn--ghost" routerLink="/closer/new-lead"><svg lucideSend></svg> New lead</a>
       <a class="btn" routerLink="/closer/inbox"><svg lucideInbox></svg> Go to inbox</a>
     </div>
   </div>
 
   <div class="stats-row">
     <app-stat-tile [value]="stats().waiting" label="Waiting for you" tone="tone-gold">
-      <svg lucideInbox></svg>
+      <svg lucideHourglass></svg>
     </app-stat-tile>
     <app-stat-tile [value]="stats().stale" label="Ageing (3+ days)" tone="tone-warning">
       <svg lucideTriangleAlert></svg>
@@ -57,7 +58,7 @@
               <span class="who">
                 <span class="nm">{{ lead.customerName }}</span>
                 <span class="mt">
-                  {{ formatPhone(lead.phone) }} · {{ lead.state }}
+                  {{ lead.state }}
                   @if (lead.need) { · {{ humanizeEnum(lead.need) }} }
                 </span>
               </span>

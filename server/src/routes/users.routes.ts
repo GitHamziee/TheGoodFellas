@@ -29,6 +29,18 @@ router.get(
   })
 );
 
+// State Sheet — every CLOSER/TEAM_LEAD/ADMIN can see which clients cover which states
+// and the carriers available there. Registered ahead of the generic "/:id" below so the
+// literal path wins the match.
+router.get(
+  "/state-sheet",
+  requireRole("ADMIN", "CLOSER", "TEAM_LEAD"),
+  asyncHandler(async (_req, res) => {
+    const clients = await userService.listClientCoverage();
+    return apiSuccess(res, { clients });
+  })
+);
+
 router.get(
   "/",
   requireRole("ADMIN"),
@@ -53,10 +65,23 @@ router.post(
   "/",
   requireRole("ADMIN"),
   asyncHandler(async (req, res) => {
-    const { name, email, password, role, phone } = req.body ?? {};
+    const { name, email, password, role, phone, levelCost, gradedCost, modifiedCost, giCost, states, carriers } =
+      req.body ?? {};
     if (!role) return apiError(res, "Role is required", 400);
 
-    const result = await authService.createStaffUser({ name, email, password, role, phone });
+    const result = await authService.createStaffUser({
+      name,
+      email,
+      password,
+      role,
+      phone,
+      levelCost,
+      gradedCost,
+      modifiedCost,
+      giCost,
+      states,
+      carriers,
+    });
     if ("error" in result) return apiError(res, result.error, result.status);
     return apiSuccess(res, result.data, "User created", 201);
   })
@@ -71,6 +96,42 @@ router.patch(
 
     const user = await userService.updateUserRole(req.params.id, role);
     return apiSuccess(res, { user }, "Role updated");
+  })
+);
+
+// Only meaningful for CLIENT accounts — the four per-plan (Level/Graded/Modified/GI)
+// lead costs shown on the create form and editable afterward from the account detail modal.
+router.patch(
+  "/:id/pricing",
+  requireRole("ADMIN"),
+  asyncHandler(async (req, res) => {
+    const result = await userService.updateClientPricing(req.params.id, req.body ?? {});
+    if ("error" in result) return apiError(res, result.error, result.status);
+    return apiSuccess(res, result.data, "Pricing updated");
+  })
+);
+
+// Only meaningful for CLIENT accounts — licensed states + carriers, the data set the
+// future State Sheet page reads (state -> clients -> carriers available there).
+router.patch(
+  "/:id/coverage",
+  requireRole("ADMIN"),
+  asyncHandler(async (req, res) => {
+    const result = await userService.updateClientCoverage(req.params.id, req.body ?? {});
+    if ("error" in result) return apiError(res, result.error, result.status);
+    return apiSuccess(res, result.data, "Coverage updated");
+  })
+);
+
+// There is no self-service "forgot password" — an Admin resets it directly here.
+router.patch(
+  "/:id/reset-password",
+  requireRole("ADMIN"),
+  asyncHandler(async (req, res) => {
+    const { newPassword } = req.body ?? {};
+    const result = await authService.resetPassword(req.params.id, newPassword);
+    if ("error" in result) return apiError(res, result.error, result.status);
+    return apiSuccess(res, result.data, "Password reset");
   })
 );
 

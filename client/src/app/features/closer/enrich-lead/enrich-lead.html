@@ -1,14 +1,27 @@
-<div class="page">
+<div class="page page--narrow">
   <div class="page-head">
     <div>
-      <a class="back-link" routerLink="/closer/inbox"><svg lucideArrowLeft></svg> Assigned leads</a>
-      <h1>Complete Lead</h1>
-      <p class="sub">Fill in the full application, then submit it to the admin team for assignment.</p>
+      @if (isCorrection()) {
+        <a class="back-link" routerLink="/closer/returned"><svg lucideArrowLeft></svg> Sent back to me</a>
+        <h1>Correct Lead</h1>
+        <p class="sub">Fix what the admin flagged, then send it back to them.</p>
+      } @else if (isDraft()) {
+        <a class="back-link" routerLink="/closer/drafts"><svg lucideArrowLeft></svg> Drafts</a>
+        <h1>Resume Draft</h1>
+        <p class="sub">Pick up where you left off, then submit it to the admin team for assignment.</p>
+      } @else {
+        <a class="back-link" routerLink="/closer/inbox"><svg lucideArrowLeft></svg> Assigned leads</a>
+        <h1>Complete Lead</h1>
+        <p class="sub">Fill in the full application, then submit it to the admin team for assignment.</p>
+      }
     </div>
   </div>
 
   @if (error()) {
     <div class="error"><svg lucideCircleAlert></svg>{{ error() }}</div>
+  }
+  @if (returnReason(); as reason) {
+    <div class="warn"><strong>Admin asked you to fix:</strong> {{ reason }}</div>
   }
 
   @if (loading()) {
@@ -17,11 +30,15 @@
     @if (lead(); as l) {
       <div class="card intake-summary">
         <div>
-          <div class="k">Intake from {{ l.juniorCloser.name }}</div>
+          @if (l.juniorCloser) {
+            <div class="k">Intake from {{ l.juniorCloser.name }}</div>
+          } @else {
+            <div class="k">Entered directly by you</div>
+          }
           <div class="v">
             {{ l.customerName }} · {{ l.state }}
             @if (l.need) { · {{ humanizeEnum(l.need) }} }
-            @if (l.age) { · {{ l.age }} yrs }
+            @if (l.age) { · {{ pluralize(l.age, 'yr') }} }
           </div>
         </div>
         @if (l.juniorNotes) {
@@ -39,9 +56,10 @@
       <p class="ph">Everything below is optional except name, phone and state — fill in as much as the customer gave you.</p>
     </div>
 
-    <form (ngSubmit)="submit()" (input)="touch()" (change)="touch()">
-      <!-- Personal -->
+    <form appNoCopy (ngSubmit)="submit()" (input)="touch()" (change)="touch()">
       <div class="card">
+      <!-- Personal -->
+      <div class="section">
         <h2 class="section-title"><svg lucideUser></svg> Personal & contact</h2>
         <div class="form-grid">
           <label>
@@ -82,16 +100,17 @@
           </label>
           <label>
             Marital status
-            <select name="maritalStatus" [(ngModel)]="form.maritalStatus">
-              <option value="">Select…</option>
-              @for (m of maritalStatusOptions; track m) {
-                <option [value]="m">{{ m }}</option>
-              }
-            </select>
+            <app-select [options]="maritalStatusOptions" [ngModel]="form.maritalStatus" name="maritalStatus"
+              (ngModelChange)="form.maritalStatus = $event; touch()" />
           </label>
           <label>
             Birth state
             <input type="text" name="birthState" [(ngModel)]="form.birthState" />
+          </label>
+          <label>
+            Gender
+            <app-select [options]="genderOptions" [ngModel]="form.gender" name="gender"
+              (ngModelChange)="form.gender = $event; touch()" />
           </label>
           <label>
             Date of birth
@@ -118,7 +137,7 @@
       </div>
 
       <!-- Health -->
-      <div class="card">
+      <div class="section">
         <h2 class="section-title"><svg lucideHeartPulse></svg> Physical & health</h2>
         <div class="form-grid">
           <label>
@@ -131,11 +150,8 @@
           </label>
           <label>
             Smoker
-            <select name="smoker" [(ngModel)]="form.smoker">
-              <option [ngValue]="undefined">Select…</option>
-              <option [ngValue]="true">Yes</option>
-              <option [ngValue]="false">No</option>
-            </select>
+            <app-select [options]="smokerOptions" [ngModel]="form.smoker" name="smoker"
+              (ngModelChange)="form.smoker = $event; touch()" />
           </label>
           <label>
             Doctor's name
@@ -153,7 +169,7 @@
       </div>
 
       <!-- Beneficiary -->
-      <div class="card">
+      <div class="section">
         <h2 class="section-title"><svg lucideUsers></svg> Beneficiary</h2>
         <div class="form-grid">
           <label>
@@ -172,7 +188,7 @@
       </div>
 
       <!-- Policy -->
-      <div class="card">
+      <div class="section">
         <h2 class="section-title"><svg lucideShieldCheck></svg> Policy</h2>
         <div class="form-grid">
           <label>
@@ -181,7 +197,8 @@
           </label>
           <label>
             Plan type
-            <input type="text" name="planType" [(ngModel)]="form.planType" />
+            <app-select [options]="planTypeOptions" [ngModel]="form.planType" name="planType"
+              (ngModelChange)="form.planType = $event; touch()" placeholder="Select a plan type…" />
           </label>
           <label>
             Coverage amount <span class="hint">Whole dollars</span>
@@ -191,11 +208,15 @@
             Monthly premium <span class="hint">Whole dollars</span>
             <input type="number" name="monthlyPremiums" min="0" [(ngModel)]="form.monthlyPremiums" />
           </label>
+          <label>
+            Annual premium <span class="hint">Monthly × 12, calculated</span>
+            <input type="number" name="annualPremium" [value]="annualPremium() ?? ''" readonly tabindex="-1" />
+          </label>
         </div>
       </div>
 
       <!-- Billing -->
-      <div class="card">
+      <div class="section">
         <h2 class="section-title"><svg lucideBanknote></svg> Billing</h2>
         <div class="form-grid">
           <label>
@@ -208,12 +229,8 @@
           </label>
           <label class="full">
             Who is paying?
-            <select name="payer" [(ngModel)]="form.payer">
-              <option value="">Select…</option>
-              @for (p of payerOptions; track p.value) {
-                <option [value]="p.value">{{ p.label }}</option>
-              }
-            </select>
+            <app-select [options]="payerOptions" [ngModel]="form.payer" name="payer"
+              (ngModelChange)="form.payer = $event; touch()" />
           </label>
         </div>
 
@@ -240,12 +257,8 @@
               </label>
               <label>
                 Account type
-                <select name="accountType" [(ngModel)]="form.accountType">
-                  <option value="">Select…</option>
-                  @for (a of accountTypeOptions; track a.value) {
-                    <option [value]="a.value">{{ a.label }}</option>
-                  }
-                </select>
+                <app-select [options]="accountTypeOptions" [ngModel]="form.accountType" name="accountType"
+                  (ngModelChange)="form.accountType = $event; touch()" />
               </label>
               <label>
                 Routing number
@@ -262,12 +275,13 @@
       </div>
 
       <!-- Notes -->
-      <div class="card">
+      <div class="section">
         <h2 class="section-title"><svg lucideNotebookPen></svg> Notes for the admin team</h2>
         <label>
           Anything worth flagging <span class="hint">Optional</span>
           <textarea name="closerNotes" rows="4" [(ngModel)]="form.closerNotes"></textarea>
         </label>
+      </div>
       </div>
 
       <div class="form-actions">
@@ -276,9 +290,16 @@
         } @else {
           <span class="pending-note ok">Ready to submit — {{ completeness() }}% of the application filled in</span>
         }
+        @if (!isCorrection()) {
+          <button class="btn btn--ghost" type="button" [disabled]="savingDraft() || submitting()" (click)="openDraftModal()">
+            <svg lucideNotebookPen></svg> Save as draft
+          </button>
+        }
         <button class="btn" type="submit" [disabled]="!canSubmit()">
           @if (submitting()) {
             <span class="spinner"></span> Submitting…
+          } @else if (isCorrection()) {
+            <svg lucideSend></svg> Send back to admin
           } @else {
             <svg lucideSend></svg> Submit to admin
           }
@@ -287,3 +308,32 @@
     </form>
   }
 </div>
+
+@if (draftModalOpen()) {
+  <app-modal title="Save as draft" subtitle="Pick a reason so admin can see why this lead is parked." (close)="closeDraftModal()">
+    <label>
+      Reason
+      <app-select
+        [options]="draftReasonOptions"
+        [ngModel]="form.draftReason"
+        [invalid]="showDraftReasonError() && !form.draftReason"
+        placeholder="Select a reason…"
+        name="draftReason"
+        (ngModelChange)="form.draftReason = $event; showDraftReasonError.set(false)"
+      />
+      @if (showDraftReasonError() && !form.draftReason) {
+        <span class="field-error">Pick a reason to save this as a draft.</span>
+      }
+    </label>
+
+    <div footer>
+      <button class="btn" type="button" [disabled]="savingDraft()" (click)="saveDraft()">
+        @if (savingDraft()) {
+          <span class="spinner"></span> Saving…
+        } @else {
+          <svg lucideNotebookPen></svg> Save draft
+        }
+      </button>
+    </div>
+  </app-modal>
+}

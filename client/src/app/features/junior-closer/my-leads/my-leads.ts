@@ -12,7 +12,6 @@ import { LeadHistoryRow } from '../../../core/models/lead.model';
 import { createListView } from '../../../core/list-view';
 import {
   formatDateTime,
-  formatPhone,
   getAvatarTone,
   getInitials,
   isThisMonth,
@@ -58,7 +57,6 @@ export class MyLeads implements OnInit {
   readonly error = signal<string | null>(null);
   readonly selected = signal<LeadHistoryRow | null>(null);
 
-  readonly formatPhone = formatPhone;
   readonly formatDateTime = formatDateTime;
   readonly timeAgo = timeAgo;
   readonly getInitials = getInitials;
@@ -75,7 +73,7 @@ export class MyLeads implements OnInit {
 
   readonly view = createListView<LeadHistoryRow>({
     source: this.leads,
-    searchFields: (l) => [l.customerName, l.phone],
+    searchFields: (l) => [l.customerName],
     statusOf: (l) => l.status,
     sorters: {
       customerName: (l) => l.customerName,

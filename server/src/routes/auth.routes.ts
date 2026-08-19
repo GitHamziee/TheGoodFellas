@@ -7,16 +7,8 @@ import * as authService from "../services/auth.service";
 
 const router = Router();
 
-router.post(
-  "/register",
-  asyncHandler(async (req, res) => {
-    const { name, email, password, phone } = req.body ?? {};
-    const result = await authService.registerClient({ name, email, password, phone });
-    if ("error" in result) return apiError(res, result.error, result.status);
-    return apiSuccess(res, result.data, "Account created", 201);
-  })
-);
-
+// No self-registration — every account (including Client) is created by an Admin via
+// POST /api/users. See auth.service.ts#resetPassword for the password-recovery story.
 router.post(
   "/login",
   asyncHandler(async (req, res) => {

@@ -1,0 +1,86 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <p class="sub">Leads the admin returned for correction. Fix what they flagged and send each one back.</p>
+    </div>
+  </div>
+
+  @if (error()) {
+    <div class="error">{{ error() }}</div>
+  }
+
+  <div class="toolbar">
+    <app-search-box
+      [value]="view.search()"
+      placeholder="Search name or reason…"
+      (valueChange)="view.setSearch($event)"
+    />
+  </div>
+
+  <div class="card card--flush">
+    @if (loading()) {
+      <app-skeleton-rows [count]="4" />
+    } @else if (view.total() === 0) {
+      @if (view.isFiltered()) {
+        <app-empty-state title="Nothing matches that search" hint="Clear the search to see everything sent back to you.">
+          <svg lucideUndo2></svg>
+        </app-empty-state>
+      } @else {
+        <app-empty-state title="Nothing to correct" hint="When an admin sends a lead back to you, it shows up here.">
+          <svg lucideCircleCheck></svg>
+        </app-empty-state>
+      }
+    } @else {
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="sortable" (click)="view.toggleSort('customerName')">
+                Customer <span class="arrow">{{ sortArrow('customerName') }}</span>
+              </th>
+              <th>What to fix</th>
+              <th class="sortable hide-md" (click)="view.toggleSort('createdAt')">
+                Age <span class="arrow">{{ sortArrow('createdAt') }}</span>
+              </th>
+              <th class="right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (lead of view.rows(); track lead.id) {
+              <tr>
+                <td>
+                  <div class="cell-main">{{ lead.customerName }}</div>
+                  <div class="cell-sub">{{ formatPhone(lead.phone) }} · {{ lead.state }}</div>
+                </td>
+                <td>
+                  @if (lead.returnReason) {
+                    <span class="cell-sub">{{ lead.returnReason }}</span>
+                  } @else {
+                    <span class="empty">—</span>
+                  }
+                </td>
+                <td class="hide-md">
+                  <span class="chip"><svg lucideClock></svg>{{ timeAgo(lead.createdAt) }}</span>
+                </td>
+                <td>
+                  <div class="row-actions">
+                    <a class="btn btn--sm" [routerLink]="['/junior/leads', lead.id, 'edit']">
+                      <svg lucideSquarePen></svg> Correct
+                    </a>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <app-pagination
+        [page]="view.page()"
+        [totalPages]="view.totalPages()"
+        [total]="view.total()"
+        (pageChange)="view.page.set($event)"
+      />
+    }
+  </div>
+</div>

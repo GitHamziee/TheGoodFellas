@@ -12,6 +12,16 @@ interface FieldSpec {
 const SSN_PATTERN = /^\d{3}-?\d{2}-?\d{4}$/;
 const ROUTING_PATTERN = /^\d{9}$/;
 
+export const DRAFT_REASON_VALUES = [
+  'MISSING_INFO',
+  'CLIENT_NOT_REACHABLE',
+  'NEEDS_FOLLOW_UP',
+  'PENDING_DOCUMENTATION',
+  'OTHER',
+] as const;
+
+export const D_CODE_VALUES = ['D1', 'D2', 'D3', 'D4'] as const;
+
 export function normalizeSSN(value: string): string {
   const digits = value.replace(/\D/g, '');
   return `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5, 9)}`;
@@ -25,6 +35,7 @@ const FIELD_SCHEMA: Record<string, FieldSpec> = {
   state: { type: 'string' },
   zipcode: { type: 'string' },
   birthState: { type: 'string' },
+  gender: { type: 'string', enumValues: ['Male', 'Female'] },
   smoker: { type: 'boolean' },
   dob: { type: 'date' },
   age: { type: 'int' },
@@ -52,7 +63,7 @@ const FIELD_SCHEMA: Record<string, FieldSpec> = {
   beneficiaryDob: { type: 'date' },
   medications: { type: 'string' },
   carrierName: { type: 'string' },
-  planType: { type: 'string' },
+  planType: { type: 'string', enumValues: ['LEVEL', 'GRADED', 'MODIFIED', 'GI'] },
   coverageAmount: { type: 'int' },
   monthlyPremiums: { type: 'int' },
   initialDraftDate: { type: 'date' },
@@ -66,10 +77,18 @@ const FIELD_SCHEMA: Record<string, FieldSpec> = {
   accountNumber: { type: 'string' },
 
   closerNotes: { type: 'string' },
+
+  // Draft-only — why the closer parked the lead. Not part of any other allowlist below.
+  draftReason: { type: 'string', enumValues: DRAFT_REASON_VALUES },
+
+  // CPL intake only
+  decisionMaker: { type: 'boolean' },
+  bankAccount: { type: 'boolean' },
+  dCode: { type: 'string', enumValues: D_CODE_VALUES },
 };
 
 export const SHARED_FIELDS = [
-  'customerName', 'maritalStatus', 'phone', 'state', 'zipcode', 'birthState',
+  'customerName', 'maritalStatus', 'phone', 'state', 'zipcode', 'birthState', 'gender',
   'smoker', 'dob', 'age', 'height', 'weight', 'healthConditions',
 ] as const;
 
@@ -89,7 +108,21 @@ export const CLOSER_ONLY_FIELDS = [
 
 export const JUNIOR_INTAKE_FIELDS = [...SHARED_FIELDS, ...JUNIOR_ONLY_FIELDS] as const;
 export const CLOSER_ENRICHMENT_FIELDS = [...SHARED_FIELDS, ...CLOSER_ONLY_FIELDS] as const;
-export const ADMIN_EDIT_FIELDS = [...SHARED_FIELDS, ...JUNIOR_ONLY_FIELDS, ...CLOSER_ONLY_FIELDS] as const;
+// Junior intake + closer enrichment together — the full CPA field set. Used by the
+// admin's post-rejection edit and by the closer's from-scratch create (self-/AI-sourced
+// calls with no junior closer involved).
+export const FULL_LEAD_FIELDS = [...SHARED_FIELDS, ...JUNIOR_ONLY_FIELDS, ...CLOSER_ONLY_FIELDS] as const;
+export const ADMIN_EDIT_FIELDS = FULL_LEAD_FIELDS;
+// Saving/updating a draft accepts everything enrichment does, plus the reason.
+export const DRAFT_FIELDS = [...CLOSER_ENRICHMENT_FIELDS, 'draftReason'] as const;
+
+// CPL's own, deliberately shorter intake — no enrichment step exists for CPL, so this
+// is the entire field set a CPL lead ever carries (see PENDING_CHANGES.md Module M3).
+export const CPL_ONLY_FIELDS = ['decisionMaker', 'bankAccount', 'dCode'] as const;
+export const CPL_INTAKE_FIELDS = [
+  'customerName', 'phone', 'state', 'zipcode', 'smoker', 'dob', 'need', 'juniorNotes',
+  ...CPL_ONLY_FIELDS,
+] as const;
 
 export type SanitizedLeadFields = Record<string, string | number | boolean | Date>;
 

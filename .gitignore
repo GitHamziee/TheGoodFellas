@@ -23,3 +23,8 @@ yarn-error.log
 # System files
 .DS_Store
 Thumbs.db
+
+# Claude Code / MCP tooling (local dev only)
+.claude/
+.mcp.json
+.playwright-mcp/
