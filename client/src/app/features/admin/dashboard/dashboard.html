@@ -52,11 +52,21 @@
               <svg lucideArrowRight></svg>
             </a>
           }
-          @if (actions().toCollect > 0) {
+          @if (actions().toCollectCpa > 0) {
             <a class="act" routerLink="/admin/leads">
-              <span class="act__n">{{ actions().toCollect }}</span>
+              <span class="act__n">{{ actions().toCollectCpa }}</span>
               <span class="act__body">
-                <span class="act__t">To collect</span>
+                <span class="act__t">To collect — CPA</span>
+                <span class="act__h">Accepted — not yet marked paid</span>
+              </span>
+              <svg lucideArrowRight></svg>
+            </a>
+          }
+          @if (actions().toCollectCpl > 0) {
+            <a class="act" routerLink="/admin/cpl-leads">
+              <span class="act__n">{{ actions().toCollectCpl }}</span>
+              <span class="act__body">
+                <span class="act__t">To collect — CPL</span>
                 <span class="act__h">Accepted — not yet marked paid</span>
               </span>
               <svg lucideArrowRight></svg>

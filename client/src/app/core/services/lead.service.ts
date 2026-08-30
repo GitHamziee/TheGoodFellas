@@ -2,7 +2,15 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { API_BASE_URL } from '../config';
-import { Lead, LeadHistoryRow, LeadInboxPreview, LeadIntakeEdit, LeadPreview, TeamLeadLeadRow } from '../models/lead.model';
+import {
+  Lead,
+  LeadHistoryRow,
+  LeadInboxPreview,
+  LeadIntakeEdit,
+  LeadPreview,
+  TeamLeadLeadRow,
+} from '../models/lead.model';
+import { LeadReviewRow, QaCloserLeadRow, QaJuniorLeadRow, ReviewOutcome } from '../models/review.model';
 
 interface ApiSuccess<T> {
   data: T;
@@ -66,6 +74,21 @@ export type AdminLeadEditInput = CloserLeadInput &
 /** Closer building a lead from scratch — junior intake + closer enrichment together,
  *  no CPL-only fields, no closerId (the caller is implicit). */
 export type CloserCreateLeadInput = CloserLeadInput & Partial<Omit<JuniorLeadInput, 'closerId'>>;
+
+/** Retention submitting a form-imported lead — same full field set as CloserCreateLeadInput
+ *  (no CPL-only fields, no owner id — the caller is implicit and not even checked, any
+ *  Retention teammate may submit any other's lead). */
+export type RetentionSubmitInput = CloserCreateLeadInput;
+
+const RETENTION_INTAKE_KEYS = [
+  'customerName', 'phone', 'mailingAddress', 'state', 'dob', 'ssn', 'carrierName',
+  'planType', 'coverageAmount', 'monthlyPremiums', 'beneficiaryName', 'bankName',
+  'accountType', 'routingNumber', 'accountNumber',
+] as const;
+
+/** What the public retention intake form (no login) submits — whoever just worked an
+ *  AI-sourced call types these in directly. */
+export type RetentionIntakeInput = Partial<Pick<Lead, (typeof RETENTION_INTAKE_KEYS)[number]>>;
 
 @Injectable({ providedIn: 'root' })
 export class LeadService {
@@ -174,6 +197,12 @@ export class LeadService {
     return res.data.leads;
   }
 
+  /** Every closer's parked drafts — Admin oversight, full detail, view-only. */
+  async adminDrafts(): Promise<Lead[]> {
+    const res = await firstValueFrom(this.http.get<ApiSuccess<{ leads: Lead[] }>>(`${BASE}/admin/drafts`));
+    return res.data.leads;
+  }
+
   /** Charged-back leads waiting to be reassigned to a different client/external client. */
   async chargeBacks(): Promise<Lead[]> {
     const res = await firstValueFrom(this.http.get<ApiSuccess<{ leads: Lead[] }>>(`${BASE}/charge-backs`));
@@ -260,6 +289,83 @@ export class LeadService {
       this.http.get<ApiSuccess<{ leads: TeamLeadLeadRow[] }>>(`${BASE}/team-lead/submitted`)
     );
     return res.data.leads;
+  }
+
+  // ─── Public — Retention intake form (no login) ─────────────────
+  /** Submits the public retention intake form. Reaches the server ahead of `authenticate`,
+   *  so this works whether or not the caller is logged in. */
+  async submitRetentionIntake(input: RetentionIntakeInput): Promise<Lead> {
+    const res = await firstValueFrom(this.http.post<ApiSuccess<{ lead: Lead }>>(`${BASE}/retention/intake`, input));
+    return res.data.lead;
+  }
+
+  // ─── Admin: Retention imports ─────────────────────────────────
+  /** Form-submitted leads not yet handed to a Retention person. */
+  async retentionUnassigned(): Promise<Lead[]> {
+    const res = await firstValueFrom(this.http.get<ApiSuccess<{ leads: Lead[] }>>(`${BASE}/retention/unassigned`));
+    return res.data.leads;
+  }
+
+  /** Hands (or re-hands, to correct a misassignment) an unworked retention lead to a person. */
+  async assignRetention(id: string, retentionId: string): Promise<Lead> {
+    const res = await firstValueFrom(
+      this.http.patch<ApiSuccess<{ lead: Lead }>>(`${BASE}/retention/${id}/assign`, { retentionId })
+    );
+    return res.data.lead;
+  }
+
+  // ─── Retention ────────────────────────────────────────────────
+  /** The whole team's shared working queue, full detail — not scoped to the caller. */
+  async retentionQueue(): Promise<Lead[]> {
+    const res = await firstValueFrom(this.http.get<ApiSuccess<{ leads: Lead[] }>>(`${BASE}/retention/queue`));
+    return res.data.leads;
+  }
+
+  /** Edits + submits a retention lead — any Retention teammate may act on any other's lead. */
+  async retentionSubmit(id: string, input: RetentionSubmitInput): Promise<Lead> {
+    const res = await firstValueFrom(
+      this.http.patch<ApiSuccess<{ lead: Lead }>>(`${BASE}/retention/${id}/submit`, input)
+    );
+    return res.data.lead;
+  }
+
+  /** Shared team history — leads worked past the queue. Coverage amount and monthly
+   *  premium come back null; Retention doesn't see money figures. */
+  async retentionHistory(): Promise<Lead[]> {
+    const res = await firstValueFrom(this.http.get<ApiSuccess<{ leads: Lead[] }>>(`${BASE}/retention/history`));
+    return res.data.leads;
+  }
+
+  // ─── QA ─────────────────────────────────────────────────────
+  /** Leads QA_JUNIOR_CLOSER hasn't reviewed the intake on yet — unmasked intake fields only. */
+  async qaJuniorQueue(): Promise<QaJuniorLeadRow[]> {
+    const res = await firstValueFrom(this.http.get<ApiSuccess<{ leads: QaJuniorLeadRow[] }>>(`${BASE}/qa/junior-queue`));
+    return res.data.leads;
+  }
+
+  async qaJuniorHistory(): Promise<LeadReviewRow<QaJuniorLeadRow>[]> {
+    const res = await firstValueFrom(
+      this.http.get<ApiSuccess<{ reviews: LeadReviewRow<QaJuniorLeadRow>[] }>>(`${BASE}/qa/junior-history`)
+    );
+    return res.data.reviews;
+  }
+
+  /** Leads QA_CLOSER hasn't reviewed the enrichment on yet — full detail. */
+  async qaCloserQueue(): Promise<QaCloserLeadRow[]> {
+    const res = await firstValueFrom(this.http.get<ApiSuccess<{ leads: QaCloserLeadRow[] }>>(`${BASE}/qa/closer-queue`));
+    return res.data.leads;
+  }
+
+  async qaCloserHistory(): Promise<LeadReviewRow<QaCloserLeadRow>[]> {
+    const res = await firstValueFrom(
+      this.http.get<ApiSuccess<{ reviews: LeadReviewRow<QaCloserLeadRow>[] }>>(`${BASE}/qa/closer-history`)
+    );
+    return res.data.reviews;
+  }
+
+  /** Records this QA reviewer's pass/fail verdict — locked to one per lead per QA lane. */
+  async submitQaReview(id: string, outcome: ReviewOutcome, comment?: string): Promise<void> {
+    await firstValueFrom(this.http.patch<ApiSuccess<unknown>>(`${BASE}/${id}/qa-review`, { outcome, comment }));
   }
 
   // ─── Shared ─────────────────────────────────────────────────

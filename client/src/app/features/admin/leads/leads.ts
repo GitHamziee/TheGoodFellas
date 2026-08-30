@@ -103,7 +103,7 @@ export class AdminLeads implements OnInit {
   /** Closers that actually appear on a lead — drives the "filter by closer" dropdown. */
   readonly closers = computed(() => {
     const seen = new Map<string, string>();
-    for (const lead of this.leads()) {
+    for (const lead of this.cpaLeads()) {
       if (lead.closer) seen.set(lead.closer.id, lead.closer.name);
     }
     return [...seen].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
@@ -114,9 +114,13 @@ export class AdminLeads implements OnInit {
     ...this.closers().map((c) => ({ value: c.id, label: c.name })),
   ]);
 
+  /** This page is the CPA counterpart to the dedicated CPL Leads page — CPL leads never
+   * appear here, same way they never appear mixed into any other CPA-only view. */
+  private readonly cpaLeads = computed(() => this.leads().filter((l) => l.leadType === 'CPA'));
+
   private readonly byCloser = computed(() => {
     const closerId = this.closerFilter();
-    const rows = this.leads();
+    const rows = this.cpaLeads();
     return closerId ? rows.filter((l) => l.closer?.id === closerId) : rows;
   });
 
@@ -134,7 +138,7 @@ export class AdminLeads implements OnInit {
   });
 
   readonly stats = computed(() => {
-    const rows = this.leads();
+    const rows = this.cpaLeads();
     const count = (s: LeadStatus) => rows.filter((l) => l.status === s).length;
     const accepted = rows.filter((l) => l.status === 'ACCEPTED');
     return {

@@ -1,8 +1,8 @@
 <div class="page">
   <div class="page-head">
     <div>
-      <h1>All Leads</h1>
-      <p class="sub">Every lead in the pipeline, across all closers and clients.</p>
+      <h1>CPA Leads</h1>
+      <p class="sub">The full CPA pipeline — Junior → Closer → Admin → Client. CPL (live-transfer) leads live on their own page.</p>
     </div>
   </div>
 
@@ -90,7 +90,7 @@
           <svg lucideFileText></svg>
         </app-empty-state>
       } @else {
-        <app-empty-state title="No leads yet" hint="Leads appear here once junior closers start submitting them.">
+        <app-empty-state title="No CPA leads yet" hint="Leads appear here once junior closers start submitting them.">
           <svg lucideFileText></svg>
         </app-empty-state>
       }
@@ -146,7 +146,7 @@
                       <span class="nm">{{ lead.closer.name }}</span>
                     </div>
                   } @else {
-                    <span class="chip">CPL @if (lead.dCode) { · {{ lead.dCode }} }</span>
+                    <span class="empty">—</span>
                   }
                 </td>
                 <td class="hide-md">
@@ -202,7 +202,7 @@
     [wide]="true"
     (close)="selected.set(null)"
   >
-    <app-lead-detail [lead]="lead" />
+    <app-lead-detail [lead]="lead" [unmasked]="true" />
 
     <div footer>
       @if (lead.status === 'ACCEPTED' || lead.status === 'ASSIGNED_EXTERNAL') {

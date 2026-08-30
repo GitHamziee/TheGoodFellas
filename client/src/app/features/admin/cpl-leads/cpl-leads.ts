@@ -1,6 +1,8 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
+  LucideBanknote,
+  LucideBanknoteX,
   LucideBuilding2,
   LucideCircleCheck,
   LucideClock,
@@ -15,10 +17,18 @@ import { ExternalClient } from '../../../core/models/external-client.model';
 import { Lead } from '../../../core/models/lead.model';
 import { createListView } from '../../../core/list-view';
 import { D_CODE_OPTIONS } from '../../../core/lead-options';
-import { formatPhone, getAvatarTone, getInitials, timeAgo } from '../../../core/format-utils';
+import { formatPhone, formatPkr, getAvatarTone, getInitials, timeAgo } from '../../../core/format-utils';
 import { Modal } from '../../../shared/ui/modal';
 import { Select } from '../../../shared/ui/select';
-import { EmptyState, Pagination, SearchBox, SkeletonRows, StatTile, StatusBadge } from '../../../shared/ui/ui';
+import {
+  EmptyState,
+  Pagination,
+  PaymentBadge,
+  SearchBox,
+  SkeletonRows,
+  StatTile,
+  StatusBadge,
+} from '../../../shared/ui/ui';
 import { LeadDetail } from '../../../shared/lead-detail';
 
 interface LookupUser {
@@ -33,6 +43,8 @@ const STATUS_FILTERS = [
   { label: 'Rejected', value: 'REJECTED' },
   { label: 'Assigned', value: 'ASSIGNED' },
   { label: 'Accepted', value: 'ACCEPTED' },
+  { label: 'Assigned (External)', value: 'ASSIGNED_EXTERNAL' },
+  { label: 'Charged Back', value: 'CHARGED_BACK' },
 ];
 
 @Component({
@@ -44,6 +56,7 @@ const STATUS_FILTERS = [
     LeadDetail,
     StatTile,
     StatusBadge,
+    PaymentBadge,
     SearchBox,
     Pagination,
     EmptyState,
@@ -54,6 +67,8 @@ const STATUS_FILTERS = [
     LucideUndo2,
     LucideClock,
     LucideTag,
+    LucideBanknote,
+    LucideBanknoteX,
   ],
   templateUrl: './cpl-leads.html',
 })
@@ -94,7 +109,21 @@ export class AdminCplLeads implements OnInit {
   readonly getInitials = getInitials;
   readonly getAvatarTone = getAvatarTone;
   readonly formatPhone = formatPhone;
+  readonly formatPkr = formatPkr;
   readonly timeAgo = timeAgo;
+
+  /** Leads picked for the batch "Mark Paid" action, keyed by id across pages/filters. */
+  readonly selectedIds = signal<Set<string>>(new Set());
+  readonly batchModalOpen = signal(false);
+  readonly batchSubmitting = signal(false);
+  batchPkrAmount: number | null = null;
+  batchNote = '';
+
+  /** Lead being charged back — single-record action, mirrors the batch "Mark Paid" modal. */
+  readonly chargeBackLead = signal<Lead | null>(null);
+  readonly chargeBackSubmitting = signal(false);
+  chargeBackPkrAmount: number | null = null;
+  chargeBackReason = '';
 
   /** Junior Closers who actually appear on a CPL lead — drives the "filter by junior" dropdown. */
   readonly juniorClosers = computed(() => {
@@ -140,11 +169,14 @@ export class AdminCplLeads implements OnInit {
 
   readonly stats = computed(() => {
     const rows = this.leads();
+    const accepted = rows.filter((l) => l.status === 'ACCEPTED');
     return {
       total: rows.length,
       submitted: rows.filter((l) => l.status === 'SUBMITTED').length,
       assigned: rows.filter((l) => l.status === 'ASSIGNED').length,
-      accepted: rows.filter((l) => l.status === 'ACCEPTED').length,
+      accepted: accepted.length,
+      unpaid: accepted.filter((l) => l.paymentStatus === 'UNPAID').length,
+      chargedBack: rows.filter((l) => l.status === 'CHARGED_BACK').length,
     };
   });
 
@@ -156,6 +188,51 @@ export class AdminCplLeads implements OnInit {
     for (const lead of rows) counts[lead.status] = (counts[lead.status] ?? 0) + 1;
     return counts;
   });
+
+  readonly selectedCount = computed(() => this.selectedIds().size);
+
+  /** Only unpaid ACCEPTED/ASSIGNED_EXTERNAL leads can be batch-marked paid. */
+  isEligibleForBatchPaid(lead: Lead): boolean {
+    return lead.paymentStatus === 'UNPAID' && (lead.status === 'ACCEPTED' || lead.status === 'ASSIGNED_EXTERNAL');
+  }
+
+  isSelected(lead: Lead): boolean {
+    return this.selectedIds().has(lead.id);
+  }
+
+  toggleSelect(lead: Lead, event: Event): void {
+    event.stopPropagation();
+    if (!this.isEligibleForBatchPaid(lead)) return;
+    this.selectedIds.update((ids) => {
+      const next = new Set(ids);
+      if (next.has(lead.id)) next.delete(lead.id);
+      else next.add(lead.id);
+      return next;
+    });
+  }
+
+  /** Header checkbox — true only when every eligible row on the current page is selected. */
+  readonly allVisibleEligibleSelected = computed(() => {
+    const eligible = this.view.rows().filter((l) => this.isEligibleForBatchPaid(l));
+    return eligible.length > 0 && eligible.every((l) => this.selectedIds().has(l.id));
+  });
+
+  toggleSelectAllVisible(): void {
+    const eligible = this.view.rows().filter((l) => this.isEligibleForBatchPaid(l));
+    const allSelected = this.allVisibleEligibleSelected();
+    this.selectedIds.update((ids) => {
+      const next = new Set(ids);
+      for (const lead of eligible) {
+        if (allSelected) next.delete(lead.id);
+        else next.add(lead.id);
+      }
+      return next;
+    });
+  }
+
+  clearSelection(): void {
+    this.selectedIds.set(new Set());
+  }
 
   /** Client dropdown, narrowed by the search box inside the assign modal. */
   readonly filteredClients = computed(() => {
@@ -292,6 +369,105 @@ export class AdminCplLeads implements OnInit {
       this.error.set(err?.error?.error ?? 'Could not send the lead back.');
     } finally {
       this.busyId.set(null);
+    }
+  }
+
+  /**
+   * Reverts a mistaken PAID back to UNPAID. Marking a lead PAID is deliberately not
+   * available as a quick toggle — it only happens through the batch "Mark Paid" action
+   * below, which requires entering the PKR amount received, even for a single lead.
+   */
+  async revertToUnpaid(lead: Lead, event: Event): Promise<void> {
+    event.stopPropagation();
+    this.error.set(null);
+    this.busyId.set(lead.id);
+    try {
+      const updated = await this.leadService.markUnpaid(lead.id);
+      this.leads.update((rows) => rows.map((l) => (l.id === lead.id ? updated : l)));
+      if (this.detailLead()?.id === lead.id) this.detailLead.set(updated);
+    } catch (err: any) {
+      this.error.set(err?.error?.error ?? 'Could not update payment status.');
+    } finally {
+      this.busyId.set(null);
+    }
+  }
+
+  openBatchModal(): void {
+    if (this.selectedCount() === 0) return;
+    this.error.set(null);
+    this.batchPkrAmount = null;
+    this.batchNote = '';
+    this.batchModalOpen.set(true);
+  }
+
+  closeBatchModal(): void {
+    this.batchModalOpen.set(false);
+  }
+
+  async confirmBatchMarkPaid(): Promise<void> {
+    if (!this.batchPkrAmount || this.batchPkrAmount <= 0) {
+      this.error.set('Enter the PKR amount received.');
+      return;
+    }
+
+    this.error.set(null);
+    this.batchSubmitting.set(true);
+    try {
+      const leadIds = [...this.selectedIds()];
+      const { count } = await this.leadService.batchMarkPaid(leadIds, this.batchPkrAmount, this.batchNote.trim() || undefined);
+      await this.refresh();
+      this.clearSelection();
+      this.batchModalOpen.set(false);
+      this.notice.set(`Marked ${count} lead${count === 1 ? '' : 's'} paid — ${formatPkr(this.batchPkrAmount)} recorded.`);
+    } catch (err: any) {
+      this.error.set(err?.error?.error ?? 'Could not mark these leads paid.');
+    } finally {
+      this.batchSubmitting.set(false);
+    }
+  }
+
+  /**
+   * Opens the charge-back modal for an ACCEPTED + PAID lead. Marking a lead charged back
+   * is deliberately not a quick toggle — it requires the PKR amount clawed back and a
+   * reason, same reasoning as why marking a lead PAID requires going through the batch
+   * modal above.
+   */
+  openChargeBack(lead: Lead, event?: Event): void {
+    event?.stopPropagation();
+    this.error.set(null);
+    this.chargeBackPkrAmount = null;
+    this.chargeBackReason = '';
+    this.chargeBackLead.set(lead);
+  }
+
+  closeChargeBackModal(): void {
+    this.chargeBackLead.set(null);
+  }
+
+  async confirmChargeBack(): Promise<void> {
+    const lead = this.chargeBackLead();
+    if (!lead) return;
+    if (!this.chargeBackPkrAmount || this.chargeBackPkrAmount <= 0) {
+      this.error.set('Enter the PKR amount charged back.');
+      return;
+    }
+    if (!this.chargeBackReason.trim()) {
+      this.error.set('A reason is required.');
+      return;
+    }
+
+    this.error.set(null);
+    this.chargeBackSubmitting.set(true);
+    try {
+      const updated = await this.leadService.chargeBackLead(lead.id, this.chargeBackPkrAmount, this.chargeBackReason.trim());
+      this.leads.update((rows) => rows.map((l) => (l.id === lead.id ? updated : l)));
+      if (this.detailLead()?.id === lead.id) this.detailLead.set(updated);
+      this.chargeBackLead.set(null);
+      this.notice.set(`${lead.customerName} marked charged back — ${formatPkr(this.chargeBackPkrAmount)} recorded.`);
+    } catch (err: any) {
+      this.error.set(err?.error?.error ?? 'Could not mark this lead charged back.');
+    } finally {
+      this.chargeBackSubmitting.set(false);
     }
   }
 }

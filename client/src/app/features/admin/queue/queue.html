@@ -168,7 +168,7 @@
 <!-- Detail -->
 @if (detailLead(); as lead) {
   <app-modal title="Lead details" [subtitle]="lead.customerName" [wide]="true" (close)="detailLead.set(null)">
-    <app-lead-detail [lead]="lead" />
+    <app-lead-detail [lead]="lead" [unmasked]="true" />
     <div footer>
       @if (lead.status === 'REJECTED') {
         <button type="button" class="btn btn--ghost" (click)="detailLead.set(null); openEdit(lead)">

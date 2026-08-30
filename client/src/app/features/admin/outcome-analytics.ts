@@ -1,3 +1,4 @@
+import { LowerCasePipe } from '@angular/common';
 import { Component, computed, input, signal } from '@angular/core';
 import {
   LucideCircleCheck,
@@ -26,6 +27,7 @@ interface Row extends UserOutcomeRow {
 @Component({
   selector: 'app-outcome-analytics',
   imports: [
+    LowerCasePipe,
     StatTile,
     SearchBox,
     EmptyState,
@@ -48,18 +50,18 @@ interface Row extends UserOutcomeRow {
         <app-stat-tile [value]="totals().people" [label]="peopleLabel()" tone="tone-gold">
           <svg lucideUsers></svg>
         </app-stat-tile>
-        <app-stat-tile [value]="totals().total" label="Leads handled" tone="tone-c">
+        <app-stat-tile [value]="totals().total" [label]="totalLabel()" tone="tone-c">
           <svg lucideLayers></svg>
         </app-stat-tile>
-        <app-stat-tile [value]="totals().accepted" label="Accepted" tone="tone-success">
+        <app-stat-tile [value]="totals().accepted" [label]="goodLabel()" tone="tone-success">
           <svg lucideCircleCheck></svg>
         </app-stat-tile>
-        <app-stat-tile [value]="totals().rejected" label="Rejected" tone="tone-danger">
+        <app-stat-tile [value]="totals().rejected" [label]="badLabel()" tone="tone-danger">
           <svg lucideCircleX></svg>
         </app-stat-tile>
         <app-stat-tile
           [value]="totals().rate === null ? '—' : totals().rate + '%'"
-          label="Team accept rate"
+          [label]="rateLabel()"
           tone="tone-a"
         >
           <svg lucideTarget></svg>
@@ -69,15 +71,15 @@ interface Row extends UserOutcomeRow {
       @if (!loading() && chart().length > 0) {
         <div class="card">
           <div class="inline-head">
-            <h2>Accepted vs rejected</h2>
-            <span class="count">Top {{ chart().length }} by decided leads</span>
+            <h2>{{ goodLabel() }} vs {{ badLabel() | lowercase }}</h2>
+            <span class="count">Top {{ chart().length }} by decided {{ unitLabel() }}</span>
           </div>
 
           <div class="chart">
             @for (row of chart(); track row.id) {
               <div
                 class="chart-row"
-                [title]="row.name + ' — ' + row.accepted + ' accepted, ' + row.rejected + ' rejected'"
+                [title]="row.name + ' — ' + row.accepted + ' ' + goodLabel() + ', ' + row.rejected + ' ' + badLabel()"
               >
                 <span class="chart-key">{{ row.name }}</span>
                 <span class="chart-track">
@@ -94,8 +96,8 @@ interface Row extends UserOutcomeRow {
           </div>
 
           <div class="chart-legend">
-            <span><i class="sw--good"></i> Accepted</span>
-            <span><i class="sw--bad"></i> Rejected</span>
+            <span><i class="sw--good"></i> {{ goodLabel() }}</span>
+            <span><i class="sw--bad"></i> {{ badLabel() }}</span>
           </div>
         </div>
       }
@@ -127,14 +129,14 @@ interface Row extends UserOutcomeRow {
                     Total <span class="arrow">{{ arrow('total') }}</span>
                   </th>
                   <th class="sortable right" (click)="toggleSort('accepted')">
-                    Accepted <span class="arrow">{{ arrow('accepted') }}</span>
+                    {{ goodLabel() }} <span class="arrow">{{ arrow('accepted') }}</span>
                   </th>
                   <th class="sortable right" (click)="toggleSort('rejected')">
-                    Rejected <span class="arrow">{{ arrow('rejected') }}</span>
+                    {{ badLabel() }} <span class="arrow">{{ arrow('rejected') }}</span>
                   </th>
                   <th class="hide-sm">Split</th>
                   <th class="sortable right" (click)="toggleSort('rate')">
-                    Accept rate <span class="arrow">{{ arrow('rate') }}</span>
+                    {{ rateLabel() }} <span class="arrow">{{ arrow('rate') }}</span>
                   </th>
                 </tr>
               </thead>
@@ -162,7 +164,7 @@ interface Row extends UserOutcomeRow {
                           <i class="bad" [style.width.%]="(row.rejected / row.decided) * 100"></i>
                         </span>
                       } @else {
-                        <span class="empty">No decisions yet</span>
+                        <span class="empty">{{ noneLabel() }}</span>
                       }
                     </td>
                     <td class="right num">
@@ -189,6 +191,15 @@ export class OutcomeAnalytics {
   readonly emptyHint = input('');
   readonly source = input<UserOutcomeRow[]>([]);
   readonly loading = input(false);
+
+  // Text for what `accepted`/`rejected` mean in this instance — defaults match the
+  // original accepted/rejected lead-outcome usage; QA Reports pass PASS/FAIL wording.
+  readonly totalLabel = input('Leads handled');
+  readonly goodLabel = input('Accepted');
+  readonly badLabel = input('Rejected');
+  readonly rateLabel = input('Accept rate');
+  readonly noneLabel = input('No decisions yet');
+  readonly unitLabel = input('leads');
 
   readonly search = signal('');
   readonly sortKey = signal<SortKey>('total');

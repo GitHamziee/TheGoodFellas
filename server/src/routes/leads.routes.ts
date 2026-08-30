@@ -5,6 +5,20 @@ import { authenticate, requireRole } from '../middleware/auth';
 import * as leadService from '../services/lead.service';
 
 const router = Router();
+
+// ─── Public — Retention intake form (no login) ───────────────────
+// Registered ahead of `authenticate` below, so this one route is reachable unauthenticated —
+// an external form filled by whoever just worked an AI-sourced call, no account to log
+// into. Replaces the old Google Sheet the same data used to be logged into by hand.
+router.post(
+  '/retention/intake',
+  asyncHandler(async (req, res) => {
+    const result = await leadService.submitRetentionIntake(req.body ?? {});
+    if ('error' in result) return apiError(res, result.error, result.status);
+    return apiSuccess(res, result.data, 'Lead submitted', 201);
+  })
+);
+
 router.use(authenticate);
 
 // ─── Junior Closer ──────────────────────────────────────────────
@@ -172,6 +186,16 @@ router.get(
   })
 );
 
+// Distinct path from the Closer-only '/drafts' above — same router, different role.
+router.get(
+  '/admin/drafts',
+  requireRole('ADMIN'),
+  asyncHandler(async (_req, res) => {
+    const leads = await leadService.listDraftsForAdmin();
+    return apiSuccess(res, { leads });
+  })
+);
+
 router.patch(
   '/:id/assign',
   requireRole('ADMIN'),
@@ -260,6 +284,58 @@ router.patch(
   })
 );
 
+// ─── Retention (admin-facing) ────────────────────────────────────
+router.get(
+  '/retention/unassigned',
+  requireRole('ADMIN'),
+  asyncHandler(async (_req, res) => {
+    const leads = await leadService.listUnassignedRetentionForAdmin();
+    return apiSuccess(res, { leads });
+  })
+);
+
+router.patch(
+  '/retention/:id/assign',
+  requireRole('ADMIN'),
+  asyncHandler(async (req, res) => {
+    const { retentionId } = req.body ?? {};
+    if (!retentionId) return apiError(res, 'retentionId is required', 400);
+
+    const result = await leadService.assignLeadToRetention(req.params.id, retentionId);
+    if ('error' in result) return apiError(res, result.error, result.status);
+    return apiSuccess(res, result.data, 'Lead assigned');
+  })
+);
+
+// ─── Retention (retention-facing) ────────────────────────────────
+router.get(
+  '/retention/queue',
+  requireRole('RETENTION'),
+  asyncHandler(async (_req, res) => {
+    const leads = await leadService.listRetentionQueue();
+    return apiSuccess(res, { leads });
+  })
+);
+
+router.patch(
+  '/retention/:id/submit',
+  requireRole('RETENTION'),
+  asyncHandler(async (req, res) => {
+    const result = await leadService.enrichAndSubmitRetentionLead(req.params.id, req.body ?? {});
+    if ('error' in result) return apiError(res, result.error, result.status);
+    return apiSuccess(res, result.data, 'Lead sent to admin');
+  })
+);
+
+router.get(
+  '/retention/history',
+  requireRole('RETENTION'),
+  asyncHandler(async (_req, res) => {
+    const leads = await leadService.listRetentionHistory();
+    return apiSuccess(res, { leads });
+  })
+);
+
 // ─── Team Lead ──────────────────────────────────────────────────
 router.get(
   '/team-lead/submitted',
@@ -267,6 +343,57 @@ router.get(
   asyncHandler(async (_req, res) => {
     const leads = await leadService.listSubmittedForTeamLead();
     return apiSuccess(res, { leads });
+  })
+);
+
+// ─── QA ─────────────────────────────────────────────────────────
+router.get(
+  '/qa/junior-queue',
+  requireRole('QA_JUNIOR_CLOSER'),
+  asyncHandler(async (_req, res) => {
+    const leads = await leadService.listQaJuniorQueue();
+    return apiSuccess(res, { leads });
+  })
+);
+
+router.get(
+  '/qa/junior-history',
+  requireRole('QA_JUNIOR_CLOSER'),
+  asyncHandler(async (req, res) => {
+    const reviews = await leadService.listQaJuniorHistory(req.user!.id);
+    return apiSuccess(res, { reviews });
+  })
+);
+
+router.get(
+  '/qa/closer-queue',
+  requireRole('QA_CLOSER'),
+  asyncHandler(async (_req, res) => {
+    const leads = await leadService.listQaCloserQueue();
+    return apiSuccess(res, { leads });
+  })
+);
+
+router.get(
+  '/qa/closer-history',
+  requireRole('QA_CLOSER'),
+  asyncHandler(async (req, res) => {
+    const reviews = await leadService.listQaCloserHistory(req.user!.id);
+    return apiSuccess(res, { reviews });
+  })
+);
+
+router.patch(
+  '/:id/qa-review',
+  requireRole('QA_JUNIOR_CLOSER', 'QA_CLOSER'),
+  asyncHandler(async (req, res) => {
+    const result = await leadService.submitQaReview(
+      req.params.id,
+      req.user! as { id: string; role: 'QA_JUNIOR_CLOSER' | 'QA_CLOSER' },
+      req.body ?? {}
+    );
+    if ('error' in result) return apiError(res, result.error, result.status);
+    return apiSuccess(res, result.data, 'Review recorded', 201);
   })
 );
 

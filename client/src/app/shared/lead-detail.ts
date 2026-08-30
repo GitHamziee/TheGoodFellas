@@ -68,17 +68,19 @@ interface Row {
           @if (lead().status === 'ACCEPTED') {
             <app-payment-badge [status]="lead().paymentStatus" />
           }
-          <button type="button" class="copy-btn" (click)="copyDetails()">
-            @if (copied()) {
-              <svg lucideCheck></svg> Copied
-            } @else {
-              <svg lucideClipboardCopy></svg> Copy details
-            }
-          </button>
+          @if (allowCopy()) {
+            <button type="button" class="copy-btn" (click)="copyDetails()">
+              @if (copied()) {
+                <svg lucideCheck></svg> Copied
+              } @else {
+                <svg lucideClipboardCopy></svg> Copy details
+              }
+            </button>
+          }
         </div>
       </div>
 
-      @if (hasSensitive()) {
+      @if (hasSensitive() && !unmasked()) {
         <button type="button" class="reveal" (click)="revealed.set(!revealed())">
           @if (revealed()) {
             <svg lucideLock></svg> Hide SSN & bank details
@@ -183,6 +185,14 @@ interface Row {
 })
 export class LeadDetail {
   readonly lead = input.required<Lead>();
+  /** Admin always sees full lead data server-side (FULL_INCLUDE) — set this to skip the
+   * dot-masked reveal toggle entirely and show SSN/routing/account numbers plainly. */
+  readonly unmasked = input(false);
+  /** "Copy details" writes straight to the clipboard via `navigator.clipboard`, so it isn't
+   * caught by an `appNoCopy` wrapper (that only blocks the browser's copy/cut events) — set
+   * this false to hide the button entirely on a page where copying lead data out is meant
+   * to be blocked, not just discouraged. */
+  readonly allowCopy = input(true);
   readonly revealed = signal(false);
   readonly copied = signal(false);
 
@@ -196,7 +206,7 @@ export class LeadDetail {
 
   readonly sections = computed(() => {
     const l = this.lead();
-    const show = this.revealed();
+    const show = this.unmasked() || this.revealed();
     const keep = (rows: (Row | null)[]): Row[] => rows.filter((r): r is Row => r !== null);
     /** Emits a row only when the lead actually carries the field. */
     const row = (k: string, v: unknown, formatted?: string, sensitive = false): Row | null => {
@@ -224,6 +234,9 @@ export class LeadDetail {
           row('Smoker', l.smoker, formatBool(l.smoker)),
           row('DL / State ID', l.dlStateId),
           row('SSN', l.ssn, show ? l.ssn! : maskSsn(l.ssn), true),
+          row('D-code', l.dCode),
+          row('Decision maker', l.decisionMaker, formatBool(l.decisionMaker)),
+          row('Bank account', l.bankAccount, formatBool(l.bankAccount)),
         ]),
       },
       {
@@ -321,7 +334,7 @@ export class LeadDetail {
    */
   copyDetails(): void {
     const l = this.lead();
-    const show = this.revealed();
+    const show = this.unmasked() || this.revealed();
     const s = (v: unknown): string => (v === null || v === undefined || v === '' ? '' : String(v));
     const date = (v: string | null | undefined): string => (v ? formatDate(v) : '');
     const money = (v: number | null | undefined): string => (v === null || v === undefined ? '' : formatMoney(v));

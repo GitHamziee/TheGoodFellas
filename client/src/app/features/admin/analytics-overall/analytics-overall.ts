@@ -30,7 +30,16 @@ const STATUS_ORDER: { status: LeadStatus; label: string; hint: string }[] = [
   { status: 'ASSIGNED_EXTERNAL', label: 'Assigned — External', hint: 'Handed off to an external client (no accept/reject step)' },
 ];
 
-const ROLE_ORDER: Role[] = ['JUNIOR_CLOSER', 'CLOSER', 'TEAM_LEAD', 'ADMIN', 'CLIENT'];
+const ROLE_ORDER: Role[] = [
+  'JUNIOR_CLOSER',
+  'CLOSER',
+  'TEAM_LEAD',
+  'RETENTION',
+  'QA_JUNIOR_CLOSER',
+  'QA_CLOSER',
+  'ADMIN',
+  'CLIENT',
+];
 
 const ROLE_TONE: Record<Role, string> = {
   ADMIN: 'tone-b',
@@ -38,6 +47,9 @@ const ROLE_TONE: Record<Role, string> = {
   JUNIOR_CLOSER: 'tone-d',
   CLIENT: 'tone-f',
   TEAM_LEAD: 'tone-e',
+  QA_JUNIOR_CLOSER: 'tone-info',
+  QA_CLOSER: 'tone-neutral',
+  RETENTION: 'tone-a',
 };
 
 @Component({

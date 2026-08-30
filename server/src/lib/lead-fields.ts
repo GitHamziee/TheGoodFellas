@@ -124,6 +124,15 @@ export const CPL_INTAKE_FIELDS = [
   ...CPL_ONLY_FIELDS,
 ] as const;
 
+// What the public retention intake form (see routes/leads.routes.ts's '/retention/intake'
+// route) submits — every one of these already exists in FIELD_SCHEMA above (shared with
+// CPA), nothing RETENTION-specific needed.
+export const RETENTION_INTAKE_FIELDS = [
+  'customerName', 'phone', 'mailingAddress', 'state', 'dob', 'ssn', 'carrierName',
+  'planType', 'coverageAmount', 'monthlyPremiums', 'beneficiaryName', 'bankName',
+  'accountType', 'routingNumber', 'accountNumber',
+] as const;
+
 export type SanitizedLeadFields = Record<string, string | number | boolean | Date>;
 
 export function sanitizeLeadFields(

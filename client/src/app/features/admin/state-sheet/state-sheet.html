@@ -16,6 +16,9 @@
     <app-stat-tile [value]="stats().carriers" label="Carriers" tone="tone-c">
       <svg lucideBuilding2></svg>
     </app-stat-tile>
+    <app-stat-tile [value]="stats().onlineBankClients" label="Accept online bank" tone="tone-b">
+      <svg lucideBanknote></svg>
+    </app-stat-tile>
   </div>
 
   @if (error()) {
@@ -31,6 +34,9 @@
     <div class="pills">
       <button type="button" class="pill" [class.active]="coveredOnly()" (click)="coveredOnly.set(!coveredOnly())">
         Covered only
+      </button>
+      <button type="button" class="pill" [class.active]="onlineBankOnly()" (click)="onlineBankOnly.set(!onlineBankOnly())">
+        Online bank
       </button>
     </div>
   </div>
@@ -50,6 +56,7 @@
               <th>State</th>
               <th>Coverage</th>
               <th>Carriers</th>
+              <th>Plans</th>
               <th></th>
             </tr>
           </thead>
@@ -80,27 +87,64 @@
                     <span class="empty empty--inline">—</span>
                   }
                 </td>
+                <td>
+                  @if (row.acceptedPlans.length) {
+                    <span class="count-pill count-pill--clients">
+                      {{ row.acceptedPlans.length }} {{ row.acceptedPlans.length === 1 ? 'plan' : 'plans' }}
+                    </span>
+                  } @else {
+                    <span class="empty empty--inline">—</span>
+                  }
+                </td>
                 <td class="right">
                   <svg lucideChevronDown class="dropdown-chevron" [class.open]="expanded() === row.state"></svg>
                 </td>
               </tr>
               @if (expanded() === row.state) {
                 <tr class="expand-row">
-                  <td colspan="4">
+                  <td colspan="5">
                     @if (row.breakdown.length) {
                       <div class="breakdown">
                         @for (client of row.breakdown; track client.name) {
                           <div class="breakdown-item">
                             <span class="chip breakdown-item__client"><svg lucideUsers></svg>{{ client.name }}</span>
-                            @if (client.carriers.length) {
-                              <div class="chip-wrap">
-                                @for (carrier of client.carriers; track carrier) {
-                                  <span class="chip"><svg lucideBuilding2></svg>{{ carrier }}</span>
+
+                            <div class="breakdown-item__body">
+                              @if (client.carriers.length) {
+                                <div class="chip-wrap">
+                                  @for (carrier of client.carriers; track carrier) {
+                                    <span class="chip"><svg lucideBuilding2></svg>{{ carrier }}</span>
+                                  }
+                                </div>
+                              } @else {
+                                <span class="empty empty--inline">No carriers assigned to this state</span>
+                              }
+
+                              <div class="plan-badges">
+                                @for (plan of planTypes; track plan.value) {
+                                  <span
+                                    class="plan-badge"
+                                    [class.plan-badge--accepted]="client.acceptedPlans.includes(plan.value)"
+                                  >
+                                    @if (client.acceptedPlans.includes(plan.value)) {
+                                      <svg lucideCircleCheck></svg>
+                                    } @else {
+                                      <svg lucideCircleX></svg>
+                                    }
+                                    {{ plan.label }}
+                                  </span>
                                 }
                               </div>
-                            } @else {
-                              <span class="empty empty--inline">No carriers listed for this client</span>
-                            }
+
+                              <div class="chip-wrap">
+                                @if (client.minimumPremium != null) {
+                                  <span class="chip"><svg lucideBanknote></svg>Min premium: {{ formatMoney(client.minimumPremium) }}</span>
+                                }
+                                @if (client.acceptsOnlineBankPayment) {
+                                  <span class="chip"><svg lucideBanknote></svg>Accepts online bank</span>
+                                }
+                              </div>
+                            </div>
                           </div>
                         }
                       </div>

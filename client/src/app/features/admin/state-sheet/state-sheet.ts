@@ -1,21 +1,40 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { LucideBuilding2, LucideChevronDown, LucideMapPin, LucideUsers } from '@lucide/angular';
+import {
+  LucideBanknote,
+  LucideBuilding2,
+  LucideChevronDown,
+  LucideCircleCheck,
+  LucideCircleX,
+  LucideMapPin,
+  LucideUsers,
+} from '@lucide/angular';
 import { UserService } from '../../../core/services/user.service';
 import { ClientCoverage } from '../../../core/models/user.model';
+import { PlanType } from '../../../core/models/lead.model';
 import { US_STATES } from '../../../core/us-states';
+import { PLAN_TYPE_OPTIONS } from '../../../core/lead-options';
+import { formatMoney } from '../../../core/format-utils';
 import { EmptyState, SearchBox, SkeletonRows, StatTile } from '../../../shared/ui/ui';
 
 interface ClientBreakdown {
   name: string;
   carriers: string[];
+  acceptedPlans: PlanType[];
+  minimumPremium: number | null;
+  acceptsOnlineBankPayment: boolean;
 }
 
 interface StateRow {
   state: string;
   clients: string[];
   carriers: string[];
+  /** Union of accepted plans across whichever clients cover this state — a row-level
+   * glance; the per-client acceptance (e.g. "this client doesn't take GI") is in `breakdown`. */
+  acceptedPlans: PlanType[];
+  /** Count of covering clients that accept online bank payments — drives the filter pill. */
+  onlineBankClients: number;
   /** Per-client carrier list, for the expanded row — pairs each covering client
-   * with the carriers *that client* supports here, unlike the flat `carriers`
+   * with the carriers *that client* supports *in this state*, unlike the flat `carriers`
    * union above which can't tell you who backs which carrier. */
   breakdown: ClientBreakdown[];
 }
@@ -34,6 +53,9 @@ interface StateRow {
     LucideBuilding2,
     LucideUsers,
     LucideChevronDown,
+    LucideBanknote,
+    LucideCircleCheck,
+    LucideCircleX,
   ],
   templateUrl: './state-sheet.html',
 })
@@ -46,8 +68,13 @@ export class StateSheet implements OnInit {
   readonly search = signal('');
   /** When on, states nobody covers yet are hidden. */
   readonly coveredOnly = signal(false);
+  /** When on, states with no client accepting online bank payments are hidden. */
+  readonly onlineBankOnly = signal(false);
   /** Which state's row is expanded to show its per-client carrier breakdown — one at a time. */
   readonly expanded = signal<string | null>(null);
+
+  readonly planTypes = PLAN_TYPE_OPTIONS;
+  readonly formatMoney = formatMoney;
 
   /** One row per US state, regardless of coverage — this is a reference sheet, so a gap
    * (no client covering a state) is as useful to see as a match. */
@@ -55,13 +82,22 @@ export class StateSheet implements OnInit {
     const clients = this.clients();
     return US_STATES.map((state) => {
       const covering = clients.filter((c) => c.states.includes(state));
+      const breakdown: ClientBreakdown[] = covering.map((c) => ({
+        name: c.name,
+        // Which of this client's roster carriers apply in *this* state — not their whole
+        // roster, which can differ state to state (e.g. NRG in Alaska, MPG in Alabama).
+        carriers: [...(c.stateCarriers.find((sc) => sc.state === state)?.carriers ?? [])].sort(),
+        acceptedPlans: c.acceptedPlans,
+        minimumPremium: c.minimumPremium,
+        acceptsOnlineBankPayment: c.acceptsOnlineBankPayment,
+      }));
       return {
         state,
         clients: covering.map((c) => c.name),
-        // Carriers aren't tracked per state, only per client — this is the union of
-        // carriers across whichever clients cover this state.
-        carriers: [...new Set(covering.flatMap((c) => c.carriers))].sort(),
-        breakdown: covering.map((c) => ({ name: c.name, carriers: [...c.carriers].sort() })),
+        carriers: [...new Set(breakdown.flatMap((b) => b.carriers))].sort(),
+        acceptedPlans: [...new Set(breakdown.flatMap((b) => b.acceptedPlans))],
+        onlineBankClients: breakdown.filter((b) => b.acceptsOnlineBankPayment).length,
+        breakdown,
       };
     });
   });
@@ -73,6 +109,7 @@ export class StateSheet implements OnInit {
   readonly filteredRows = computed<StateRow[]>(() => {
     let rows = this.rows();
     if (this.coveredOnly()) rows = rows.filter((r) => r.clients.length > 0);
+    if (this.onlineBankOnly()) rows = rows.filter((r) => r.onlineBankClients > 0);
 
     const q = this.search().trim().toLowerCase();
     if (!q) return rows;
@@ -88,11 +125,13 @@ export class StateSheet implements OnInit {
     const rows = this.rows();
     const covered = rows.filter((r) => r.clients.length > 0);
     const allCarriers = new Set(rows.flatMap((r) => r.carriers));
+    const onlineBankClients = this.clients().filter((c) => c.acceptsOnlineBankPayment).length;
     return {
       statesCovered: covered.length,
       totalStates: rows.length,
       clients: this.clients().length,
       carriers: allCarriers.size,
+      onlineBankClients,
     };
   });
 

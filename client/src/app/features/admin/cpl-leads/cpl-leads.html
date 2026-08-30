@@ -1,7 +1,8 @@
 <div class="page">
   <div class="page-head">
     <div>
-      <p class="sub">Live-transfer leads — shorter intake, no closer step. Filter by D-code, date, or submitting junior.</p>
+      <h1>CPL Leads</h1>
+      <p class="sub">Live-transfer leads — shorter intake, no closer step. CPA pipeline leads live on their own page.</p>
     </div>
   </div>
 
@@ -18,13 +19,31 @@
     <app-stat-tile [value]="stats().accepted" label="Accepted" tone="tone-success">
       <svg lucideCircleCheck></svg>
     </app-stat-tile>
+    <app-stat-tile [value]="stats().unpaid" label="Accepted, unpaid" tone="tone-neutral">
+      <svg lucideBanknote></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().chargedBack" label="Charged back" tone="tone-danger">
+      <svg lucideBanknoteX></svg>
+    </app-stat-tile>
   </div>
 
-  @if (error()) {
+  @if (error() && !batchModalOpen() && !chargeBackLead()) {
     <div class="error">{{ error() }}</div>
   }
   @if (notice()) {
     <div class="success"><svg lucideCircleCheck></svg>{{ notice() }}</div>
+  }
+
+  @if (selectedCount() > 0) {
+    <div class="batch-bar">
+      <span><strong>{{ selectedCount() }}</strong> lead{{ selectedCount() === 1 ? '' : 's' }} selected</span>
+      <div class="row-actions">
+        <button type="button" class="btn btn--sm btn--ghost" (click)="clearSelection()">Clear</button>
+        <button type="button" class="btn btn--sm btn--success" (click)="openBatchModal()">
+          <svg lucideBanknote></svg> Mark Paid
+        </button>
+      </div>
+    </div>
   }
 
   <div class="toolbar">
@@ -96,6 +115,14 @@
         <table>
           <thead>
             <tr>
+              <th class="checkbox-col">
+                <input
+                  type="checkbox"
+                  [checked]="allVisibleEligibleSelected()"
+                  (change)="toggleSelectAllVisible()"
+                  aria-label="Select all eligible leads on this page"
+                />
+              </th>
               <th class="sortable" (click)="view.toggleSort('customerName')">
                 Customer <span class="arrow">{{ sortArrow('customerName') }}</span>
               </th>
@@ -104,6 +131,7 @@
               <th class="hide-md">Bank account</th>
               <th class="hide-sm">Junior closer</th>
               <th>Status</th>
+              <th class="hide-md">Payment</th>
               <th class="sortable hide-md" (click)="view.toggleSort('createdAt')">
                 Age <span class="arrow">{{ sortArrow('createdAt') }}</span>
               </th>
@@ -113,6 +141,15 @@
           <tbody>
             @for (lead of view.rows(); track lead.id) {
               <tr class="clickable" (click)="detailLead.set(lead)">
+                <td class="checkbox-col" (click)="$event.stopPropagation()">
+                  <input
+                    type="checkbox"
+                    [checked]="isSelected(lead)"
+                    [disabled]="!isEligibleForBatchPaid(lead)"
+                    (change)="toggleSelect(lead, $event)"
+                    [attr.aria-label]="'Select ' + lead.customerName"
+                  />
+                </td>
                 <td>
                   <div class="cell-main">{{ lead.customerName }}</div>
                   <div class="cell-sub">{{ formatPhone(lead.phone) }} · {{ lead.state }}</div>
@@ -139,6 +176,13 @@
                   }
                 </td>
                 <td><app-status-badge [status]="lead.status" /></td>
+                <td class="hide-md">
+                  @if (lead.status === 'ACCEPTED' || lead.status === 'ASSIGNED_EXTERNAL') {
+                    <app-payment-badge [status]="lead.paymentStatus" />
+                  } @else {
+                    <span class="empty">—</span>
+                  }
+                </td>
                 <td class="hide-md">
                   <span class="chip"><svg lucideClock></svg>{{ timeAgo(lead.createdAt) }}</span>
                 </td>
@@ -176,7 +220,7 @@
 <!-- Detail -->
 @if (detailLead(); as lead) {
   <app-modal title="Lead details" [subtitle]="lead.customerName" [wide]="true" (close)="detailLead.set(null)">
-    <app-lead-detail [lead]="lead" />
+    <app-lead-detail [lead]="lead" [unmasked]="true" />
     <div footer>
       @if (lead.status === 'SUBMITTED' || lead.status === 'REJECTED') {
         <button type="button" class="btn btn--ghost" (click)="detailLead.set(null); openReturn(lead)">
@@ -188,6 +232,30 @@
         <button type="button" class="btn" (click)="detailLead.set(null); openAssign(lead)">
           <svg lucideUserCheck></svg> Assign to client
         </button>
+      }
+      @if (lead.status === 'ACCEPTED' || lead.status === 'ASSIGNED_EXTERNAL') {
+        @if (lead.paymentStatus === 'PAID') {
+          @if (lead.status === 'ACCEPTED') {
+            <button type="button" class="btn btn--danger" (click)="openChargeBack(lead, $event)">
+              <svg lucideBanknoteX></svg> Charge back
+            </button>
+          }
+          <button
+            type="button"
+            class="btn btn--ghost"
+            [disabled]="busyId() === lead.id"
+            (click)="revertToUnpaid(lead, $event)"
+          >
+            @if (busyId() === lead.id) {
+              <span class="spinner"></span>
+            } @else {
+              <svg lucideBanknote></svg>
+            }
+            Mark unpaid
+          </button>
+        } @else {
+          <span class="hint">Select this lead in the list and use "Mark Paid" to record the amount received.</span>
+        }
       }
     </div>
   </app-modal>
@@ -344,6 +412,70 @@
           <span class="spinner"></span> Assigning…
         } @else {
           <svg lucideBuilding2></svg> Confirm assignment
+        }
+      </button>
+    </div>
+  </app-modal>
+}
+
+<!-- Charge back -->
+@if (chargeBackLead(); as lead) {
+  <app-modal title="Charge back this lead" [subtitle]="lead.customerName" (close)="closeChargeBackModal()">
+    @if (error()) {
+      <div class="error">{{ error() }}</div>
+    }
+
+    <div class="form-grid">
+      <label>
+        PKR clawed back <span class="hint">Amount charged back</span>
+        <input type="number" min="0" [(ngModel)]="chargeBackPkrAmount" name="chargeBackPkrAmount" placeholder="0" />
+      </label>
+      <label class="full">
+        Reason <span class="req">Required</span>
+        <input type="text" [(ngModel)]="chargeBackReason" name="chargeBackReason" placeholder="e.g. Client cancelled the policy" />
+      </label>
+    </div>
+
+    <div footer>
+      <button type="button" class="btn btn--danger" [disabled]="chargeBackSubmitting()" (click)="confirmChargeBack()">
+        @if (chargeBackSubmitting()) {
+          <span class="spinner"></span> Saving…
+        } @else {
+          <svg lucideBanknoteX></svg> Confirm charge back
+        }
+      </button>
+    </div>
+  </app-modal>
+}
+
+<!-- Batch mark paid -->
+@if (batchModalOpen()) {
+  <app-modal
+    title="Mark leads paid"
+    [subtitle]="selectedCount() + ' lead' + (selectedCount() === 1 ? '' : 's') + ' selected'"
+    (close)="closeBatchModal()"
+  >
+    @if (error()) {
+      <div class="error">{{ error() }}</div>
+    }
+
+    <div class="form-grid">
+      <label>
+        PKR received <span class="hint">Total for this batch</span>
+        <input type="number" min="0" [(ngModel)]="batchPkrAmount" name="batchPkrAmount" placeholder="0" />
+      </label>
+      <label class="full">
+        Note <span class="hint">Optional</span>
+        <input type="text" [(ngModel)]="batchNote" name="batchNote" placeholder="e.g. Bank transfer ref #1234" />
+      </label>
+    </div>
+
+    <div footer>
+      <button type="button" class="btn btn--success" [disabled]="batchSubmitting()" (click)="confirmBatchMarkPaid()">
+        @if (batchSubmitting()) {
+          <span class="spinner"></span> Saving…
+        } @else {
+          <svg lucideBanknote></svg> Confirm
         }
       </button>
     </div>

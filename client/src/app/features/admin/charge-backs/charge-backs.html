@@ -85,6 +85,15 @@
                 </td>
                 <td>
                   <div class="row-actions">
+                    <button
+                      type="button"
+                      class="btn btn--sm btn--icon btn--ghost"
+                      title="Edit"
+                      aria-label="Edit"
+                      (click)="openEdit(lead, $event)"
+                    >
+                      <svg lucideSquarePen></svg>
+                    </button>
                     <button type="button" class="btn btn--sm btn--ghost" (click)="openAssignExternal(lead, $event)">
                       <svg lucideBuilding2></svg> Assign External
                     </button>
@@ -114,6 +123,9 @@
   <app-modal title="Lead details" [subtitle]="lead.customerName" [wide]="true" (close)="detailLead.set(null)">
     <app-lead-detail [lead]="lead" />
     <div footer>
+      <button type="button" class="btn btn--ghost" (click)="detailLead.set(null); openEdit(lead)">
+        <svg lucideSquarePen></svg> Edit
+      </button>
       <button type="button" class="btn btn--ghost" (click)="detailLead.set(null); openAssignExternal(lead)">
         <svg lucideBuilding2></svg> Assign to external
       </button>
@@ -238,4 +250,64 @@
       </button>
     </div>
   </app-modal>
+}
+
+<!-- Edit charged-back lead -->
+@if (editLead(); as lead) {
+  @if (draft(); as d) {
+    <app-modal
+      title="Edit lead"
+      subtitle="Correct the details before reassigning."
+      [wide]="true"
+      (close)="editLead.set(null)"
+    >
+      @if (error()) {
+        <div class="error">{{ error() }}</div>
+      }
+      @if (lead.chargeBacks[0]?.reason; as reason) {
+        <div class="warn">Charge-back reason: {{ reason }}</div>
+      }
+
+      <div class="form-grid">
+        <label>
+          Customer name
+          <input type="text" [ngModel]="d.customerName" (ngModelChange)="updateDraft('customerName', $event)" name="customerName" />
+        </label>
+        <label>
+          Phone
+          <input type="text" [ngModel]="d.phone" (ngModelChange)="updateDraft('phone', $event)" name="phone" />
+        </label>
+        <label>
+          State
+          <input type="text" [ngModel]="d.state" (ngModelChange)="updateDraft('state', $event)" name="state" />
+        </label>
+        <label>
+          Zipcode
+          <input type="text" [ngModel]="d.zipcode" (ngModelChange)="updateDraft('zipcode', $event)" name="zipcode" />
+        </label>
+        <label>
+          Marital status
+          <input type="text" [ngModel]="d.maritalStatus" (ngModelChange)="updateDraft('maritalStatus', $event)" name="maritalStatus" />
+        </label>
+        <label class="full">
+          Health conditions
+          <input type="text" [ngModel]="d.healthConditions" (ngModelChange)="updateDraft('healthConditions', $event)" name="healthConditions" />
+        </label>
+        <label class="full">
+          Closer notes
+          <textarea rows="3" [ngModel]="d.closerNotes" (ngModelChange)="updateDraft('closerNotes', $event)" name="closerNotes"></textarea>
+        </label>
+      </div>
+
+      <div footer>
+        <button type="button" class="btn" [disabled]="busyId() === lead.id" (click)="saveEdit()">
+          @if (busyId() === lead.id) {
+            <span class="spinner"></span> Saving…
+          } @else {
+            Save changes
+          }
+        </button>
+      </div>
+    </app-modal>
+  }
 }

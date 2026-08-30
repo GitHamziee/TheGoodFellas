@@ -7,6 +7,7 @@ import {
   DRAFT_FIELDS,
   FULL_LEAD_FIELDS,
   JUNIOR_INTAKE_FIELDS,
+  RETENTION_INTAKE_FIELDS,
   sanitizeLeadFields,
 } from '../lib/lead-fields';
 
@@ -23,6 +24,7 @@ const FULL_INCLUDE = {
   closer: { select: { id: true, name: true, email: true } },
   client: { select: { id: true, name: true, email: true } },
   externalClient: { select: { id: true, name: true, company: true, email: true, phone: true } },
+  retention: { select: { id: true, name: true, email: true } },
   chargeBacks: {
     orderBy: { createdAt: 'desc' },
     include: { client: { select: { id: true, name: true, email: true } } },
@@ -82,6 +84,13 @@ const JUNIOR_EDIT_SELECT = {
   closer: { select: { id: true, name: true } },
   ...Object.fromEntries(JUNIOR_EDIT_FIELDS.map((f) => [f, true])),
 } as const;
+
+// QA_JUNIOR_CLOSER's view of a lead awaiting/already reviewed — reuses JUNIOR_EDIT_SELECT
+// verbatim: exactly the intake fields a Junior Closer typed (phone included, unlike every
+// other masked view — the anti-data-theft rule protects against the *junior* harvesting
+// customer data, which doesn't apply to a QA reviewer checking their work), and pointedly
+// still excludes every closer-added field for the same reason it does there.
+const QA_JUNIOR_SELECT = JUNIOR_EDIT_SELECT;
 
 // Team Lead's view of the admin's SUBMITTED queue — same anti-data-theft masking as the
 // Junior/Closer views (no phone, no SSN/bank/beneficiary), plus both parties who worked the
@@ -240,6 +249,15 @@ export async function listHistoryForCloser(closerId: string) {
 export async function listDraftsForCloser(closerId: string) {
   return prisma.lead.findMany({
     where: { closerId, status: 'DRAFT' },
+    include: FULL_INCLUDE,
+    orderBy: { updatedAt: 'desc' },
+  });
+}
+
+/** Every closer's parked drafts, not just one — Admin's oversight view. Full detail, same as listAllLeadsForAdmin. */
+export async function listDraftsForAdmin() {
+  return prisma.lead.findMany({
+    where: { status: 'DRAFT' },
     include: FULL_INCLUDE,
     orderBy: { updatedAt: 'desc' },
   });
@@ -407,11 +425,72 @@ export async function assignLeadToExternalClient(
   return { data: { lead: result } };
 }
 
-/** Admin edits lead fields — only permitted while a lead sits REJECTED, prior to reassignment. */
+/**
+ * Public retention intake form submission (no login — see routes/leads.routes.ts's
+ * '/retention/intake' route, registered ahead of `authenticate`). Someone working an
+ * AI-sourced call types the lead's details in directly, so this is the sole entry point
+ * for RETENTION leads. Creates the lead fully unassigned (retentionId: null, status: NEW)
+ * for admin to hand out via assignLeadToRetention below — mirrors what the old sheet
+ * import used to produce.
+ */
+export async function submitRetentionIntake(input: Record<string, unknown>): Promise<ServiceResult<{ lead: unknown }>> {
+  const sanitized = sanitizeLeadFields(input, RETENTION_INTAKE_FIELDS);
+  if ('error' in sanitized) return { error: sanitized.error, status: 400 };
+  const { data } = sanitized;
+
+  if (!isNonEmptyString(data.customerName as string | undefined)) return { error: "Customer's name is required", status: 400 };
+  if (!isNonEmptyString(data.phone as string | undefined)) return { error: 'Phone number is required', status: 400 };
+  if (!isNonEmptyString(data.state as string | undefined)) return { error: 'State is required', status: 400 };
+
+  const lead = await prisma.lead.create({
+    data: { leadType: 'RETENTION', status: 'NEW', ...data } as any,
+    include: FULL_INCLUDE,
+  });
+  return { data: { lead } };
+}
+
+/** Sheet-imported leads Admin hasn't handed to a Retention person yet. */
+export async function listUnassignedRetentionForAdmin() {
+  return prisma.lead.findMany({
+    where: { leadType: 'RETENTION', retentionId: null },
+    include: FULL_INCLUDE,
+    orderBy: { createdAt: 'desc' },
+  });
+}
+
+/**
+ * Admin hands (or re-hands, to correct a misassignment) an unworked RETENTION lead to a
+ * Retention person. Doesn't change status — mirrors how a Junior Closer picks a Closer at
+ * CPA intake, claimed via a foreign key while the lead stays NEW until actually worked.
+ */
+export async function assignLeadToRetention(leadId: string, retentionId: string): Promise<ServiceResult<{ lead: unknown }>> {
+  const lead = await prisma.lead.findUnique({ where: { id: leadId } });
+  if (!lead) return { error: 'Lead not found', status: 404 };
+  if (lead.leadType !== 'RETENTION') return { error: 'Not a retention lead', status: 400 };
+  if (lead.status !== 'NEW') return { error: 'Lead is no longer available for assignment', status: 400 };
+
+  const person = await prisma.user.findUnique({ where: { id: retentionId } });
+  if (!person || person.role !== 'RETENTION') return { error: 'Selected retention person is invalid', status: 400 };
+
+  const updated = await prisma.lead.updateMany({
+    where: { id: leadId, status: 'NEW' },
+    data: { retentionId },
+  });
+  if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
+
+  const result = await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE });
+  return { data: { lead: result } };
+}
+
+const EDITABLE_STATUSES = ['REJECTED', 'CHARGED_BACK'] as const;
+
+/** Admin edits lead fields — only permitted while a lead sits REJECTED or CHARGED_BACK, prior to reassignment. */
 export async function editLead(leadId: string, input: Record<string, unknown>): Promise<ServiceResult<{ lead: unknown }>> {
   const lead = await prisma.lead.findUnique({ where: { id: leadId } });
   if (!lead) return { error: 'Lead not found', status: 404 };
-  if (lead.status !== 'REJECTED') return { error: 'Only rejected leads can be edited', status: 400 };
+  if (!EDITABLE_STATUSES.includes(lead.status as (typeof EDITABLE_STATUSES)[number])) {
+    return { error: 'Only rejected or charged-back leads can be edited', status: 400 };
+  }
 
   // A CPL lead never acquires Closer-only fields — not even Admin fills those in.
   const sanitized = sanitizeLeadFields(input, lead.leadType === 'CPL' ? CPL_INTAKE_FIELDS : ADMIN_EDIT_FIELDS);
@@ -612,6 +691,170 @@ export async function listSubmittedForTeamLead() {
   });
 }
 
+// ─── Retention ──────────────────────────────────────────────────
+// Unlike every other role's leads, RETENTION leads are a shared team queue, not an
+// individually-owned one — confirmed deliberately: any Retention person can cover a
+// teammate's leads, not just view them. So listRetentionQueue() below is NOT scoped to the
+// caller, and enrichAndSubmitRetentionLead() below does NOT check requester ownership.
+
+/** The whole team's working queue — every RETENTION lead handed out and not yet submitted.
+ * The "filter to Person A" UX is client-side over this one list, same pattern as
+ * admin/leads.ts's closerFilter. */
+export async function listRetentionQueue() {
+  return prisma.lead.findMany({
+    where: { leadType: 'RETENTION', retentionId: { not: null }, status: 'NEW' },
+    include: FULL_INCLUDE,
+    orderBy: { createdAt: 'desc' },
+  });
+}
+
+/** Any Retention teammate may edit and submit any other's lead — confirmed, no ownership check. */
+export async function enrichAndSubmitRetentionLead(
+  leadId: string,
+  input: Record<string, unknown>
+): Promise<ServiceResult<{ lead: unknown }>> {
+  const lead = await prisma.lead.findUnique({ where: { id: leadId } });
+  if (!lead) return { error: 'Lead not found', status: 404 };
+  if (lead.leadType !== 'RETENTION') return { error: 'Not a retention lead', status: 400 };
+  if (lead.status !== 'NEW') return { error: 'Lead has already been submitted', status: 400 };
+
+  const sanitized = sanitizeLeadFields(input, FULL_LEAD_FIELDS);
+  if ('error' in sanitized) return { error: sanitized.error, status: 400 };
+
+  const updated = await prisma.lead.updateMany({
+    where: { id: leadId, status: 'NEW' },
+    data: { ...sanitized.data, status: 'SUBMITTED' } as any,
+  });
+  if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
+
+  const result = await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE });
+  return { data: { lead: result } };
+}
+
+/**
+ * Leads the Retention team has already worked past the queue (submitted, assigned,
+ * accepted, rejected, etc.) — shared team history, not scoped to the caller, same
+ * "any teammate can see it" philosophy as listRetentionQueue above. Money fields
+ * (coverage amount, monthly premium) are stripped: Retention's job ends at submitting
+ * a clean lead to admin, and what a client ends up paying isn't theirs to see.
+ */
+export async function listRetentionHistory() {
+  const leads = await prisma.lead.findMany({
+    where: { leadType: 'RETENTION', retentionId: { not: null }, status: { not: 'NEW' } },
+    include: FULL_INCLUDE,
+    orderBy: { createdAt: 'desc' },
+  });
+  return leads.map((lead) => ({ ...lead, coverageAmount: null, monthlyPremiums: null }));
+}
+
+// ─── QA ─────────────────────────────────────────────────────────
+// Neither queue/history function below touches Lead.status or any transition — QA is
+// purely an internal metrics side-channel (see LeadReview in schema.prisma). A lead
+// with no juniorCloserId (Closer built it from scratch) never has intake to review, and
+// a CPL lead never acquires a closer, so both are excluded from their respective queues.
+
+/** Leads with intake QA hasn't reviewed yet — any status, as soon as a junior closer submits. */
+export async function listQaJuniorQueue() {
+  return prisma.lead.findMany({
+    where: { juniorCloserId: { not: null }, qaReviews: { none: { role: 'QA_JUNIOR_CLOSER' } } },
+    select: QA_JUNIOR_SELECT,
+    orderBy: { createdAt: 'desc' },
+  });
+}
+
+/** Leads QA has already reviewed the intake on, most recent first. */
+export async function listQaJuniorHistory(reviewerId: string) {
+  const reviews = await prisma.leadReview.findMany({
+    where: { role: 'QA_JUNIOR_CLOSER' },
+    orderBy: { createdAt: 'desc' },
+    select: {
+      id: true,
+      outcome: true,
+      comment: true,
+      createdAt: true,
+      reviewerId: true,
+      lead: { select: QA_JUNIOR_SELECT },
+    },
+  });
+  return reviews.map((r) => ({ ...r, mine: r.reviewerId === reviewerId }));
+}
+
+/** Leads whose enrichment QA hasn't reviewed yet — once the closer has actually submitted it. */
+export async function listQaCloserQueue() {
+  return prisma.lead.findMany({
+    where: {
+      closerId: { not: null },
+      status: { notIn: ['NEW', 'DRAFT'] },
+      qaReviews: { none: { role: 'QA_CLOSER' } },
+    },
+    include: FULL_INCLUDE,
+    orderBy: { createdAt: 'desc' },
+  });
+}
+
+/** Leads QA has already reviewed the enrichment on, most recent first. */
+export async function listQaCloserHistory(reviewerId: string) {
+  const reviews = await prisma.leadReview.findMany({
+    where: { role: 'QA_CLOSER' },
+    orderBy: { createdAt: 'desc' },
+    select: {
+      id: true,
+      outcome: true,
+      comment: true,
+      createdAt: true,
+      reviewerId: true,
+      lead: { include: FULL_INCLUDE },
+    },
+  });
+  return reviews.map((r) => ({ ...r, mine: r.reviewerId === reviewerId }));
+}
+
+/**
+ * Records a QA reviewer's pass/fail verdict on one lead. `role` (which lane) comes from
+ * the authenticated reviewer, never the request body — a QA_JUNIOR_CLOSER cannot review
+ * enrichment and vice versa. Locked once written: the unique (leadId, role) constraint
+ * turns a race into a clean 409 rather than a silent overwrite. Never touches Lead.status.
+ */
+export async function submitQaReview(
+  leadId: string,
+  reviewer: { id: string; role: 'QA_JUNIOR_CLOSER' | 'QA_CLOSER' },
+  input: { outcome?: unknown; comment?: unknown }
+): Promise<ServiceResult<{ review: unknown }>> {
+  const outcome = input.outcome;
+  if (outcome !== 'PASS' && outcome !== 'FAIL') return { error: 'outcome must be PASS or FAIL', status: 400 };
+  if (input.comment !== undefined && input.comment !== null && typeof input.comment !== 'string') {
+    return { error: 'Invalid comment', status: 400 };
+  }
+
+  const lead = await prisma.lead.findUnique({ where: { id: leadId } });
+  if (!lead) return { error: 'Lead not found', status: 404 };
+
+  if (reviewer.role === 'QA_JUNIOR_CLOSER') {
+    if (!lead.juniorCloserId) return { error: 'This lead has no junior closer intake to review', status: 400 };
+  } else {
+    if (!lead.closerId) return { error: 'This lead has no closer enrichment to review', status: 400 };
+    if (lead.status === 'NEW' || lead.status === 'DRAFT') {
+      return { error: 'This lead has not been submitted by the closer yet', status: 400 };
+    }
+  }
+
+  try {
+    const review = await prisma.leadReview.create({
+      data: {
+        leadId,
+        reviewerId: reviewer.id,
+        role: reviewer.role,
+        outcome,
+        comment: isNonEmptyString(input.comment as string | undefined) ? (input.comment as string).trim() : null,
+      },
+    });
+    return { data: { review } };
+  } catch {
+    // Unique (leadId, role) violation — someone on the same QA lane already reviewed this lead.
+    return { error: 'This lead has already been reviewed', status: 409 };
+  }
+}
+
 // ─── Client ─────────────────────────────────────────────────────
 /** New Leads page — ASSIGNED leads awaiting a decision. Masked preview until accepted. */
 export async function listAssignedPreviewsForClient(clientId: string) {
@@ -664,7 +907,18 @@ export async function rejectLead(leadId: string, clientId: string, reason?: stri
 }
 
 // ─── Shared ─────────────────────────────────────────────────────
-type Requester = { id: string; role: 'JUNIOR_CLOSER' | 'CLOSER' | 'ADMIN' | 'CLIENT' | 'TEAM_LEAD' };
+type Requester = {
+  id: string;
+  role:
+    | 'JUNIOR_CLOSER'
+    | 'CLOSER'
+    | 'ADMIN'
+    | 'CLIENT'
+    | 'TEAM_LEAD'
+    | 'QA_JUNIOR_CLOSER'
+    | 'QA_CLOSER'
+    | 'RETENTION';
+};
 
 /** Fetches a lead, scoped to what the requesting role/status combination is allowed to see. */
 export async function getLeadById(leadId: string, requester: Requester): Promise<ServiceResult<{ lead: unknown }>> {
@@ -701,6 +955,24 @@ export async function getLeadById(leadId: string, requester: Requester): Promise
     if (lead.status !== 'SUBMITTED') return { error: 'Forbidden', status: 403 };
     const masked = await prisma.lead.findUnique({ where: { id: leadId }, select: TEAM_LEAD_SELECT });
     return { data: { lead: masked } };
+  }
+
+  if (requester.role === 'QA_JUNIOR_CLOSER') {
+    if (!lead.juniorCloserId) return { error: 'Forbidden', status: 403 };
+    const masked = await prisma.lead.findUnique({ where: { id: leadId }, select: QA_JUNIOR_SELECT });
+    return { data: { lead: masked } };
+  }
+
+  if (requester.role === 'QA_CLOSER') {
+    if (!lead.closerId) return { error: 'Forbidden', status: 403 };
+    return { data: { lead: await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE }) } };
+  }
+
+  if (requester.role === 'RETENTION') {
+    // No masking, and deliberately no ownership check against requester.id — any Retention
+    // teammate can view/edit any RETENTION lead, confirmed shared-queue behavior.
+    if (lead.leadType !== 'RETENTION') return { error: 'Forbidden', status: 403 };
+    return { data: { lead: await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE }) } };
   }
 
   // CLIENT

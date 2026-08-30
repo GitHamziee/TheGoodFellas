@@ -1,0 +1,124 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1>Drafts</h1>
+      <p class="sub">Leads every closer has parked instead of submitting — who's holding them, and for how long.</p>
+    </div>
+  </div>
+
+  <div class="stats-row">
+    <app-stat-tile [value]="stats().total" label="Parked" tone="tone-gold">
+      <svg lucideFileText></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().closers" label="Closers holding drafts" tone="tone-f">
+      <svg lucideUsers></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().oldest + ' d'" label="Oldest draft" tone="tone-warning">
+      <svg lucideTriangleAlert></svg>
+    </app-stat-tile>
+  </div>
+
+  @if (error()) {
+    <div class="error">{{ error() }}</div>
+  }
+
+  <div class="toolbar">
+    <app-search-box
+      [value]="view.search()"
+      placeholder="Search by name, state, closer, or reason…"
+      (valueChange)="view.setSearch($event)"
+    />
+  </div>
+
+  <div class="card card--flush">
+    @if (loading()) {
+      <app-skeleton-rows [count]="4" />
+    } @else if (view.total() === 0) {
+      @if (view.isFiltered()) {
+        <app-empty-state title="No drafts match" hint="Try a different search term.">
+          <svg lucideFileText></svg>
+        </app-empty-state>
+      } @else {
+        <app-empty-state title="No drafts parked" hint="Leads a closer saves as a draft while enriching them will show up here.">
+          <svg lucideFileText></svg>
+        </app-empty-state>
+      }
+    } @else {
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="sortable" (click)="view.toggleSort('customerName')">
+                Customer <span class="arrow">{{ sortArrow('customerName') }}</span>
+              </th>
+              <th class="hide-md">Closer</th>
+              <th class="hide-sm">Reason</th>
+              <th class="sortable hide-sm" (click)="view.toggleSort('updatedAt')">
+                Last touched <span class="arrow">{{ sortArrow('updatedAt') }}</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (lead of view.rows(); track lead.id) {
+              <tr class="clickable" (click)="selected.set(lead)">
+                <td>
+                  <div class="cell-main">{{ lead.customerName }}</div>
+                  <div class="cell-sub">
+                    {{ formatPhone(lead.phone) }} · {{ lead.state }}
+                  </div>
+                </td>
+                <td class="hide-md">
+                  @if (lead.closer; as closer) {
+                    <div class="person">
+                      <span class="avatar-sm" [class]="getAvatarTone(closer.id)">
+                        {{ getInitials(closer.name) }}
+                      </span>
+                      <span class="nm">{{ closer.name }}</span>
+                    </div>
+                  } @else {
+                    <span class="empty">—</span>
+                  }
+                </td>
+                <td class="hide-sm">
+                  @if (lead.draftReason) {
+                    <span class="chip">{{ humanizeEnum(lead.draftReason) }}</span>
+                  } @else {
+                    <span class="empty">—</span>
+                  }
+                </td>
+                <td class="hide-sm">
+                  <span class="chip"><svg lucideClock></svg>{{ timeAgo(lead.updatedAt) }}</span>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <app-pagination
+        [page]="view.page()"
+        [totalPages]="view.totalPages()"
+        [total]="view.total()"
+        (pageChange)="view.page.set($event)"
+      />
+    }
+  </div>
+</div>
+
+@if (selected(); as lead) {
+  <app-modal
+    title="Draft"
+    [subtitle]="lead.customerName"
+    [wide]="true"
+    (close)="selected.set(null)"
+  >
+    @if (lead.draftReason) {
+      <div class="locked" style="border-style: solid;">
+        <svg lucideNotebookPen></svg>
+        <span><strong>Draft reason:</strong> {{ humanizeEnum(lead.draftReason) }}</span>
+      </div>
+    }
+
+    <app-lead-detail [lead]="lead" [unmasked]="true" />
+  </app-modal>
+}

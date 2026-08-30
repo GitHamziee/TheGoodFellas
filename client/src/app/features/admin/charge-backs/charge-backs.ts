@@ -5,6 +5,7 @@ import {
   LucideBuilding2,
   LucideCircleCheck,
   LucideClock,
+  LucideSquarePen,
   LucideUserCheck,
 } from '@lucide/angular';
 import { LeadService } from '../../../core/services/lead.service';
@@ -24,6 +25,17 @@ interface LookupUser {
   email: string;
 }
 
+/** Fields an admin may correct on a charged-back lead before reassigning it. */
+interface EditDraft {
+  customerName: string;
+  phone: string;
+  state: string;
+  zipcode: string;
+  maritalStatus: string;
+  healthConditions: string;
+  closerNotes: string;
+}
+
 @Component({
   selector: 'app-admin-charge-backs',
   imports: [
@@ -39,6 +51,7 @@ interface LookupUser {
     LucideBuilding2,
     LucideCircleCheck,
     LucideUserCheck,
+    LucideSquarePen,
     LucideClock,
   ],
   templateUrl: './charge-backs.html',
@@ -60,11 +73,13 @@ export class AdminChargeBacks implements OnInit {
   readonly detailLead = signal<Lead | null>(null);
   readonly assignLead = signal<Lead | null>(null);
   readonly assignExternalLead = signal<Lead | null>(null);
+  readonly editLead = signal<Lead | null>(null);
 
   readonly clientSearch = signal('');
   readonly chosenClientId = signal('');
   readonly externalClientSearch = signal('');
   readonly chosenExternalClientId = signal('');
+  readonly draft = signal<EditDraft | null>(null);
 
   readonly getInitials = getInitials;
   readonly getAvatarTone = getAvatarTone;
@@ -195,5 +210,52 @@ export class AdminChargeBacks implements OnInit {
     } finally {
       this.busyId.set(null);
     }
+  }
+
+  // ─── Edit (charged-back leads only) ────────────────────────
+  openEdit(lead: Lead, event?: Event): void {
+    event?.stopPropagation();
+    this.error.set(null);
+    this.draft.set({
+      customerName: lead.customerName,
+      phone: lead.phone,
+      state: lead.state,
+      zipcode: lead.zipcode ?? '',
+      maritalStatus: lead.maritalStatus ?? '',
+      healthConditions: lead.healthConditions ?? '',
+      closerNotes: lead.closerNotes ?? '',
+    });
+    this.editLead.set(lead);
+  }
+
+  async saveEdit(): Promise<void> {
+    const lead = this.editLead();
+    const draft = this.draft();
+    if (!lead || !draft) return;
+
+    this.error.set(null);
+    this.busyId.set(lead.id);
+    try {
+      const updated = await this.leadService.editLead(lead.id, {
+        customerName: draft.customerName,
+        phone: draft.phone,
+        state: draft.state,
+        zipcode: draft.zipcode || undefined,
+        maritalStatus: draft.maritalStatus || undefined,
+        healthConditions: draft.healthConditions || undefined,
+        closerNotes: draft.closerNotes || undefined,
+      });
+      this.leads.update((rows) => rows.map((l) => (l.id === lead.id ? updated : l)));
+      this.editLead.set(null);
+      this.notice.set(`Saved changes to ${updated.customerName}.`);
+    } catch (err: any) {
+      this.error.set(err?.error?.error ?? 'Could not save changes.');
+    } finally {
+      this.busyId.set(null);
+    }
+  }
+
+  updateDraft<K extends keyof EditDraft>(key: K, value: string): void {
+    this.draft.update((d) => (d ? { ...d, [key]: value } : d));
   }
 }

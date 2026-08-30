@@ -67,11 +67,16 @@ export class AdminDashboard implements OnInit {
     const toAssign = rows.filter((l) => l.status === 'SUBMITTED');
     const toFix = rows.filter((l) => l.status === 'REJECTED');
     const toCollect = rows.filter((l) => l.status === 'ACCEPTED' && l.paymentStatus === 'UNPAID');
+    // CPA and CPL leads are marked paid from their own separate admin pages, so "to collect"
+    // is split by type — a single count would send the admin to a page missing half of them.
+    const toCollectCpa = toCollect.filter((l) => l.leadType === 'CPA').length;
+    const toCollectCpl = toCollect.filter((l) => l.leadType === 'CPL').length;
     return {
       toAssign: toAssign.length,
       toFix: toFix.length,
-      toCollect: toCollect.length,
-      total: toAssign.length + toFix.length + toCollect.length,
+      toCollectCpa,
+      toCollectCpl,
+      total: toAssign.length + toFix.length + toCollectCpa + toCollectCpl,
       /** Assignment work that has been waiting too long — the reason to act today rather than tomorrow. */
       stalled: toAssign.filter((l) => this.ageInDays(l.updatedAt) >= STALE_AFTER_DAYS).length,
     };
