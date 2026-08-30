@@ -44,9 +44,10 @@ const BLOCK_GAP_MS = 5 * 60 * 1000;
 const NAME_COLORS = ['#b8952c', '#92592c', '#46586a', '#5c6a38', '#9c4f34', '#3d6b60'];
 
 const ROOM_MEMBERS: Record<ChatRoomKey, string> = {
-  CLOSERS: 'All closers + admin',
-  JUNIOR_CLOSERS: 'All junior closers + admin',
+  CLOSERS: 'All closers + team lead + admin',
+  JUNIOR_CLOSERS: 'All junior closers + team lead + admin',
   TEAM_LEADS: 'All team leads + admin',
+  RETENTION: 'All retention + admin',
 };
 
 @Component({

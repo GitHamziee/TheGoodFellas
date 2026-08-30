@@ -9,9 +9,13 @@ import type { ChatRoom, Role } from "@prisma/client";
  *
  *   CLOSER        → CLOSERS only
  *   JUNIOR_CLOSER → JUNIOR_CLOSERS only
- *   TEAM_LEAD     → TEAM_LEADS only (its own channel — not CLOSERS/JUNIOR_CLOSERS)
- *   ADMIN         → all three (this is how each group talks to admin)
+ *   TEAM_LEAD     → CLOSERS + JUNIOR_CLOSERS + TEAM_LEADS — oversees both roles, so it
+ *                   sits in both of their channels (talks to Closer, Junior Closer, and
+ *                   Admin there) plus its own channel for team-lead-to-team-lead + admin
+ *   RETENTION     → RETENTION only (its own channel, same pattern as TEAM_LEADS)
+ *   ADMIN         → all four (this is how each group talks to admin)
  *   CLIENT        → none (clients are outside the org, no chat access at all)
+ *   QA_JUNIOR_CLOSER, QA_CLOSER → none (internal metrics roles, not part of team chat)
  */
 export function roomsFor(role: Role): ChatRoom[] {
   switch (role) {
@@ -20,10 +24,14 @@ export function roomsFor(role: Role): ChatRoom[] {
     case "JUNIOR_CLOSER":
       return ["JUNIOR_CLOSERS"];
     case "TEAM_LEAD":
-      return ["TEAM_LEADS"];
-    case "ADMIN":
       return ["CLOSERS", "JUNIOR_CLOSERS", "TEAM_LEADS"];
+    case "RETENTION":
+      return ["RETENTION"];
+    case "ADMIN":
+      return ["CLOSERS", "JUNIOR_CLOSERS", "TEAM_LEADS", "RETENTION"];
     case "CLIENT":
+    case "QA_JUNIOR_CLOSER":
+    case "QA_CLOSER":
       return [];
   }
 }
@@ -32,7 +40,7 @@ export function canAccessRoom(role: Role, room: ChatRoom): boolean {
   return roomsFor(role).includes(room);
 }
 
-const ROOM_VALUES: readonly string[] = ["CLOSERS", "JUNIOR_CLOSERS", "TEAM_LEADS"];
+const ROOM_VALUES: readonly string[] = ["CLOSERS", "JUNIOR_CLOSERS", "TEAM_LEADS", "RETENTION"];
 
 /** Narrows an untrusted route/socket param to a real ChatRoom. */
 export function parseRoom(value: unknown): ChatRoom | null {
@@ -43,6 +51,7 @@ export const ROOM_LABEL: Record<ChatRoom, string> = {
   CLOSERS: "Closers",
   JUNIOR_CLOSERS: "Junior Closers",
   TEAM_LEADS: "Team Leads",
+  RETENTION: "Retention",
 };
 
 /** Socket.IO room name — namespaced so it can't collide with any future per-user room. */

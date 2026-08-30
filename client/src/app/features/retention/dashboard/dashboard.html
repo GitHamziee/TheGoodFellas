@@ -1,0 +1,95 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1>Welcome back{{ firstName() ? ', ' + firstName() : '' }}</h1>
+      <p class="sub">The team's queue at a glance, and how recently-worked leads are landing.</p>
+    </div>
+    <div class="page-head-actions">
+      <a class="btn" routerLink="/retention/queue"><svg lucideSend></svg> Go to queue</a>
+    </div>
+  </div>
+
+  <div class="stats-row">
+    <app-stat-tile [value]="stats().queueTotal" label="In team queue" tone="tone-gold">
+      <svg lucideSend></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().mine" label="Assigned to me" tone="tone-c">
+      <svg lucideClock></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().submitted" label="Submitted total" tone="tone-d">
+      <svg lucideUsers></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().accepted" label="Accepted" tone="tone-success">
+      <svg lucideCircleCheck></svg>
+    </app-stat-tile>
+    <app-stat-tile
+      [value]="stats().acceptRate === null ? '—' : stats().acceptRate + '%'"
+      label="Accept rate"
+      tone="tone-a"
+    >
+      <svg lucideTarget></svg>
+    </app-stat-tile>
+  </div>
+
+  <div class="split">
+    <div class="card">
+      <div class="inline-head">
+        <h2>Work these next</h2>
+        <a class="count" routerLink="/retention/queue">View queue</a>
+      </div>
+
+      @if (loading()) {
+        <app-skeleton-rows [count]="4" />
+      } @else if (upNext().length === 0) {
+        <app-empty-state title="Nothing assigned to you" hint="Leads Admin hands you land here.">
+          <svg lucideCircleCheck></svg>
+        </app-empty-state>
+      } @else {
+        <div class="feed">
+          @for (lead of upNext(); track lead.id) {
+            <a class="feed-row feed-row--link" [routerLink]="['/retention/leads', lead.id]">
+              <span class="avatar-sm" [class]="getAvatarTone(lead.id)">
+                {{ getInitials(lead.customerName) }}
+              </span>
+              <span class="who">
+                <span class="nm">{{ lead.customerName }}</span>
+                <span class="mt">{{ lead.state }}</span>
+              </span>
+              <span class="chip"><svg lucideClock></svg>{{ timeAgo(lead.createdAt) }}</span>
+            </a>
+          }
+        </div>
+      }
+    </div>
+
+    <div class="card">
+      <div class="inline-head">
+        <h2>Recent outcomes</h2>
+        <a class="count" routerLink="/retention/history">View history</a>
+      </div>
+
+      @if (loading()) {
+        <app-skeleton-rows [count]="4" />
+      } @else if (recentOutcomes().length === 0) {
+        <app-empty-state title="Nothing submitted yet" hint="Leads the team sends onward will show their outcome here.">
+          <svg lucideSend></svg>
+        </app-empty-state>
+      } @else {
+        <div class="feed">
+          @for (lead of recentOutcomes(); track lead.id) {
+            <div class="feed-row">
+              <span class="avatar-sm" [class]="getAvatarTone(lead.id)">
+                {{ getInitials(lead.customerName) }}
+              </span>
+              <span class="who">
+                <span class="nm">{{ lead.customerName }}</span>
+                <span class="mt">{{ timeAgo(lead.createdAt) }}</span>
+              </span>
+              <app-status-badge [status]="lead.status" />
+            </div>
+          }
+        </div>
+      }
+    </div>
+  </div>
+</div>

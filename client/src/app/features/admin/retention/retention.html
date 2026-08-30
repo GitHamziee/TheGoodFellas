@@ -1,0 +1,169 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <p class="sub">Leads submitted through the public retention intake form, waiting to be handed to a Retention person.</p>
+    </div>
+  </div>
+
+  <div class="stats-row">
+    <app-stat-tile [value]="stats().total" label="Unassigned" tone="tone-gold">
+      <svg lucideInbox></svg>
+    </app-stat-tile>
+  </div>
+
+  @if (error()) {
+    <div class="error">{{ error() }}</div>
+  }
+  @if (notice()) {
+    <div class="success"><svg lucideCircleCheck></svg>{{ notice() }}</div>
+  }
+
+  <app-search-box
+    [value]="view.search()"
+    placeholder="Search by name, phone, state, or carrier…"
+    (valueChange)="view.setSearch($event)"
+  />
+
+  <div class="card card--flush">
+    @if (loading()) {
+      <app-skeleton-rows [count]="5" />
+    } @else if (view.total() === 0) {
+      @if (view.isFiltered()) {
+        <app-empty-state title="No leads match" hint="Try a different search term.">
+          <svg lucideInbox></svg>
+        </app-empty-state>
+      } @else {
+        <app-empty-state title="Nothing unassigned" hint="Nothing's come in through the intake form yet, or everything's already handed out.">
+          <svg lucideInbox></svg>
+        </app-empty-state>
+      }
+    } @else {
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="sortable" (click)="view.toggleSort('customerName')">
+                Customer <span class="arrow">{{ sortArrow('customerName') }}</span>
+              </th>
+              <th class="hide-sm">Phone</th>
+              <th class="hide-sm">State</th>
+              <th class="hide-md">Carrier</th>
+              <th class="sortable hide-sm" (click)="view.toggleSort('createdAt')">
+                Imported <span class="arrow">{{ sortArrow('createdAt') }}</span>
+              </th>
+              <th class="right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (lead of view.rows(); track lead.id) {
+              <tr class="clickable" (click)="detailLead.set(lead)">
+                <td>
+                  <div class="person">
+                    <span class="avatar-sm" [class]="getAvatarTone(lead.id)">{{ getInitials(lead.customerName) }}</span>
+                    <span class="cell-main">{{ lead.customerName }}</span>
+                  </div>
+                </td>
+                <td class="hide-sm">{{ formatPhone(lead.phone) }}</td>
+                <td class="hide-sm">{{ lead.state }}</td>
+                <td class="hide-md">{{ lead.carrierName || '—' }}</td>
+                <td class="hide-sm">
+                  <span class="chip">{{ formatDateTime(lead.createdAt) }}</span>
+                </td>
+                <td>
+                  <div class="row-actions">
+                    <button
+                      type="button"
+                      class="btn btn--sm"
+                      title="Assign"
+                      aria-label="Assign"
+                      (click)="openAssign(lead, $event)"
+                    >
+                      <svg lucideUserCheck></svg> Assign
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <app-pagination
+        [page]="view.page()"
+        [totalPages]="view.totalPages()"
+        [total]="view.total()"
+        (pageChange)="view.page.set($event)"
+      />
+    }
+  </div>
+</div>
+
+<!-- Detail -->
+@if (detailLead(); as lead) {
+  <app-modal title="Lead details" [subtitle]="lead.customerName" [wide]="true" (close)="detailLead.set(null)">
+    <app-lead-detail [lead]="lead" [unmasked]="true" />
+    <div footer>
+      <button type="button" class="btn" (click)="detailLead.set(null); openAssign(lead)">
+        <svg lucideUserCheck></svg> Assign
+      </button>
+    </div>
+  </app-modal>
+}
+
+<!-- Assign -->
+@if (assignLead(); as lead) {
+  <app-modal
+    title="Assign to retention"
+    [subtitle]="'Choose who works ' + lead.customerName"
+    (close)="assignLead.set(null)"
+  >
+    @if (error()) {
+      <div class="error">{{ error() }}</div>
+    }
+
+    <app-search-box
+      [value]="personSearch()"
+      placeholder="Search retention staff by name or email…"
+      (valueChange)="personSearch.set($event)"
+    />
+
+    <div class="pick-list">
+      @for (person of filteredPeople(); track person.id) {
+        <button
+          type="button"
+          class="pick-row"
+          [class.chosen]="chosenRetentionId() === person.id"
+          (click)="chosenRetentionId.set(person.id)"
+        >
+          <span class="avatar-sm" [class]="getAvatarTone(person.id)">{{ getInitials(person.name) }}</span>
+          <span class="who">
+            <span class="cell-main">{{ person.name }}</span>
+            <span class="cell-sub">{{ person.email }}</span>
+          </span>
+          @if (chosenRetentionId() === person.id) {
+            <svg lucideCircleCheck class="tick"></svg>
+          }
+        </button>
+      } @empty {
+        <app-empty-state title="No retention staff match" hint="Clear the search to see everyone.">
+          <svg lucideUserCheck></svg>
+        </app-empty-state>
+      }
+    </div>
+
+    <div footer>
+      <button
+        type="button"
+        class="btn"
+        [disabled]="!chosenRetentionId() || busyId() === lead.id"
+        (click)="confirmAssign()"
+      >
+        @if (busyId() === lead.id) {
+          <span class="spinner"></span> Assigning…
+        } @else {
+          <svg lucideUserCheck></svg> Confirm assignment
+        }
+      </button>
+    </div>
+  </app-modal>
+}

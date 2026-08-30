@@ -1,0 +1,132 @@
+<div class="page" appNoCopy>
+  <div class="page-head">
+    <div>
+      <p class="sub">Leads the team has submitted onward, and how they turned out.</p>
+    </div>
+  </div>
+
+  <div class="stats-row">
+    <app-stat-tile [value]="stats().total" label="Submitted total" tone="tone-gold">
+      <svg lucideSend></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().thisMonth" label="This month" tone="tone-c">
+      <svg lucideClock></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().accepted" label="Accepted" tone="tone-success">
+      <svg lucideCircleCheck></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().rejected" label="Rejected" tone="tone-danger">
+      <svg lucideCircleX></svg>
+    </app-stat-tile>
+    <app-stat-tile
+      [value]="stats().acceptRate === null ? '—' : stats().acceptRate + '%'"
+      label="Accept rate"
+      tone="tone-a"
+    >
+      <svg lucideTarget></svg>
+    </app-stat-tile>
+  </div>
+
+  @if (error()) {
+    <div class="error">{{ error() }}</div>
+  }
+
+  <div class="toolbar">
+    <app-search-box
+      [value]="view.search()"
+      placeholder="Search by name, phone, state, carrier, or teammate…"
+      (valueChange)="view.setSearch($event)"
+    />
+    <div class="pills">
+      @for (filter of statusFilters; track filter.value) {
+        <button
+          type="button"
+          class="pill"
+          [class.active]="view.status() === filter.value"
+          (click)="view.setStatus(filter.value)"
+        >
+          {{ filter.label }}
+          <span class="n">{{ statusCounts()[filter.value] }}</span>
+        </button>
+      }
+    </div>
+  </div>
+
+  <div class="card card--flush">
+    @if (loading()) {
+      <app-skeleton-rows [count]="5" />
+    } @else if (view.total() === 0) {
+      @if (view.isFiltered()) {
+        <app-empty-state title="No leads match" hint="Try a different search term or clear the filters.">
+          <svg lucideSend></svg>
+        </app-empty-state>
+      } @else {
+        <app-empty-state title="Nothing submitted yet" hint="Leads the team completes and sends to admin will show up here.">
+          <svg lucideSend></svg>
+        </app-empty-state>
+      }
+    } @else {
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="sortable" (click)="view.toggleSort('customerName')">
+                Customer <span class="arrow">{{ sortArrow('customerName') }}</span>
+              </th>
+              <th class="hide-sm">Phone</th>
+              <th class="hide-sm">State</th>
+              <th class="hide-md">Worked by</th>
+              <th class="sortable" (click)="view.toggleSort('status')">
+                Outcome <span class="arrow">{{ sortArrow('status') }}</span>
+              </th>
+              <th class="sortable right hide-sm" (click)="view.toggleSort('createdAt')">
+                Submitted <span class="arrow">{{ sortArrow('createdAt') }}</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (lead of view.rows(); track lead.id) {
+              <tr class="clickable" (click)="selected.set(lead)">
+                <td>
+                  <div class="cell-main">{{ lead.customerName }}</div>
+                  <div class="cell-sub">{{ lead.carrierName || '—' }}</div>
+                </td>
+                <td class="hide-sm">{{ formatPhone(lead.phone) }}</td>
+                <td class="hide-sm">{{ lead.state }}</td>
+                <td class="hide-md">
+                  @if (lead.retention) {
+                    <div class="person">
+                      <span class="avatar-sm" [class]="getAvatarTone(lead.retention.id)">
+                        {{ getInitials(lead.retention.name) }}
+                      </span>
+                      <span class="nm">{{ lead.retention.name }}</span>
+                    </div>
+                  } @else {
+                    <span class="empty">—</span>
+                  }
+                </td>
+                <td><app-status-badge [status]="lead.status" /></td>
+                <td class="right hide-sm">
+                  <span class="chip"><svg lucideClock></svg>{{ timeAgo(lead.createdAt) }}</span>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <app-pagination
+        [page]="view.page()"
+        [totalPages]="view.totalPages()"
+        [total]="view.total()"
+        (pageChange)="view.page.set($event)"
+      />
+    }
+  </div>
+</div>
+
+@if (selected(); as lead) {
+  <app-modal appNoCopy title="Lead details" [subtitle]="lead.customerName" [wide]="true" (close)="selected.set(null)">
+    <app-lead-detail [lead]="lead" [unmasked]="true" [allowCopy]="false" />
+  </app-modal>
+}

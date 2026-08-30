@@ -1,0 +1,120 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <p class="sub">
+        AI-sourced leads handed out by Admin. Filter to a teammate to help — you can open,
+        edit, and submit anyone's lead here, not just your own.
+      </p>
+    </div>
+  </div>
+
+  <div class="stats-row">
+    <app-stat-tile [value]="stats().total" label="Team total" tone="tone-gold">
+      <svg lucideSend></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().mine" label="Assigned to me" tone="tone-c">
+      <svg lucideClock></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().teammates" label="Teammates working leads" tone="tone-d">
+      <svg lucideUsers></svg>
+    </app-stat-tile>
+  </div>
+
+  @if (error()) {
+    <div class="error">{{ error() }}</div>
+  }
+
+  <div class="toolbar">
+    <app-search-box
+      [value]="view.search()"
+      placeholder="Search by name, phone, state, or carrier…"
+      (valueChange)="view.setSearch($event)"
+    />
+    <app-select
+      [options]="teammateOptions()"
+      [ngModel]="teammateFilter()"
+      (ngModelChange)="teammateFilter.set($event)"
+      placeholder="All teammates"
+      ariaLabel="Filter by teammate"
+      name="teammateFilter"
+    />
+  </div>
+
+  <div class="card card--flush">
+    @if (loading()) {
+      <app-skeleton-rows [count]="5" />
+    } @else if (view.total() === 0) {
+      @if (view.isFiltered() || teammateFilter()) {
+        <app-empty-state title="No leads match" hint="Try a different search term or teammate.">
+          <svg lucideSend></svg>
+        </app-empty-state>
+      } @else {
+        <app-empty-state title="Queue is clear" hint="Leads Admin hands out to Retention land here.">
+          <svg lucideSend></svg>
+        </app-empty-state>
+      }
+    } @else {
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="sortable" (click)="view.toggleSort('customerName')">
+                Customer <span class="arrow">{{ sortArrow('customerName') }}</span>
+              </th>
+              <th class="hide-sm">Phone</th>
+              <th class="hide-sm">State</th>
+              <th class="hide-md">Assigned to</th>
+              <th class="sortable hide-sm" (click)="view.toggleSort('createdAt')">
+                Age <span class="arrow">{{ sortArrow('createdAt') }}</span>
+              </th>
+              <th class="right">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (lead of view.rows(); track lead.id) {
+              <tr class="clickable">
+                <td>
+                  <div class="cell-main">{{ lead.customerName }}</div>
+                  <div class="cell-sub">{{ lead.carrierName || '—' }}</div>
+                </td>
+                <td class="hide-sm">{{ formatPhone(lead.phone) }}</td>
+                <td class="hide-sm">{{ lead.state }}</td>
+                <td class="hide-md">
+                  @if (lead.retention) {
+                    <div class="person">
+                      <span class="avatar-sm" [class]="getAvatarTone(lead.retention.id)">
+                        {{ getInitials(lead.retention.name) }}
+                      </span>
+                      <span class="nm">
+                        {{ lead.retention.id === currentUserId() ? 'Me' : lead.retention.name }}
+                      </span>
+                    </div>
+                  } @else {
+                    <span class="empty">—</span>
+                  }
+                </td>
+                <td class="hide-sm">
+                  <span class="chip"><svg lucideClock></svg>{{ timeAgo(lead.createdAt) }}</span>
+                </td>
+                <td>
+                  <div class="row-actions">
+                    <a class="btn btn--sm btn--ghost" [routerLink]="['/retention/leads', lead.id]">
+                      <svg lucideSquarePen></svg> Open
+                    </a>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <app-pagination
+        [page]="view.page()"
+        [totalPages]="view.totalPages()"
+        [total]="view.total()"
+        (pageChange)="view.page.set($event)"
+      />
+    }
+  </div>
+</div>
