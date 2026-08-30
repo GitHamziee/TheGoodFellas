@@ -109,15 +109,18 @@ export class AdminClients implements OnInit {
 
   /** Which carriers this client writes business through in each selected state — e.g.
    * Sunrise writes NRG in Alaska but MPG in Alabama. Keyed by state; each state's list is
-   * independent freehand text, entered only for the one state currently being edited
-   * (`carrierEditState`) — carriers typed for one state never leak into another. On the
-   * detail modal, edits auto-save per state via a small debounce (see addStateCarrierValue/
-   * removeStateCarrier). */
+   * independent freehand text, entered only for whichever state(s) are currently checked
+   * (`carrierEditStates`) — carriers typed for one state never leak into another unless
+   * multiple states are checked at once. On the detail modal, edits auto-save per state via
+   * a small debounce (see addStateCarrierValue/removeStateCarrier). */
   stateCarriers: Record<string, string[]> = {};
-  /** Which licensed state the "Carrier availability by state" editor is currently showing —
-   * null until the admin picks one. Only one state is edited at a time, which is what keeps
-   * entries from fanning out across states. */
-  carrierEditState: string | null = null;
+  /** Which licensed state(s) the "Carrier availability by state" editor is currently
+   * showing/targeting — checked states share whatever carrier gets typed next, so one
+   * carrier (e.g. a carrier newly licensed region-wide) can be added to several states in
+   * one go instead of repeating the same entry per state. The existing-carriers tag list
+   * only renders when exactly one state is checked, since with more than one selected their
+   * carrier sets aren't necessarily the same and showing one would be misleading. */
+  carrierEditStates: string[] = [];
   carrierEditStateInput = '';
   /** States with unsaved carrier changes, flushed together on the debounce timer. */
   private dirtyStateCarriers = new Set<string>();
@@ -198,7 +201,7 @@ export class AdminClients implements OnInit {
     this.acceptsOnlineBankPayment = false;
     this.selectedStates = [];
     this.stateCarriers = {};
-    this.carrierEditState = null;
+    this.carrierEditStates = [];
     this.carrierEditStateInput = '';
     this.dirtyStateCarriers.clear();
     if (this.stateCarrierSaveTimer) clearTimeout(this.stateCarrierSaveTimer);
@@ -209,14 +212,14 @@ export class AdminClients implements OnInit {
   /** Toggles a state in/out of `selectedStates` — used by both the create form and the
    * detail modal's coverage editor. Removing a state drops whatever carriers were entered
    * for it (the server cleans up the saved assignment in the same coverage-update request)
-   * and clears it from the per-state editor if it was the one being edited. */
+   * and unchecks it in the carrier editor if it was checked there. */
   toggleState(state: string): void {
     const adding = !this.selectedStates.includes(state);
     this.selectedStates = adding ? [...this.selectedStates, state] : this.selectedStates.filter((s) => s !== state);
     if (!adding) {
       const { [state]: _removed, ...rest } = this.stateCarriers;
       this.stateCarriers = rest;
-      if (this.carrierEditState === state) this.carrierEditState = null;
+      this.carrierEditStates = this.carrierEditStates.filter((s) => s !== state);
     }
     this.queueCoverageAutoSave();
   }
@@ -236,13 +239,13 @@ export class AdminClients implements OnInit {
     return this.usStates.filter((s) => this.selectedStates.includes(s));
   }
 
-  /** Picks which licensed state the "Carriers by state" panel shows — pure navigation, never
-   * a data change. Clicking the state already showing is a no-op (not a toggle-off): the
-   * panel always has either a selected state or nothing, it never flips back and forth from
-   * the same click target. */
-  selectCarrierEditState(state: string): void {
-    if (this.carrierEditState === state) return;
-    this.carrierEditState = state;
+  /** Checks/unchecks a state in the "Carriers by state" panel — pure navigation, never a
+   * data change. Multiple states can be checked at once so a carrier typed next gets added
+   * to all of them in one go, instead of repeating the same entry per state. */
+  toggleCarrierEditState(state: string): void {
+    this.carrierEditStates = this.carrierEditStates.includes(state)
+      ? this.carrierEditStates.filter((s) => s !== state)
+      : [...this.carrierEditStates, state];
     this.carrierEditStateInput = '';
   }
 
@@ -254,21 +257,33 @@ export class AdminClients implements OnInit {
     return count === 1 ? '1 carrier' : `${count} carriers`;
   }
 
-  /** Carriers for the currently selected state (`carrierEditState`) — has no fixed list,
+  /** Carriers for the currently checked state(s) (`carrierEditStates`) — has no fixed list,
    * typed manually the same way the general roster above does. */
   addStateCarrier(): void {
     this.addStateCarrierValue(this.carrierEditStateInput);
     this.carrierEditStateInput = '';
   }
 
+  /** Adds one carrier to every checked state, skipping states that already have it (a
+   * case-insensitive match) rather than erroring — the common case is broadening a carrier
+   * to a few more states, not renaming one that's already there. */
   private addStateCarrierValue(raw: string): void {
-    const state = this.carrierEditState;
-    if (!state) return;
+    const states = this.carrierEditStates;
+    if (!states.length) return;
     const value = raw.trim();
-    const current = this.stateCarriers[state] ?? [];
-    if (!value || current.some((c) => c.toLowerCase() === value.toLowerCase())) return;
-    this.stateCarriers = { ...this.stateCarriers, [state]: [...current, value] };
-    this.queueStateCarrierAutoSave(state);
+    if (!value) return;
+    const next = { ...this.stateCarriers };
+    let changed = false;
+    for (const state of states) {
+      const current = next[state] ?? [];
+      if (current.some((c) => c.toLowerCase() === value.toLowerCase())) continue;
+      next[state] = [...current, value];
+      this.dirtyStateCarriers.add(state);
+      changed = true;
+    }
+    if (!changed) return;
+    this.stateCarriers = next;
+    this.scheduleStateCarrierAutoSave();
   }
 
   /** Same comma-splitting UX as the general roster's onCarrierInputChange. */
@@ -282,19 +297,22 @@ export class AdminClients implements OnInit {
     for (const segment of segments) this.addStateCarrierValue(segment);
   }
 
+  /** Only available when exactly one state is checked — see the `carrierEditStates` doc for
+   * why the tag list (and so its remove button) doesn't render otherwise. */
   removeStateCarrier(carrier: string): void {
-    const state = this.carrierEditState;
-    if (!state) return;
+    if (this.carrierEditStates.length !== 1) return;
+    const state = this.carrierEditStates[0];
     this.stateCarriers = { ...this.stateCarriers, [state]: (this.stateCarriers[state] ?? []).filter((c) => c !== carrier) };
-    this.queueStateCarrierAutoSave(state);
+    this.dirtyStateCarriers.add(state);
+    this.scheduleStateCarrierAutoSave();
   }
 
-  /** Debounced per-state auto-save — only while an existing account is open (`selected()`);
-   * the create form saves everything together on submit. Debounces per state edited so a
-   * quick edit to one state never resends another state's list. */
-  private queueStateCarrierAutoSave(state: string): void {
+  /** Debounced auto-save for whatever states are in `dirtyStateCarriers` — only while an
+   * existing account is open (`selected()`); the create form saves everything together on
+   * submit. One shared debounce rather than one per state, so adding a carrier to several
+   * checked states at once flushes them together instead of firing a request per state. */
+  private scheduleStateCarrierAutoSave(): void {
     if (!this.selected()) return;
-    this.dirtyStateCarriers.add(state);
     this.coverageStatus.set('idle');
     if (this.stateCarrierSaveTimer) clearTimeout(this.stateCarrierSaveTimer);
     this.stateCarrierSaveTimer = setTimeout(() => this.flushStateCarrierSaves(), 700);
@@ -379,7 +397,7 @@ export class AdminClients implements OnInit {
     this.acceptsOnlineBankPayment = user.acceptsOnlineBankPayment ?? false;
     this.selectedStates = user.states ?? [];
     this.stateCarriers = Object.fromEntries((user.stateCarriers ?? []).map((sc) => [sc.state, sc.carriers]));
-    this.carrierEditState = null;
+    this.carrierEditStates = [];
     this.carrierEditStateInput = '';
     this.dirtyStateCarriers.clear();
     if (this.stateCarrierSaveTimer) clearTimeout(this.stateCarrierSaveTimer);

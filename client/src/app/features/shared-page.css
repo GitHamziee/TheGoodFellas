@@ -1128,6 +1128,21 @@ tbody tr.clickable:hover {
 
 .cbs-row-main {
   display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.cbs-row-check {
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  accent-color: var(--gold-500);
+  cursor: pointer;
+}
+
+.cbs-row-labels {
+  display: flex;
   flex-direction: column;
   gap: 0.15rem;
   min-width: 0;

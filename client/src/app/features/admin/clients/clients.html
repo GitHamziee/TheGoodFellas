@@ -197,26 +197,37 @@
       <div class="section">
         <h4 class="section-title">Carriers by state</h4>
         <p class="hint cbs-intro">
-          Click a state to view or add the carriers it writes business through — this is just
+          Check one or more states to view or add the carriers they write business through —
+          checking several at once adds the same carrier to all of them. This is just
           navigation, it never changes which states are licensed. Use the <strong>×</strong> on a
           row to stop covering that state entirely.
         </p>
         <div class="cbs-grid">
-          <div class="cbs-list" role="listbox" aria-label="Licensed states">
+          <div class="cbs-list" role="listbox" aria-label="Licensed states" aria-multiselectable="true">
             @for (state of sortedSelectedStates; track state) {
               <div
                 class="cbs-row"
-                [class.cbs-row--active]="carrierEditState === state"
+                [class.cbs-row--active]="carrierEditStates.includes(state)"
                 role="option"
-                [attr.aria-selected]="carrierEditState === state"
+                [attr.aria-selected]="carrierEditStates.includes(state)"
                 tabindex="0"
-                (click)="selectCarrierEditState(state)"
-                (keydown.enter)="selectCarrierEditState(state)"
-                (keydown.space)="$event.preventDefault(); selectCarrierEditState(state)"
+                (click)="toggleCarrierEditState(state)"
+                (keydown.enter)="toggleCarrierEditState(state)"
+                (keydown.space)="$event.preventDefault(); toggleCarrierEditState(state)"
               >
                 <span class="cbs-row-main">
-                  <span class="cbs-row-name">{{ state }}</span>
-                  <span class="cbs-row-count">{{ carrierCountLabel(state) }}</span>
+                  <input
+                    type="checkbox"
+                    class="cbs-row-check"
+                    [checked]="carrierEditStates.includes(state)"
+                    (click)="$event.stopPropagation(); toggleCarrierEditState(state)"
+                    [attr.aria-label]="'Select ' + state"
+                    tabindex="-1"
+                  />
+                  <span class="cbs-row-labels">
+                    <span class="cbs-row-name">{{ state }}</span>
+                    <span class="cbs-row-count">{{ carrierCountLabel(state) }}</span>
+                  </span>
                 </span>
                 <button
                   type="button"
@@ -232,10 +243,10 @@
           </div>
 
           <div class="cbs-detail">
-            @if (carrierEditState; as state) {
+            @if (carrierEditStates.length === 1) {
               <div class="cbs-detail-head">
-                <h5>Carriers in {{ state }}</h5>
-                <span>{{ carrierCountLabel(state) }}</span>
+                <h5>Carriers in {{ carrierEditStates[0] }}</h5>
+                <span>{{ carrierCountLabel(carrierEditStates[0]) }}</span>
               </div>
               <div class="tag-input">
                 <input
@@ -248,9 +259,9 @@
                 />
                 <button type="button" class="btn btn--ghost btn--sm" (click)="addStateCarrier()">Add</button>
               </div>
-              @if ((stateCarriers[state] ?? []).length) {
+              @if ((stateCarriers[carrierEditStates[0]] ?? []).length) {
                 <div class="tag-list">
-                  @for (carrier of stateCarriers[state] ?? []; track carrier) {
+                  @for (carrier of stateCarriers[carrierEditStates[0]] ?? []; track carrier) {
                     <span class="chip">
                       <svg lucideBuilding2></svg>{{ carrier }}
                       <button type="button" (click)="removeStateCarrier(carrier)" [attr.aria-label]="'Remove ' + carrier">
@@ -260,12 +271,32 @@
                   }
                 </div>
               } @else {
-                <p class="cbs-empty-inline">No carriers entered for {{ state }} yet — add one above.</p>
+                <p class="cbs-empty-inline">No carriers entered for {{ carrierEditStates[0] }} yet — add one above.</p>
               }
+            } @else if (carrierEditStates.length > 1) {
+              <div class="cbs-detail-head">
+                <h5>Add carrier to {{ carrierEditStates.length }} states</h5>
+                <span>{{ carrierEditStates.join(', ') }}</span>
+              </div>
+              <div class="tag-input">
+                <input
+                  type="text"
+                  [ngModel]="carrierEditStateInput"
+                  (ngModelChange)="onCarrierEditStateInputChange($event)"
+                  name="carrierEditStateInput"
+                  placeholder="Type a carrier — comma or Enter to add to all checked states"
+                  (keydown.enter)="$event.preventDefault(); addStateCarrier()"
+                />
+                <button type="button" class="btn btn--ghost btn--sm" (click)="addStateCarrier()">Add</button>
+              </div>
+              <p class="cbs-empty-inline">
+                Adds to every checked state above. Uncheck down to one state to view or remove its
+                existing carriers individually.
+              </p>
             } @else {
               <div class="cbs-empty-state">
                 <svg lucideMapPin></svg>
-                <p>Select a state on the left to view or add its carriers.</p>
+                <p>Check one or more states on the left to view or add their carriers.</p>
               </div>
             }
           </div>
@@ -397,26 +428,37 @@
       <div class="section">
         <h4 class="section-title">Carriers by state</h4>
         <p class="hint cbs-intro">
-          Click a state to view or add the carriers it writes business through — this is just
+          Check one or more states to view or add the carriers they write business through —
+          checking several at once adds the same carrier to all of them. This is just
           navigation, it never changes which states are licensed. Use the <strong>×</strong> on a
           row to stop covering that state entirely.
         </p>
         <div class="cbs-grid">
-          <div class="cbs-list" role="listbox" aria-label="Licensed states">
+          <div class="cbs-list" role="listbox" aria-label="Licensed states" aria-multiselectable="true">
             @for (state of sortedSelectedStates; track state) {
               <div
                 class="cbs-row"
-                [class.cbs-row--active]="carrierEditState === state"
+                [class.cbs-row--active]="carrierEditStates.includes(state)"
                 role="option"
-                [attr.aria-selected]="carrierEditState === state"
+                [attr.aria-selected]="carrierEditStates.includes(state)"
                 tabindex="0"
-                (click)="selectCarrierEditState(state)"
-                (keydown.enter)="selectCarrierEditState(state)"
-                (keydown.space)="$event.preventDefault(); selectCarrierEditState(state)"
+                (click)="toggleCarrierEditState(state)"
+                (keydown.enter)="toggleCarrierEditState(state)"
+                (keydown.space)="$event.preventDefault(); toggleCarrierEditState(state)"
               >
                 <span class="cbs-row-main">
-                  <span class="cbs-row-name">{{ state }}</span>
-                  <span class="cbs-row-count">{{ carrierCountLabel(state) }}</span>
+                  <input
+                    type="checkbox"
+                    class="cbs-row-check"
+                    [checked]="carrierEditStates.includes(state)"
+                    (click)="$event.stopPropagation(); toggleCarrierEditState(state)"
+                    [attr.aria-label]="'Select ' + state"
+                    tabindex="-1"
+                  />
+                  <span class="cbs-row-labels">
+                    <span class="cbs-row-name">{{ state }}</span>
+                    <span class="cbs-row-count">{{ carrierCountLabel(state) }}</span>
+                  </span>
                 </span>
                 <button
                   type="button"
@@ -432,10 +474,10 @@
           </div>
 
           <div class="cbs-detail">
-            @if (carrierEditState; as state) {
+            @if (carrierEditStates.length === 1) {
               <div class="cbs-detail-head">
-                <h5>Carriers in {{ state }}</h5>
-                <span>{{ carrierCountLabel(state) }}</span>
+                <h5>Carriers in {{ carrierEditStates[0] }}</h5>
+                <span>{{ carrierCountLabel(carrierEditStates[0]) }}</span>
               </div>
               <div class="tag-input">
                 <input
@@ -448,9 +490,9 @@
                 />
                 <button type="button" class="btn btn--ghost btn--sm" (click)="addStateCarrier()">Add</button>
               </div>
-              @if ((stateCarriers[state] ?? []).length) {
+              @if ((stateCarriers[carrierEditStates[0]] ?? []).length) {
                 <div class="tag-list">
-                  @for (carrier of stateCarriers[state] ?? []; track carrier) {
+                  @for (carrier of stateCarriers[carrierEditStates[0]] ?? []; track carrier) {
                     <span class="chip">
                       <svg lucideBuilding2></svg>{{ carrier }}
                       <button type="button" (click)="removeStateCarrier(carrier)" [attr.aria-label]="'Remove ' + carrier">
@@ -460,8 +502,36 @@
                   }
                 </div>
               } @else {
-                <p class="cbs-empty-inline">No carriers entered for {{ state }} yet — add one above.</p>
+                <p class="cbs-empty-inline">No carriers entered for {{ carrierEditStates[0] }} yet — add one above.</p>
               }
+
+              <p class="save-status" [class.save-status--saving]="coverageStatus() === 'saving'">
+                @if (coverageStatus() === 'saving') {
+                  <span class="spinner"></span> Saving…
+                } @else if (coverageStatus() === 'saved') {
+                  <svg lucideCircleCheck></svg> Saved
+                }
+              </p>
+            } @else if (carrierEditStates.length > 1) {
+              <div class="cbs-detail-head">
+                <h5>Add carrier to {{ carrierEditStates.length }} states</h5>
+                <span>{{ carrierEditStates.join(', ') }}</span>
+              </div>
+              <div class="tag-input">
+                <input
+                  type="text"
+                  [ngModel]="carrierEditStateInput"
+                  (ngModelChange)="onCarrierEditStateInputChange($event)"
+                  name="detailCarrierEditStateInput"
+                  placeholder="Type a carrier — comma or Enter to add to all checked states"
+                  (keydown.enter)="$event.preventDefault(); addStateCarrier()"
+                />
+                <button type="button" class="btn btn--ghost btn--sm" (click)="addStateCarrier()">Add</button>
+              </div>
+              <p class="cbs-empty-inline">
+                Adds to every checked state above. Uncheck down to one state to view or remove its
+                existing carriers individually.
+              </p>
 
               <p class="save-status" [class.save-status--saving]="coverageStatus() === 'saving'">
                 @if (coverageStatus() === 'saving') {
@@ -473,7 +543,7 @@
             } @else {
               <div class="cbs-empty-state">
                 <svg lucideMapPin></svg>
-                <p>Select a state on the left to view or add its carriers.</p>
+                <p>Check one or more states on the left to view or add their carriers.</p>
               </div>
             }
           </div>
