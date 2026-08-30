@@ -445,10 +445,33 @@ model ExternalClient {
   gradedCost   Int?
   modifiedCost Int?
   giCost       Int?
+  // Same coverage fields as CLIENT-role User accounts (minimumPremium, states, carriers,
+  // stateCarriers, acceptsOnlineBankPayment) — an external client is priced and licensed
+  // the same way a real CLIENT account is, it just has no login.
+  minimumPremium           Int?
+  acceptsOnlineBankPayment Boolean  @default(false)
+  states                   String[] @default([])
+  carriers                 String[] @default([])
 
-  leads Lead[] @relation("ExternalClientLeads")
+  stateCarriers ExternalClientStateCarrier[]
+  leads         Lead[]                       @relation("ExternalClientLeads")
 
   @@index([name])
+}
+
+// Per (external client, state) subset of that external client's carrier roster
+// (ExternalClient.carriers) available in that state — same pattern as ClientStateCarrier
+// above, just for the no-login bookkeeping-only client type.
+model ExternalClientStateCarrier {
+  id               String   @id @default(cuid())
+  externalClientId String
+  state            String
+  carriers         String[] @default([])
+
+  externalClient ExternalClient @relation(fields: [externalClientId], references: [id], onDelete: Cascade)
+
+  @@unique([externalClientId, state])
+  @@index([externalClientId])
 }
 
 // One row per message in a team channel. Soft-deleted (deletedAt) rather than removed so

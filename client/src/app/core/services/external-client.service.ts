@@ -21,6 +21,11 @@ export type ExternalClientInput = {
   gradedCost?: number | null;
   modifiedCost?: number | null;
   giCost?: number | null;
+  minimumPremium?: number | null;
+  acceptsOnlineBankPayment?: boolean;
+  states?: string[];
+  carriers?: string[];
+  stateCarriers?: { state: string; carriers: string[] }[];
 };
 
 @Injectable({ providedIn: 'root' })
