@@ -8,4 +8,4 @@
  * Example once the API is deployed:
  *   window.__API_BASE_URL__ = 'https://thegoodfellas-api.onrender.com/api';
  */
-window.__API_BASE_URL__ = '';
+window.__API_BASE_URL__ = '/api'; // TEMP: ngrok demo, routes through client/proxy.conf.json — revert to '' after
