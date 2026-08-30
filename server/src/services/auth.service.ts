@@ -19,8 +19,11 @@ function publicUser(user: {
   gradedCost?: number | null;
   modifiedCost?: number | null;
   giCost?: number | null;
+  minimumPremium?: number | null;
+  acceptsOnlineBankPayment?: boolean;
   states?: string[];
   carriers?: string[];
+  stateCarriers?: { state: string; carriers: string[] }[];
 }) {
   return {
     id: user.id,
@@ -32,8 +35,11 @@ function publicUser(user: {
     gradedCost: user.gradedCost ?? null,
     modifiedCost: user.modifiedCost ?? null,
     giCost: user.giCost ?? null,
+    minimumPremium: user.minimumPremium ?? null,
+    acceptsOnlineBankPayment: user.acceptsOnlineBankPayment ?? false,
     states: user.states ?? [],
     carriers: user.carriers ?? [],
+    stateCarriers: (user.stateCarriers ?? []).map((sc) => ({ state: sc.state, carriers: sc.carriers })),
   };
 }
 
@@ -53,7 +59,9 @@ export async function login(email: unknown, password: unknown): Promise<ServiceR
 }
 
 const STAFF_ROLES: Role[] = ["JUNIOR_CLOSER", "CLOSER", "ADMIN", "CLIENT", "TEAM_LEAD"];
-const PLAN_COST_KEYS = ["levelCost", "gradedCost", "modifiedCost", "giCost"] as const;
+// minimumPremium isn't a plan cost, but shares the same nullable-non-negative-whole-dollar
+// validation, so it rides the same parse loop as the four plan costs below.
+const PLAN_COST_KEYS = ["levelCost", "gradedCost", "modifiedCost", "giCost", "minimumPremium"] as const;
 
 /** A whole-dollar amount, or null/undefined to leave it unset. Rejects negative or non-numeric input. */
 function parsePlanCost(raw: unknown): number | null | undefined {
@@ -64,7 +72,9 @@ function parsePlanCost(raw: unknown): number | null | undefined {
 }
 
 /** Admin-only — creates a JUNIOR_CLOSER, CLOSER, ADMIN, or CLIENT account directly.
- * For CLIENT accounts, also accepts the four per-plan lead cost fields (USD) up front. */
+ * For CLIENT accounts, also accepts the per-plan lead cost fields + minimum premium (USD),
+ * licensed states, carrier roster, per-state carrier assignment, and online-bank-payment
+ * acceptance up front. */
 export async function createStaffUser(input: {
   name?: unknown;
   email?: unknown;
@@ -75,8 +85,11 @@ export async function createStaffUser(input: {
   gradedCost?: unknown;
   modifiedCost?: unknown;
   giCost?: unknown;
+  minimumPremium?: unknown;
+  acceptsOnlineBankPayment?: unknown;
   states?: unknown;
   carriers?: unknown;
+  stateCarriers?: unknown;
 }): Promise<ServiceResult<{ user: ReturnType<typeof publicUser> }>> {
   const { name, email, password, role, phone } = input;
 
@@ -92,11 +105,16 @@ export async function createStaffUser(input: {
   // Pricing, states, and carriers only make sense for a CLIENT account — silently
   // ignored for other roles rather than erroring, since the create form only shows
   // these fields for CLIENT.
-  const coverage: Record<string, number | null | string[]> = {};
+  const coverage: Record<string, number | null | string[] | boolean> = {};
+  let stateCarriersNested: { state: string; carriers: string[] }[] | undefined;
   if (role === "CLIENT") {
     for (const key of PLAN_COST_KEYS) {
       const parsed = parsePlanCost((input as Record<string, unknown>)[key]);
       if (parsed !== undefined) coverage[key] = parsed;
+    }
+
+    if (typeof input.acceptsOnlineBankPayment === "boolean") {
+      coverage.acceptsOnlineBankPayment = input.acceptsOnlineBankPayment;
     }
 
     const states = parseStates(input.states);
@@ -106,11 +124,40 @@ export async function createStaffUser(input: {
     const carriers = parseCarriers(input.carriers);
     if (carriers && "error" in carriers) return { error: carriers.error, status: 400 };
     if (carriers) coverage.carriers = carriers.value;
+
+    if (Array.isArray(input.stateCarriers)) {
+      const finalStates = states && "value" in states ? states.value : [];
+      const nested: { state: string; carriers: string[] }[] = [];
+      for (const entry of input.stateCarriers) {
+        if (typeof entry !== "object" || entry === null) return { error: "Invalid state-carrier entry", status: 400 };
+        const { state, carriers: entryCarriers } = entry as Record<string, unknown>;
+        if (typeof state !== "string" || !finalStates.includes(state)) {
+          return { error: `Invalid state in carrier assignment: ${String(state)}`, status: 400 };
+        }
+        // Each state's carriers are independent freehand text, not a subset of the general
+        // roster — the same validation as the roster itself, just scoped per state.
+        const parsed = parseCarriers(entryCarriers);
+        if (parsed && "error" in parsed) return { error: parsed.error, status: 400 };
+        nested.push({ state, carriers: parsed?.value ?? [] });
+      }
+      stateCarriersNested = nested;
+    }
   }
 
   const hashed = await bcrypt.hash(password, SALT_ROUNDS);
   const user = await prisma.user.create({
-    data: { name, email, password: hashed, phone, role: role as Role, ...coverage },
+    data: {
+      name,
+      email,
+      password: hashed,
+      phone,
+      role: role as Role,
+      ...coverage,
+      ...(stateCarriersNested && stateCarriersNested.length
+        ? { stateCarriers: { create: stateCarriersNested } }
+        : {}),
+    },
+    include: { stateCarriers: { select: { state: true, carriers: true } } },
   });
 
   return { data: { user: publicUser(user) } };

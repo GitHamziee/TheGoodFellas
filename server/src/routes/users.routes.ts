@@ -10,12 +10,35 @@ const router = Router();
 router.use(authenticate);
 
 // Junior closers need the closer list for the "select a closer" field at submission.
+// QA_CLOSER needs it for the "who is this call review about" picker on their Write a
+// Review page.
 router.get(
   "/closers",
-  requireRole("JUNIOR_CLOSER", "ADMIN"),
+  requireRole("JUNIOR_CLOSER", "ADMIN", "QA_CLOSER"),
   asyncHandler(async (_req, res) => {
     const closers = await userService.listClosers();
     return apiSuccess(res, { closers });
+  })
+);
+
+// QA_JUNIOR_CLOSER's own "who is this call review about" picker.
+router.get(
+  "/junior-closers",
+  requireRole("QA_JUNIOR_CLOSER"),
+  asyncHandler(async (_req, res) => {
+    const juniorClosers = await userService.listJuniorClosers();
+    return apiSuccess(res, { juniorClosers });
+  })
+);
+
+// Admin needs it for the "assign to retention person" dropdown; Retention needs it for the
+// Retention queue's "filter by teammate" dropdown.
+router.get(
+  "/retention",
+  requireRole("ADMIN", "RETENTION"),
+  asyncHandler(async (_req, res) => {
+    const retention = await userService.listRetention();
+    return apiSuccess(res, { retention });
   })
 );
 
@@ -61,12 +84,39 @@ router.get(
   })
 );
 
+// Basic account info (name/email/phone) — any role. Separate from /:id/role, /:id/pricing
+// etc., which each own a narrower, role-scoped slice of the account.
+router.patch(
+  "/:id",
+  requireRole("ADMIN"),
+  asyncHandler(async (req, res) => {
+    const { name, email, phone } = req.body ?? {};
+    const result = await userService.updateUserProfile(req.params.id, { name, email, phone });
+    if ("error" in result) return apiError(res, result.error, result.status);
+    return apiSuccess(res, result.data, "Account updated");
+  })
+);
+
 router.post(
   "/",
   requireRole("ADMIN"),
   asyncHandler(async (req, res) => {
-    const { name, email, password, role, phone, levelCost, gradedCost, modifiedCost, giCost, states, carriers } =
-      req.body ?? {};
+    const {
+      name,
+      email,
+      password,
+      role,
+      phone,
+      levelCost,
+      gradedCost,
+      modifiedCost,
+      giCost,
+      minimumPremium,
+      acceptsOnlineBankPayment,
+      states,
+      carriers,
+      stateCarriers,
+    } = req.body ?? {};
     if (!role) return apiError(res, "Role is required", 400);
 
     const result = await authService.createStaffUser({
@@ -79,8 +129,11 @@ router.post(
       gradedCost,
       modifiedCost,
       giCost,
+      minimumPremium,
+      acceptsOnlineBankPayment,
       states,
       carriers,
+      stateCarriers,
     });
     if ("error" in result) return apiError(res, result.error, result.status);
     return apiSuccess(res, result.data, "User created", 201);
@@ -111,8 +164,9 @@ router.patch(
   })
 );
 
-// Only meaningful for CLIENT accounts — licensed states + carriers, the data set the
-// future State Sheet page reads (state -> clients -> carriers available there).
+// Only meaningful for CLIENT accounts — licensed states + carrier roster + online-bank-
+// payment acceptance, the data set the State Sheet page reads (state -> clients -> carriers
+// available there).
 router.patch(
   "/:id/coverage",
   requireRole("ADMIN"),
@@ -120,6 +174,18 @@ router.patch(
     const result = await userService.updateClientCoverage(req.params.id, req.body ?? {});
     if ("error" in result) return apiError(res, result.error, result.status);
     return apiSuccess(res, result.data, "Coverage updated");
+  })
+);
+
+// Only meaningful for CLIENT accounts — which of a client's roster carriers apply in one
+// specific licensed state (e.g. Sunrise writes NRG in Alaska but MPG in Alabama).
+router.patch(
+  "/:id/state-carriers",
+  requireRole("ADMIN"),
+  asyncHandler(async (req, res) => {
+    const result = await userService.updateClientStateCarriers(req.params.id, req.body ?? {});
+    if ("error" in result) return apiError(res, result.error, result.status);
+    return apiSuccess(res, result.data, "Carrier availability updated");
   })
 );
 

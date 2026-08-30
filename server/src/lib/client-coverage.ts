@@ -15,6 +15,10 @@ export const US_STATES = [
 
 const US_STATE_SET = new Set<string>(US_STATES);
 
+export function isValidState(state: string): boolean {
+  return US_STATE_SET.has(state);
+}
+
 const MAX_CARRIERS = 50;
 const MAX_CARRIER_LENGTH = 80;
 

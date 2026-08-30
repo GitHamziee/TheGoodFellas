@@ -1,8 +1,8 @@
 <div class="page">
   <div class="page-head">
     <div>
-      <h1>Clients & Staff</h1>
-      <p class="sub">Every account on the platform.</p>
+      <h1>Team</h1>
+      <p class="sub">Internal staff accounts — Junior Closers, Closers, Team Leads, and Admins.</p>
     </div>
     <div class="page-head-actions">
       <button type="button" class="btn" (click)="openCreate()">
@@ -12,16 +12,16 @@
   </div>
 
   <div class="stats-row">
-    <app-stat-tile [value]="stats().total" label="Total accounts" tone="tone-gold">
+    <app-stat-tile [value]="stats().total" label="Total team members" tone="tone-gold">
       <svg lucideUsers></svg>
-    </app-stat-tile>
-    <app-stat-tile [value]="stats().clients" label="Clients" tone="tone-f">
-      <svg lucideBriefcase></svg>
     </app-stat-tile>
     <app-stat-tile [value]="stats().closers" label="Closers" tone="tone-c">
       <svg lucideUsers></svg>
     </app-stat-tile>
     <app-stat-tile [value]="stats().juniors" label="Junior closers" tone="tone-d">
+      <svg lucideUsers></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().teamLeads" label="Team leads" tone="tone-e">
       <svg lucideUsers></svg>
     </app-stat-tile>
     <app-stat-tile [value]="stats().admins" label="Admins" tone="tone-b">
@@ -62,11 +62,11 @@
       <app-skeleton-rows [count]="6" />
     } @else if (view.total() === 0) {
       @if (view.isFiltered()) {
-        <app-empty-state title="No accounts match" hint="Try a different search term or clear the filters.">
+        <app-empty-state title="No team members match" hint="Try a different search term or clear the filters.">
           <svg lucideUsers></svg>
         </app-empty-state>
       } @else {
-        <app-empty-state title="No accounts yet" hint="Create the first junior closer or closer account to get started.">
+        <app-empty-state title="No team members yet" hint="Create the first junior closer or closer account to get started.">
           <svg lucideUsers></svg>
         </app-empty-state>
       }
@@ -154,75 +154,6 @@
       </label>
     </div>
 
-    @if (role === 'CLIENT') {
-      <div class="section">
-        <h4 class="section-title">Lead cost by plan <span class="hint">$, optional</span></h4>
-        <div class="form-grid">
-          <label>
-            Level
-            <input type="number" min="0" [(ngModel)]="levelCost" name="levelCost" placeholder="0" />
-          </label>
-          <label>
-            Graded
-            <input type="number" min="0" [(ngModel)]="gradedCost" name="gradedCost" placeholder="0" />
-          </label>
-          <label>
-            Modified
-            <input type="number" min="0" [(ngModel)]="modifiedCost" name="modifiedCost" placeholder="0" />
-          </label>
-          <label>
-            GI
-            <input type="number" min="0" [(ngModel)]="giCost" name="giCost" placeholder="0" />
-          </label>
-        </div>
-      </div>
-
-      <div class="section">
-        <h4 class="section-title">
-          Licensed states <span class="hint">{{ selectedStates.length }} selected</span>
-        </h4>
-        <div class="pill-grid">
-          @for (state of usStates; track state) {
-            <button
-              type="button"
-              class="pill"
-              [class.active]="selectedStates.includes(state)"
-              (click)="toggleState(state)"
-            >
-              {{ state }}
-            </button>
-          }
-        </div>
-      </div>
-
-      <div class="section">
-        <h4 class="section-title">Carriers <span class="hint">Optional, entered manually</span></h4>
-        <div class="tag-input">
-          <input
-            type="text"
-            [ngModel]="carrierInput"
-            (ngModelChange)="onCarrierInputChange($event)"
-            name="carrierInput"
-            placeholder="Type a carrier — comma or Enter to add"
-            (keydown.enter)="$event.preventDefault(); addCarrier()"
-          />
-          <button type="button" class="btn btn--ghost btn--sm" (click)="addCarrier()">Add</button>
-        </div>
-        @if (carriers.length) {
-          <div class="tag-list">
-            @for (carrier of carriers; track carrier) {
-              <span class="chip">
-                <svg lucideBuilding2></svg>{{ carrier }}
-                <button type="button" (click)="removeCarrier(carrier)" [attr.aria-label]="'Remove ' + carrier">
-                  <svg lucideX></svg>
-                </button>
-              </span>
-            }
-          </div>
-        }
-      </div>
-    }
-
     <div footer>
       <button type="button" class="btn" [disabled]="!canSubmitCreate() || creating()" (click)="createUser()">
         @if (creating()) {
@@ -293,90 +224,6 @@
         }
       }
     </div>
-
-    @if (user.role === 'CLIENT') {
-      <div class="section">
-        <h4 class="section-title">Lead cost by plan <span class="hint">$</span></h4>
-        <div class="form-grid">
-          <label>
-            Level
-            <input type="number" min="0" [(ngModel)]="levelCost" name="detailLevelCost" placeholder="0" />
-          </label>
-          <label>
-            Graded
-            <input type="number" min="0" [(ngModel)]="gradedCost" name="detailGradedCost" placeholder="0" />
-          </label>
-          <label>
-            Modified
-            <input type="number" min="0" [(ngModel)]="modifiedCost" name="detailModifiedCost" placeholder="0" />
-          </label>
-          <label>
-            GI
-            <input type="number" min="0" [(ngModel)]="giCost" name="detailGiCost" placeholder="0" />
-          </label>
-        </div>
-        <button type="button" class="btn btn--ghost" style="margin-top: 0.9rem;" [disabled]="savingPricing()" (click)="savePricing()">
-          @if (savingPricing()) {
-            <span class="spinner"></span> Saving…
-          } @else {
-            <svg lucideBanknote></svg> Save pricing
-          }
-        </button>
-      </div>
-
-      <div class="section">
-        <h4 class="section-title">
-          Licensed states <span class="hint">{{ selectedStates.length }} selected</span>
-        </h4>
-        <div class="pill-grid">
-          @for (state of usStates; track state) {
-            <button
-              type="button"
-              class="pill"
-              [class.active]="selectedStates.includes(state)"
-              (click)="toggleState(state)"
-            >
-              {{ state }}
-            </button>
-          }
-        </div>
-
-        <h4 class="section-title" style="margin-top: 1.1rem;">
-          Carriers <span class="hint">Optional, entered manually</span>
-        </h4>
-        <div class="tag-input">
-          <input
-            type="text"
-            [ngModel]="carrierInput"
-            (ngModelChange)="onCarrierInputChange($event)"
-            name="detailCarrierInput"
-            placeholder="Type a carrier — comma or Enter to add"
-            (keydown.enter)="$event.preventDefault(); addCarrier()"
-          />
-          <button type="button" class="btn btn--ghost btn--sm" (click)="addCarrier()">Add</button>
-        </div>
-        @if (carriers.length) {
-          <div class="tag-list">
-            @for (carrier of carriers; track carrier) {
-              <span class="chip">
-                <svg lucideBuilding2></svg>{{ carrier }}
-                <button type="button" (click)="removeCarrier(carrier)" [attr.aria-label]="'Remove ' + carrier">
-                  <svg lucideX></svg>
-                </button>
-              </span>
-            }
-          </div>
-        }
-
-        <p class="save-status" [class.save-status--saving]="coverageStatus() === 'saving'">
-          @if (coverageStatus() === 'saving') {
-            <span class="spinner"></span> Saving…
-          } @else if (coverageStatus() === 'saved') {
-            <svg lucideCircleCheck></svg> Saved
-          }
-        </p>
-      </div>
-    }
 
     <div class="section">
       <h4 class="section-title">Password</h4>
