@@ -22,6 +22,14 @@ export const routes: Routes = [
     loadComponent: () => import('./features/auth/login/login').then((m) => m.Login),
   },
 
+  // Public, no login — external form for logging AI-sourced ("Retention") leads,
+  // replaces the old Google Sheet these used to be logged into by hand.
+  {
+    path: 'retention-intake',
+    loadComponent: () =>
+      import('./features/retention-intake/retention-intake').then((m) => m.RetentionIntake),
+  },
+
   {
     path: 'junior',
     canMatch: [authGuard, roleGuard('JUNIOR_CLOSER')],
@@ -130,12 +138,24 @@ export const routes: Routes = [
         loadComponent: () => import('./features/admin/charge-backs/charge-backs').then((m) => m.AdminChargeBacks),
       },
       {
+        path: 'retention',
+        loadComponent: () => import('./features/admin/retention/retention').then((m) => m.AdminRetention),
+      },
+      {
         path: 'cpl-leads',
         loadComponent: () => import('./features/admin/cpl-leads/cpl-leads').then((m) => m.AdminCplLeads),
       },
       {
-        path: 'users',
-        loadComponent: () => import('./features/admin/users/users').then((m) => m.AdminUsers),
+        path: 'drafts',
+        loadComponent: () => import('./features/admin/drafts/drafts').then((m) => m.AdminDrafts),
+      },
+      {
+        path: 'clients',
+        loadComponent: () => import('./features/admin/clients/clients').then((m) => m.AdminClients),
+      },
+      {
+        path: 'team',
+        loadComponent: () => import('./features/admin/team/team').then((m) => m.AdminTeam),
       },
       {
         path: 'external-clients',
@@ -159,6 +179,11 @@ export const routes: Routes = [
         loadComponent: () => import('./features/admin/analytics-closer/analytics-closer').then((m) => m.AnalyticsCloser),
       },
       {
+        path: 'analytics/retention',
+        loadComponent: () =>
+          import('./features/admin/analytics-retention/analytics-retention').then((m) => m.AnalyticsRetention),
+      },
+      {
         path: 'analytics/clients',
         loadComponent: () => import('./features/admin/analytics-client/analytics-client').then((m) => m.AnalyticsClient),
       },
@@ -174,6 +199,26 @@ export const routes: Routes = [
         path: 'analytics/charge-backs',
         loadComponent: () =>
           import('./features/admin/analytics-charge-backs/analytics-charge-backs').then((m) => m.AnalyticsChargeBacks),
+      },
+      {
+        path: 'qa-reports/transfer-junior-closers',
+        loadComponent: () =>
+          import('./features/qa-reports/transfer-junior/transfer-junior').then((m) => m.QaTransferJunior),
+      },
+      {
+        path: 'qa-reports/transfer-closers',
+        loadComponent: () =>
+          import('./features/qa-reports/transfer-closer/transfer-closer').then((m) => m.QaTransferCloser),
+      },
+      {
+        path: 'qa-reports/live-call-junior-closers',
+        loadComponent: () =>
+          import('./features/qa-reports/live-call-junior/live-call-junior').then((m) => m.QaLiveCallJunior),
+      },
+      {
+        path: 'qa-reports/live-call-closers',
+        loadComponent: () =>
+          import('./features/qa-reports/live-call-closer/live-call-closer').then((m) => m.QaLiveCallCloser),
       },
       {
         path: 'chat',
@@ -237,6 +282,108 @@ export const routes: Routes = [
       {
         path: 'analytics/closers',
         loadComponent: () => import('./features/admin/analytics-closer/analytics-closer').then((m) => m.AnalyticsCloser),
+      },
+      {
+        path: 'qa-reports/transfer-junior-closers',
+        loadComponent: () =>
+          import('./features/qa-reports/transfer-junior/transfer-junior').then((m) => m.QaTransferJunior),
+      },
+      {
+        path: 'qa-reports/transfer-closers',
+        loadComponent: () =>
+          import('./features/qa-reports/transfer-closer/transfer-closer').then((m) => m.QaTransferCloser),
+      },
+      {
+        path: 'qa-reports/live-call-junior-closers',
+        loadComponent: () =>
+          import('./features/qa-reports/live-call-junior/live-call-junior').then((m) => m.QaLiveCallJunior),
+      },
+      {
+        path: 'qa-reports/live-call-closers',
+        loadComponent: () =>
+          import('./features/qa-reports/live-call-closer/live-call-closer').then((m) => m.QaLiveCallCloser),
+      },
+      {
+        path: 'chat',
+        loadComponent: () => import('./features/chat/chat').then((m) => m.Chat),
+      },
+      // Settings removed from this portal's nav — redirect stray bookmarks/links rather
+      // than letting them 404 all the way out to the public marketing site.
+      { path: 'settings', redirectTo: 'dashboard' },
+    ],
+  },
+
+  {
+    path: 'qa-junior',
+    canMatch: [authGuard, roleGuard('QA_JUNIOR_CLOSER')],
+    loadComponent: () => import('./layout/portal-shell/portal-shell').then((m) => m.PortalShell),
+    children: [
+      { path: '', pathMatch: 'full', redirectTo: 'review-queue' },
+      {
+        path: 'review-queue',
+        loadComponent: () => import('./features/qa/review-queue/review-queue').then((m) => m.QaReviewQueue),
+      },
+      {
+        path: 'review-history',
+        loadComponent: () => import('./features/qa/review-history/review-history').then((m) => m.QaReviewHistory),
+      },
+      {
+        path: 'write-review',
+        loadComponent: () => import('./features/qa/write-review/write-review').then((m) => m.QaWriteReview),
+      },
+      {
+        path: 'settings',
+        loadComponent: () => import('./features/settings/settings').then((m) => m.Settings),
+      },
+    ],
+  },
+
+  {
+    path: 'qa-closer',
+    canMatch: [authGuard, roleGuard('QA_CLOSER')],
+    loadComponent: () => import('./layout/portal-shell/portal-shell').then((m) => m.PortalShell),
+    children: [
+      { path: '', pathMatch: 'full', redirectTo: 'review-queue' },
+      {
+        path: 'review-queue',
+        loadComponent: () => import('./features/qa/review-queue/review-queue').then((m) => m.QaReviewQueue),
+      },
+      {
+        path: 'review-history',
+        loadComponent: () => import('./features/qa/review-history/review-history').then((m) => m.QaReviewHistory),
+      },
+      {
+        path: 'write-review',
+        loadComponent: () => import('./features/qa/write-review/write-review').then((m) => m.QaWriteReview),
+      },
+      {
+        path: 'settings',
+        loadComponent: () => import('./features/settings/settings').then((m) => m.Settings),
+      },
+    ],
+  },
+
+  {
+    path: 'retention',
+    canMatch: [authGuard, roleGuard('RETENTION')],
+    loadComponent: () => import('./layout/portal-shell/portal-shell').then((m) => m.PortalShell),
+    children: [
+      { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
+      {
+        path: 'dashboard',
+        loadComponent: () => import('./features/retention/dashboard/dashboard').then((m) => m.RetentionDashboard),
+      },
+      {
+        path: 'queue',
+        loadComponent: () => import('./features/retention/queue/queue').then((m) => m.RetentionQueue),
+      },
+      {
+        path: 'leads/:id',
+        loadComponent: () => import('./features/retention/lead-edit/lead-edit').then((m) => m.RetentionLeadEdit),
+      },
+      {
+        path: 'history',
+        loadComponent: () => import('./features/retention/history/history').then((m) => m.RetentionHistory),
       },
       {
         path: 'chat',

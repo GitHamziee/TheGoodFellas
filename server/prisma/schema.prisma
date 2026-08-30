@@ -15,6 +15,16 @@ enum Role {
   ADMIN
   CLIENT
   TEAM_LEAD
+  QA_JUNIOR_CLOSER
+  QA_CLOSER
+  RETENTION
+}
+
+// Pass/fail verdict on a QA review — see LeadReview and CallReview below. Internal
+// metrics only; never read by any workflow/state-transition code.
+enum ReviewOutcome {
+  PASS
+  FAIL
 }
 
 // NEW                — submitted by junior closer, sitting with the chosen closer
@@ -73,9 +83,14 @@ enum LeadNeed {
 // CPA = today's full pipeline (Junior -> Closer -> Admin -> Client), unchanged.
 // CPL = a lighter pipeline that skips the Closer step entirely — Junior submits it
 // straight to SUBMITTED with a shorter intake field set (see CPL intake only below).
+// RETENTION = AI-sourced leads submitted through the public retention intake form (no login,
+// see routes/leads.routes.ts's '/retention/intake' route), imported unassigned, handed to a
+// Retention person by Admin, then enriched/submitted straight into the same admin SUBMITTED
+// queue as CPA/CPL — no Junior Closer or Closer step exists for it.
 enum LeadType {
   CPA
   CPL
+  RETENTION
 }
 
 // The client's own internal classification code for a CPL lead, picked by the Junior
@@ -123,6 +138,7 @@ enum ChatRoom {
   CLOSERS
   JUNIOR_CLOSERS
   TEAM_LEADS
+  RETENTION
 }
 
 model User {
@@ -143,23 +159,55 @@ model User {
   gradedCost   Int?
   modifiedCost Int?
   giCost       Int?
+  // Lowest monthly premium (USD) this client will accept on a lead — CLIENT accounts only,
+  // set at creation, editable after like the four costs above. Shown against the client on
+  // the State Sheet.
+  minimumPremium Int?
+
+  // CLIENT accounts only — whether this client can take payment via online bank transfer.
+  // Checkbox at account creation; filterable on the State Sheet.
+  acceptsOnlineBankPayment Boolean @default(false)
 
   // CLIENT accounts only — the states this client is licensed/covers and the carriers
-  // they write business through. Feeds the future State Sheet page (state -> clients ->
-  // carriers available there), viewed by Closer/Team Lead/Admin. Meaningless for other
-  // roles, left as the default empty array for them. `states` is drawn from a fixed
-  // US-states list (validated server-side); `carriers` is freehand text, no fixed list.
+  // they write business through. Feeds the State Sheet page (state -> clients -> carriers
+  // available there), viewed by Closer/Team Lead/Admin. Meaningless for other roles, left
+  // as the default empty array for them. `states` is drawn from a fixed US-states list
+  // (validated server-side); `carriers` is freehand text, no fixed list — this is the
+  // client's overall carrier roster, not per state. See ClientStateCarrier below for which
+  // of these carriers apply in which state.
   states   String[] @default([])
   carriers String[] @default([])
+
+  stateCarriers ClientStateCarrier[]
 
   submittedLeads    Lead[]        @relation("JuniorCloserLeads")
   closerLeads       Lead[]        @relation("CloserLeads")
   clientLeads       Lead[]        @relation("ClientLeads")
+  retentionLeads    Lead[]        @relation("RetentionLeads")
   clientChargeBacks ChargeBack[]  @relation("ClientChargeBacks")
   chatMessages      ChatMessage[]
   chatReads         ChatRead[]
+  leadReviews       LeadReview[]
+  callReviewsGiven    CallReview[] @relation("CallReviewsGiven")
+  callReviewsReceived CallReview[] @relation("CallReviewsReceived")
 
   @@index([role])
+}
+
+// Per (client, state) subset of that client's carrier roster (User.carriers) available in
+// that state — e.g. Sunrise writes NRG in Alaska but MPG in Alabama. `state` must be one of
+// US_STATES and one the client is licensed in (User.states); `carriers` must be a subset of
+// the client's roster — both enforced in user.service.ts, not by a DB constraint.
+model ClientStateCarrier {
+  id       String   @id @default(cuid())
+  clientId String
+  state    String
+  carriers String[] @default([])
+
+  client User @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, state])
+  @@index([clientId])
 }
 
 model Lead {
@@ -171,6 +219,9 @@ model Lead {
   closerId         String?
   clientId         String?
   externalClientId String?
+  // Set only for RETENTION leads — who Admin handed a form-submitted lead to. Null while an
+  // imported lead is still sitting unassigned in the admin retention-import queue.
+  retentionId      String?
 
   // CPA = today's pipeline. CPL leads never leave this default field set — no
   // enrichment step exists for them, not even Admin fills in Closer-only fields.
@@ -269,16 +320,60 @@ model Lead {
   closer         User?           @relation("CloserLeads", fields: [closerId], references: [id], onDelete: Cascade)
   client         User?           @relation("ClientLeads", fields: [clientId], references: [id], onDelete: SetNull)
   externalClient ExternalClient? @relation("ExternalClientLeads", fields: [externalClientId], references: [id], onDelete: SetNull)
+  retention      User?           @relation("RetentionLeads", fields: [retentionId], references: [id], onDelete: Cascade)
   incomePayment  IncomePayment?  @relation(fields: [incomePaymentId], references: [id], onDelete: SetNull)
   chargeBacks    ChargeBack[]
+  qaReviews      LeadReview[]
 
   @@index([juniorCloserId])
   @@index([closerId])
   @@index([clientId])
   @@index([externalClientId])
+  @@index([retentionId])
   @@index([status])
   @@index([createdAt])
   @@index([incomePaymentId])
+}
+
+// A QA reviewer's pass/fail verdict on the data a Junior Closer or Closer submitted on
+// one lead — internal metrics only, never gates the lead's own status. `role` records
+// which QA lane produced it (QA_JUNIOR_CLOSER reviews intake, QA_CLOSER reviews
+// enrichment) — denormalized off reviewer.role at write time, same pattern as
+// ChargeBack.clientId, so history survives even if the reviewer's role later changes.
+// One review per lead per lane: once written it's locked (@@unique below).
+model LeadReview {
+  id         String        @id @default(cuid())
+  leadId     String
+  reviewerId String
+  role       Role
+  outcome    ReviewOutcome
+  comment    String?
+  createdAt  DateTime      @default(now())
+
+  lead     Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  reviewer User @relation(fields: [reviewerId], references: [id], onDelete: Cascade)
+
+  @@unique([leadId, role])
+  @@index([reviewerId])
+}
+
+// A QA reviewer flagging something wrong on a live call with a Junior Closer or Closer,
+// written directly against that person — no lead involved. Unlimited per person. There is
+// deliberately no "pass" outcome — a call with nothing wrong just never gets a row here,
+// so `comment` (what went wrong) is required, not optional. Internal metrics only.
+model CallReview {
+  id         String   @id @default(cuid())
+  reviewerId String
+  revieweeId String
+  comment    String
+  createdAt  DateTime @default(now())
+
+  reviewer User @relation("CallReviewsGiven", fields: [reviewerId], references: [id], onDelete: Cascade)
+  reviewee User @relation("CallReviewsReceived", fields: [revieweeId], references: [id], onDelete: Cascade)
+
+  @@index([revieweeId])
+  @@index([reviewerId])
+  @@index([createdAt])
 }
 
 // One PKR payment received against a batch of leads marked paid together via the admin

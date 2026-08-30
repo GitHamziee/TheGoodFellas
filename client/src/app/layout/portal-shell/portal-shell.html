@@ -43,6 +43,7 @@
               @case ('history') { <svg lucideClock></svg> }
               @case ('inbox') { <svg lucideInbox></svg> }
               @case ('users') { <svg lucideUsers></svg> }
+              @case ('briefcase') { <svg lucideBriefcase></svg> }
               @case ('queue') { <svg lucideListChecks></svg> }
               @case ('returned') { <svg lucideUndo2></svg> }
               @case ('leads') { <svg lucideFileText></svg> }
@@ -55,6 +56,8 @@
               @case ('states') { <svg lucideMapPin></svg> }
               @case ('chat') { <svg lucideMessageSquare></svg> }
               @case ('settings') { <svg lucideSettings></svg> }
+              @case ('review') { <svg lucideClipboardCheck></svg> }
+              @case ('call') { <svg lucidePhoneCall></svg> }
             }
             <span>{{ item.label }}</span>
             @if (item.badge === 'chat' && chatUnread() > 0) {

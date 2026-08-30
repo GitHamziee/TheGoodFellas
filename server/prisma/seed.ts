@@ -9,7 +9,15 @@ const PLAN_TYPES = ["LEVEL", "GRADED", "MODIFIED", "GI"] as const;
 async function upsertUser(
   email: string,
   name: string,
-  role: "JUNIOR_CLOSER" | "CLOSER" | "ADMIN" | "CLIENT" | "TEAM_LEAD",
+  role:
+    | "JUNIOR_CLOSER"
+    | "CLOSER"
+    | "ADMIN"
+    | "CLIENT"
+    | "TEAM_LEAD"
+    | "QA_JUNIOR_CLOSER"
+    | "QA_CLOSER"
+    | "RETENTION",
   pricing?: { levelCost: number; gradedCost: number; modifiedCost: number; giCost: number },
 ) {
   const password = await bcrypt.hash("Password1", 10);
@@ -116,8 +124,14 @@ async function main() {
     giCost: 3_100,
   });
   await upsertUser("teamlead@thegoodfellas.dev", "Taylor Lead", "TEAM_LEAD");
+  const qaJunior = await upsertUser("qa.junior@thegoodfellas.dev", "Quinn Abara", "QA_JUNIOR_CLOSER");
+  const qaCloser = await upsertUser("qa.closer@thegoodfellas.dev", "Quentin Ashby", "QA_CLOSER");
+  // Two accounts (not one) so the cross-edit "filter to a teammate and work their lead"
+  // behavior is actually testable without first creating a second account by hand.
+  await upsertUser("retention@thegoodfellas.dev", "Riley Retention", "RETENTION");
+  await upsertUser("retention2@thegoodfellas.dev", "Rowan Retention", "RETENTION");
 
-  console.log(`Seeded ${10} users — password for all: Password1`);
+  console.log(`Seeded ${14} users — password for all: Password1`);
   console.log(`  admin: ${admin.email}`);
 
   const juniors = [junior, junior2];
@@ -223,6 +237,63 @@ async function main() {
   const counts = await prisma.lead.groupBy({ by: ["status"], _count: true });
   console.log(`Seeded ${DEMO_LEADS.length} demo leads:`);
   console.log(Object.fromEntries(counts.map((c) => [c.status, c._count])));
+
+  // ─── QA reviews ───
+  // A handful of intake reviews (any lead with a junior closer) and enrichment reviews
+  // (any lead past NEW/DRAFT with a closer) — enough demo data for the QA queues/history
+  // and the admin QA analytics pages to have something to show. Deterministic ids so
+  // re-running the seed replaces rather than stacks.
+  const juniorReviewTargets = DEMO_LEADS.slice(0, 6);
+  const closerReviewTargets = DEMO_LEADS.filter((l) => l.status !== "NEW").slice(0, 6);
+
+  for (const [i, l] of juniorReviewTargets.entries()) {
+    const outcome = i % 4 === 0 ? "FAIL" : "PASS";
+    const comment = i % 4 === 0 ? "Phone number transposed a digit — confirm with the customer before enrichment." : "Clean intake, nothing to flag.";
+    await prisma.leadReview.upsert({
+      where: { leadId_role: { leadId: `demo-lead-${String(l.n).padStart(2, "0")}`, role: "QA_JUNIOR_CLOSER" } },
+      update: { outcome, comment },
+      create: {
+        leadId: `demo-lead-${String(l.n).padStart(2, "0")}`,
+        reviewerId: qaJunior.id,
+        role: "QA_JUNIOR_CLOSER",
+        outcome,
+        comment,
+      },
+    });
+  }
+
+  for (const [i, l] of closerReviewTargets.entries()) {
+    const outcome = i % 5 === 0 ? "FAIL" : "PASS";
+    const comment = i % 5 === 0 ? "Routing number failed checksum — send back for correction before it reaches billing." : "Enrichment complete and consistent with the recorded call.";
+    await prisma.leadReview.upsert({
+      where: { leadId_role: { leadId: `demo-lead-${String(l.n).padStart(2, "0")}`, role: "QA_CLOSER" } },
+      update: { outcome, comment },
+      create: {
+        leadId: `demo-lead-${String(l.n).padStart(2, "0")}`,
+        reviewerId: qaCloser.id,
+        role: "QA_CLOSER",
+        outcome,
+        comment,
+      },
+    });
+  }
+
+  // ─── Call reviews — live-call QA issue log, unrelated to any lead. No "pass" side —
+  // this only exists to flag something wrong, so every row here is a problem call. ───
+  const callReviewSeed: { id: string; reviewer: string; reviewee: string; comment: string }[] = [
+    { id: "demo-call-review-01", reviewer: qaJunior.id, reviewee: junior.id, comment: "Skipped the smoker question — call had to be redialed." },
+    { id: "demo-call-review-02", reviewer: qaJunior.id, reviewee: junior2.id, comment: "Rushed through the health questions, customer had to be asked to repeat an answer." },
+    { id: "demo-call-review-03", reviewer: qaCloser.id, reviewee: closer2.id, comment: "Did not read the beneficiary disclosure required by the carrier." },
+  ];
+  for (const r of callReviewSeed) {
+    await prisma.callReview.upsert({
+      where: { id: r.id },
+      update: { reviewerId: r.reviewer, revieweeId: r.reviewee, comment: r.comment },
+      create: { id: r.id, reviewerId: r.reviewer, revieweeId: r.reviewee, comment: r.comment },
+    });
+  }
+
+  console.log(`Seeded ${juniorReviewTargets.length} intake reviews, ${closerReviewTargets.length} enrichment reviews, ${callReviewSeed.length} call reviews`);
 }
 
 main()

@@ -71,6 +71,12 @@ export class AuthService {
         return '/client/dashboard';
       case 'TEAM_LEAD':
         return '/team-lead/dashboard';
+      case 'QA_JUNIOR_CLOSER':
+        return '/qa-junior/review-queue';
+      case 'QA_CLOSER':
+        return '/qa-closer/review-queue';
+      case 'RETENTION':
+        return '/retention/queue';
     }
   }
 }

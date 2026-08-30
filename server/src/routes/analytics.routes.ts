@@ -27,6 +27,16 @@ router.get(
   })
 );
 
+// Admin-only — Retention isn't in Team Lead's oversight scope (Junior Closer/Closer only).
+router.get(
+  '/retention',
+  requireRole('ADMIN'),
+  asyncHandler(async (_req, res) => {
+    const rows = await analyticsService.retentionAnalytics();
+    return apiSuccess(res, { rows });
+  })
+);
+
 // Admin-only — revenue by plan type, same "business totals" category as /overall, so
 // kept out of the Team Lead's module even though /closers itself is shared with them.
 router.get(
@@ -75,6 +85,44 @@ router.get(
   asyncHandler(async (_req, res) => {
     const chargeBacks = await analyticsService.chargeBackAnalytics();
     return apiSuccess(res, { chargeBacks });
+  })
+);
+
+// ─── QA Reports — internal quality metrics from LeadReview/CallReview. Shared with Team
+// Lead like the outcome analytics above (no revenue/expense data in these either).
+router.get(
+  '/qa-junior-closers',
+  requireRole('ADMIN', 'TEAM_LEAD'),
+  asyncHandler(async (_req, res) => {
+    const rows = await analyticsService.qaJuniorAnalytics();
+    return apiSuccess(res, { rows });
+  })
+);
+
+router.get(
+  '/qa-closers',
+  requireRole('ADMIN', 'TEAM_LEAD'),
+  asyncHandler(async (_req, res) => {
+    const rows = await analyticsService.qaCloserAnalytics();
+    return apiSuccess(res, { rows });
+  })
+);
+
+router.get(
+  '/call-reviews-junior',
+  requireRole('ADMIN', 'TEAM_LEAD'),
+  asyncHandler(async (_req, res) => {
+    const issues = await analyticsService.callReviewJuniorAnalytics();
+    return apiSuccess(res, { issues });
+  })
+);
+
+router.get(
+  '/call-reviews-closer',
+  requireRole('ADMIN', 'TEAM_LEAD'),
+  asyncHandler(async (_req, res) => {
+    const issues = await analyticsService.callReviewCloserAnalytics();
+    return apiSuccess(res, { issues });
   })
 );
 

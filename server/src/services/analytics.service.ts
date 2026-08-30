@@ -13,7 +13,10 @@ const PLAN_COST_FIELD: Record<PlanType, 'levelCost' | 'gradedCost' | 'modifiedCo
 // that was rejected once, reassigned, and later accepted only counts toward "accepted".
 // See REQUIREMENTS.md for the known gap.
 
-async function perUserOutcome(role: 'JUNIOR_CLOSER' | 'CLOSER', groupField: 'juniorCloserId' | 'closerId') {
+async function perUserOutcome(
+  role: 'JUNIOR_CLOSER' | 'CLOSER' | 'RETENTION',
+  groupField: 'juniorCloserId' | 'closerId' | 'retentionId'
+) {
   const users = await prisma.user.findMany({ where: { role }, select: { id: true, name: true, email: true } });
   const grouped = await prisma.lead.groupBy({
     by: [groupField, 'status'],
@@ -35,6 +38,96 @@ export function juniorCloserAnalytics() {
 
 export function closerAnalytics() {
   return perUserOutcome('CLOSER', 'closerId');
+}
+
+// retentionId is only ever set on a RETENTION-type lead (see schema.prisma), so grouping
+// by it naturally scopes to just those leads — no extra leadType filter needed, same as
+// juniorCloserId/closerId scope themselves to CPA/CPL leads by construction.
+export function retentionAnalytics() {
+  return perUserOutcome('RETENTION', 'retentionId');
+}
+
+// ─── QA metrics ─────────────────────────────────────────────────
+// Both sections below reuse the UserOutcomeRow shape (total/accepted/rejected) that the
+// lead-outcome analytics above already return, with `accepted`/`rejected` standing in for
+// PASS/FAIL — same shape, different meaning, so the client's existing OutcomeAnalytics
+// table/chart component can render QA metrics with no changes. Internal metrics only,
+// derived from LeadReview/CallReview — never from Lead.status.
+
+/** Per Junior Closer / Closer, how QA scored the leads whose intake/enrichment they submitted. */
+async function leadReviewOutcome(role: 'JUNIOR_CLOSER' | 'CLOSER', qaRole: 'QA_JUNIOR_CLOSER' | 'QA_CLOSER') {
+  const groupField = role === 'JUNIOR_CLOSER' ? 'juniorCloserId' : 'closerId';
+  const users = await prisma.user.findMany({ where: { role }, select: { id: true, name: true, email: true } });
+  const reviews = await prisma.leadReview.findMany({
+    where: { role: qaRole },
+    select: { outcome: true, lead: { select: { juniorCloserId: true, closerId: true } } },
+  });
+
+  const counts = new Map<string, { total: number; accepted: number; rejected: number }>();
+  for (const r of reviews) {
+    const targetId = r.lead[groupField];
+    if (!targetId) continue;
+    const entry = counts.get(targetId) ?? { total: 0, accepted: 0, rejected: 0 };
+    entry.total += 1;
+    if (r.outcome === 'PASS') entry.accepted += 1;
+    else entry.rejected += 1;
+    counts.set(targetId, entry);
+  }
+
+  return users.map((u) => ({ id: u.id, name: u.name, email: u.email, ...(counts.get(u.id) ?? { total: 0, accepted: 0, rejected: 0 }) }));
+}
+
+export function qaJuniorAnalytics() {
+  return leadReviewOutcome('JUNIOR_CLOSER', 'QA_JUNIOR_CLOSER');
+}
+
+export function qaCloserAnalytics() {
+  return leadReviewOutcome('CLOSER', 'QA_CLOSER');
+}
+
+/**
+ * Per Junior Closer / Closer, how many live-call issues QA has flagged against them —
+ * unrelated to any lead. There is no "pass" side to this: CallReview only exists to log
+ * a problem, so the metric is an issue count, not a rate. Includes everyone in the role
+ * even with zero flags, same as the recent-issues list stays capped like
+ * chargeBackAnalytics's `recent` above.
+ */
+async function callReviewIssues(role: 'JUNIOR_CLOSER' | 'CLOSER') {
+  const [people, reviews] = await Promise.all([
+    prisma.user.findMany({ where: { role }, select: { id: true, name: true, email: true } }),
+    prisma.callReview.findMany({
+      where: { reviewee: { role } },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        comment: true,
+        createdAt: true,
+        reviewee: { select: { id: true, name: true, email: true } },
+        reviewer: { select: { id: true, name: true, email: true } },
+      },
+    }),
+  ]);
+
+  const countByPerson = new Map<string, number>();
+  for (const r of reviews) countByPerson.set(r.reviewee.id, (countByPerson.get(r.reviewee.id) ?? 0) + 1);
+
+  const byPerson = people
+    .map((p) => ({ id: p.id, name: p.name, email: p.email, count: countByPerson.get(p.id) ?? 0 }))
+    .sort((a, b) => b.count - a.count);
+
+  return {
+    total: reviews.length,
+    byPerson,
+    recent: reviews.slice(0, 20),
+  };
+}
+
+export function callReviewJuniorAnalytics() {
+  return callReviewIssues('JUNIOR_CLOSER');
+}
+
+export function callReviewCloserAnalytics() {
+  return callReviewIssues('CLOSER');
 }
 
 // ─── Sales by plan (Closer) ────────────────────────────────────

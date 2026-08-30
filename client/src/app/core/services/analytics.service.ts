@@ -3,6 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { API_BASE_URL } from '../config';
 import { DraftReason, LeadParty, LeadStatus, PlanType } from '../models/lead.model';
+import { CallReviewAnalytics } from '../models/review.model';
 
 interface ApiSuccess<T> {
   data: T;
@@ -111,6 +112,11 @@ export class AnalyticsService {
     return res.data.rows;
   }
 
+  async retention(): Promise<UserOutcomeRow[]> {
+    const res = await firstValueFrom(this.http.get<ApiSuccess<{ rows: UserOutcomeRow[] }>>(`${BASE}/retention`));
+    return res.data.rows;
+  }
+
   async closerPlans(): Promise<ClosePlanRow[]> {
     const res = await firstValueFrom(this.http.get<ApiSuccess<{ rows: ClosePlanRow[] }>>(`${BASE}/closers/plans`));
     return res.data.rows;
@@ -136,5 +142,30 @@ export class AnalyticsService {
       this.http.get<ApiSuccess<{ chargeBacks: ChargeBackAnalytics }>>(`${BASE}/charge-backs`)
     );
     return res.data.chargeBacks;
+  }
+
+  // ─── QA Reports — reuse UserOutcomeRow (accepted/rejected stand in for PASS/FAIL) ──
+  /** Transfer Report — how QA scored the leads each Junior Closer submitted. */
+  async qaJuniorClosers(): Promise<UserOutcomeRow[]> {
+    const res = await firstValueFrom(this.http.get<ApiSuccess<{ rows: UserOutcomeRow[] }>>(`${BASE}/qa-junior-closers`));
+    return res.data.rows;
+  }
+
+  /** Transfer Report — how QA scored the leads each Closer enriched. */
+  async qaClosers(): Promise<UserOutcomeRow[]> {
+    const res = await firstValueFrom(this.http.get<ApiSuccess<{ rows: UserOutcomeRow[] }>>(`${BASE}/qa-closers`));
+    return res.data.rows;
+  }
+
+  /** Live Call Report — issues QA has flagged against each Junior Closer's live calls. */
+  async callReviewsJunior(): Promise<CallReviewAnalytics> {
+    const res = await firstValueFrom(this.http.get<ApiSuccess<{ issues: CallReviewAnalytics }>>(`${BASE}/call-reviews-junior`));
+    return res.data.issues;
+  }
+
+  /** Live Call Report — issues QA has flagged against each Closer's live calls. */
+  async callReviewsCloser(): Promise<CallReviewAnalytics> {
+    const res = await firstValueFrom(this.http.get<ApiSuccess<{ issues: CallReviewAnalytics }>>(`${BASE}/call-reviews-closer`));
+    return res.data.issues;
   }
 }

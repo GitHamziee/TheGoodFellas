@@ -23,8 +23,10 @@ export type DraftReason =
   | 'PENDING_DOCUMENTATION'
   | 'OTHER';
 export type LeadNeed = 'BURIAL' | 'CREMATION' | 'LEAVE_MONEY';
-/** CPA = today's full pipeline. CPL skips the Closer step entirely — see the Lead interface. */
-export type LeadType = 'CPA' | 'CPL';
+/** CPA = today's full pipeline. CPL skips the Closer step entirely — see the Lead interface.
+ * RETENTION = AI-sourced leads submitted through the public retention intake form (no login),
+ * no Junior Closer/Closer step. */
+export type LeadType = 'CPA' | 'CPL' | 'RETENTION';
 /** The client's own internal classification code for a CPL lead, picked at intake. */
 export type DCode = 'D1' | 'D2' | 'D3' | 'D4';
 export type IncomeSource = 'EMPLOYED' | 'SELF_EMPLOYED' | 'RETIRED';
@@ -59,6 +61,8 @@ export interface Lead {
   closerId: string | null;
   clientId: string | null;
   externalClientId: string | null;
+  /** Set only for RETENTION leads — who Admin handed a form-submitted lead to. */
+  retentionId: string | null;
 
   /** CPA = today's pipeline. A CPL lead never leaves this shorter field set. */
   leadType: LeadType;
@@ -139,6 +143,8 @@ export interface Lead {
   closer: LeadParty | null;
   client: LeadParty | null;
   externalClient: Pick<ExternalClient, 'id' | 'name' | 'company' | 'email' | 'phone'> | null;
+  /** Set only for RETENTION leads — who Admin handed a form-submitted lead to. */
+  retention: LeadParty | null;
   /** Full chargeback history, newest first. Empty unless the lead has ever been charged back. */
   chargeBacks: ChargeBack[];
 }

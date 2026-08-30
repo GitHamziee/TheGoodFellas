@@ -1,6 +1,6 @@
 import { Role } from './user.model';
 
-export type ChatRoomKey = 'CLOSERS' | 'JUNIOR_CLOSERS' | 'TEAM_LEADS';
+export type ChatRoomKey = 'CLOSERS' | 'JUNIOR_CLOSERS' | 'TEAM_LEADS' | 'RETENTION';
 
 export interface ChatSender {
   id: string;
@@ -34,6 +34,7 @@ export const CHAT_ROOM_LABEL: Record<ChatRoomKey, string> = {
   CLOSERS: 'Closers',
   JUNIOR_CLOSERS: 'Junior Closers',
   TEAM_LEADS: 'Team Leads',
+  RETENTION: 'Retention',
 };
 
 /**
@@ -43,7 +44,13 @@ export const CHAT_ROOM_LABEL: Record<ChatRoomKey, string> = {
 export const CHAT_ROOMS_BY_ROLE: Record<Role, ChatRoomKey[]> = {
   CLOSER: ['CLOSERS'],
   JUNIOR_CLOSER: ['JUNIOR_CLOSERS'],
-  TEAM_LEAD: ['TEAM_LEADS'],
-  ADMIN: ['CLOSERS', 'JUNIOR_CLOSERS', 'TEAM_LEADS'],
+  // Oversees both roles, so it sits in both of their channels (Closer, Junior Closer, and
+  // Admin) plus its own channel for team-lead-to-team-lead + admin.
+  TEAM_LEAD: ['CLOSERS', 'JUNIOR_CLOSERS', 'TEAM_LEADS'],
+  RETENTION: ['RETENTION'],
+  ADMIN: ['CLOSERS', 'JUNIOR_CLOSERS', 'TEAM_LEADS', 'RETENTION'],
   CLIENT: [],
+  // Internal metrics roles, not part of team chat — see server/src/lib/chat-rooms.ts.
+  QA_JUNIOR_CLOSER: [],
+  QA_CLOSER: [],
 };
