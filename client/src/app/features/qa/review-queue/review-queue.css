@@ -1,0 +1,27 @@
+.qa-outcome {
+  margin-top: 1rem;
+}
+
+.qa-outcome-ico {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.qa-outcome-ico--pass {
+  color: var(--success-700);
+}
+
+.qa-outcome-ico--fail {
+  color: var(--danger-700);
+}
+
+.review-comment {
+  margin: 0.75rem 0 0;
+  padding: 0.75rem 0.9rem;
+  border-radius: var(--radius-sm);
+  background: var(--gray-50);
+  color: var(--gray-700);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}

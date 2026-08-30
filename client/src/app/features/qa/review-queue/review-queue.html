@@ -1,0 +1,126 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <p class="sub">{{ subtitle() }}</p>
+    </div>
+  </div>
+
+  <div class="stats-row">
+    <app-stat-tile [value]="leads().length" label="Pending review" tone="tone-gold">
+      <svg lucideClipboardCheck></svg>
+    </app-stat-tile>
+  </div>
+
+  <div class="toolbar">
+    <app-search-box
+      [value]="view.search()"
+      placeholder="Search by name, phone or state…"
+      (valueChange)="view.setSearch($event)"
+    />
+  </div>
+
+  <div class="card card--flush">
+    @if (loading()) {
+      <app-skeleton-rows [count]="5" />
+    } @else if (view.rows().length === 0) {
+      <app-empty-state title="Nothing to review" hint="Every submitted lead has already been reviewed.">
+        <svg lucideClipboardCheck></svg>
+      </app-empty-state>
+    } @else {
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Customer</th>
+              <th class="hide-sm">Phone</th>
+              <th class="hide-sm">State</th>
+              <th>Status</th>
+              <th>Submitted</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of view.rows(); track row.id) {
+              <tr>
+                <td class="cell-main">{{ row.customerName }}</td>
+                <td class="hide-sm">{{ formatPhone(row.phone) }}</td>
+                <td class="hide-sm">{{ row.state }}</td>
+                <td><app-status-badge [status]="row.status" /></td>
+                <td>{{ timeAgo(row.createdAt) }}</td>
+                <td class="right">
+                  <button type="button" class="btn btn--sm" (click)="openReview(row)">Review</button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <app-pagination
+        [page]="view.page()"
+        [totalPages]="view.totalPages()"
+        [total]="view.total()"
+        (pageChange)="view.page.set($event)"
+      />
+    }
+  </div>
+</div>
+
+@if (selected(); as row) {
+  <app-modal title="Review lead" [subtitle]="row.customerName" [wide]="lane() === 'CLOSER'" (close)="selected.set(null)">
+    @if (lane() === 'CLOSER') {
+      <app-lead-detail [lead]="$any(row)" />
+    } @else {
+      <div class="detail-grid">
+        @for (r of juniorDetailRows(); track r.k) {
+          <app-detail [label]="r.k" [value]="r.v" />
+        }
+      </div>
+    }
+
+    <div class="pick-list qa-outcome">
+      <button type="button" class="pick-row" [class.chosen]="outcome() === 'PASS'" (click)="outcome.set('PASS')">
+        <svg lucideCircleCheck class="qa-outcome-ico qa-outcome-ico--pass"></svg>
+        <span class="who">
+          <span class="cell-main">Pass</span>
+          <span class="cell-sub">Information looks accurate and complete</span>
+        </span>
+        @if (outcome() === 'PASS') {
+          <svg lucideCircleCheck class="tick"></svg>
+        }
+      </button>
+      <button type="button" class="pick-row" [class.chosen]="outcome() === 'FAIL'" (click)="outcome.set('FAIL')">
+        <svg lucideCircleX class="qa-outcome-ico qa-outcome-ico--fail"></svg>
+        <span class="who">
+          <span class="cell-main">Fail</span>
+          <span class="cell-sub">Something is missing, wrong, or needs a second look</span>
+        </span>
+        @if (outcome() === 'FAIL') {
+          <svg lucideCircleCheck class="tick"></svg>
+        }
+      </button>
+    </div>
+
+    <div class="form-grid">
+      <label class="full">
+        Notes (optional)
+        <textarea
+          rows="3"
+          [value]="comment()"
+          (input)="comment.set($any($event.target).value)"
+          placeholder="What did you check? Anything QA should flag to the admin?"
+        ></textarea>
+      </label>
+    </div>
+
+    @if (error()) {
+      <div class="error">{{ error() }}</div>
+    }
+
+    <div footer>
+      <button type="button" class="btn" [disabled]="submitting()" (click)="submit()">
+        {{ submitting() ? 'Saving…' : 'Submit review' }}
+      </button>
+    </div>
+  </app-modal>
+}

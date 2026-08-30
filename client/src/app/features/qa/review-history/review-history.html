@@ -1,0 +1,98 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <p class="sub">Leads you and the rest of QA have already reviewed.</p>
+    </div>
+  </div>
+
+  <div class="stats-row">
+    <app-stat-tile [value]="reviews().length" label="Reviewed" tone="tone-gold">
+      <svg lucideClock></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="passCount()" label="Pass" tone="tone-success">
+      <svg lucideCircleCheck></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="failCount()" label="Fail" tone="tone-danger">
+      <svg lucideCircleCheck></svg>
+    </app-stat-tile>
+  </div>
+
+  <div class="toolbar">
+    <app-search-box [value]="view.search()" placeholder="Search by name or phone…" (valueChange)="view.setSearch($event)" />
+    <div class="pills">
+      @for (filter of outcomeFilters; track filter.value) {
+        <button type="button" class="pill" [class.active]="view.status() === filter.value" (click)="view.setStatus(filter.value)">
+          {{ filter.label }}
+        </button>
+      }
+    </div>
+  </div>
+
+  <div class="card card--flush">
+    @if (loading()) {
+      <app-skeleton-rows [count]="5" />
+    } @else if (view.rows().length === 0) {
+      <app-empty-state title="No reviews yet" hint="Leads you review will show up here.">
+        <svg lucideClock></svg>
+      </app-empty-state>
+    } @else {
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Customer</th>
+              <th class="hide-sm">Phone</th>
+              <th>Outcome</th>
+              <th>Reviewed</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of view.rows(); track r.id) {
+              <tr>
+                <td class="cell-main">{{ r.lead.customerName }}</td>
+                <td class="hide-sm">{{ formatPhone(r.lead.phone) }}</td>
+                <td><span [class]="outcomeClass(r.outcome)">{{ outcomeText(r.outcome) }}</span></td>
+                <td>{{ timeAgo(r.createdAt) }}{{ r.mine ? '' : ' · by another QA reviewer' }}</td>
+                <td class="right">
+                  <button type="button" class="btn btn--ghost btn--sm" (click)="selected.set(r)">View</button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <app-pagination
+        [page]="view.page()"
+        [totalPages]="view.totalPages()"
+        [total]="view.total()"
+        (pageChange)="view.page.set($event)"
+      />
+    }
+  </div>
+</div>
+
+@if (selected(); as r) {
+  <app-modal title="Review details" [subtitle]="r.lead.customerName" [wide]="lane() === 'CLOSER'" (close)="selected.set(null)">
+    <div class="detail-grid">
+      <app-detail label="Outcome" [value]="outcomeText(r.outcome)" />
+      <app-detail label="Reviewed" [value]="formatDateTime(r.createdAt)" />
+    </div>
+    @if (r.comment) {
+      <p class="review-comment">{{ r.comment }}</p>
+    }
+
+    <hr />
+
+    @if (lane() === 'CLOSER') {
+      <app-lead-detail [lead]="$any(r.lead)" />
+    } @else {
+      <div class="detail-grid">
+        @for (row of juniorDetailRows(); track row.k) {
+          <app-detail [label]="row.k" [value]="row.v" />
+        }
+      </div>
+    }
+  </app-modal>
+}

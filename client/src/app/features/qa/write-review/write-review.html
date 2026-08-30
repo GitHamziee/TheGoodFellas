@@ -1,0 +1,102 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <p class="sub">Just got off a call where something went wrong? Flag it here — this is an issue log, not a rating, so only log calls that need attention.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    @if (error()) {
+      <div class="error">{{ error() }}</div>
+    }
+
+    <app-search-box
+      [value]="personSearch()"
+      [placeholder]="'Search ' + personLabel() + 's by name or email…'"
+      (valueChange)="personSearch.set($event)"
+    />
+
+    @if (loadingPeople()) {
+      <app-skeleton-rows [count]="3" />
+    } @else {
+      <div class="pick-list">
+        @for (person of filteredPeople(); track person.id) {
+          <button
+            type="button"
+            class="pick-row"
+            [class.chosen]="chosenPersonId() === person.id"
+            (click)="chosenPersonId.set(person.id)"
+          >
+            <span class="avatar-sm" [class]="getAvatarTone(person.id)">{{ getInitials(person.name) }}</span>
+            <span class="who">
+              <span class="cell-main">{{ person.name }}</span>
+              <span class="cell-sub">{{ person.email }}</span>
+            </span>
+            @if (chosenPersonId() === person.id) {
+              <svg lucideCircleCheck class="tick"></svg>
+            }
+          </button>
+        } @empty {
+          <app-empty-state title="No one matches" [hint]="'No ' + personLabel() + ' accounts found.'">
+            <svg lucideUserCheck></svg>
+          </app-empty-state>
+        }
+      </div>
+    }
+
+    <div class="form-grid">
+      <label class="full">
+        What went wrong?
+        <textarea
+          rows="3"
+          [value]="comment()"
+          (input)="comment.set($any($event.target).value)"
+          placeholder="What happened on the call that needs a follow-up?"
+        ></textarea>
+      </label>
+    </div>
+
+    <div class="form-actions">
+      <button type="button" class="btn" [disabled]="submitting()" (click)="submit()">
+        {{ submitting() ? 'Saving…' : 'Submit review' }}
+      </button>
+    </div>
+  </div>
+
+  <div class="page-head">
+    <div>
+      <h2>Issues you've flagged</h2>
+    </div>
+  </div>
+
+  <div class="card card--flush">
+    @if (loadingMine()) {
+      <app-skeleton-rows [count]="3" />
+    } @else if (mine().length === 0) {
+      <app-empty-state title="Nothing flagged yet" hint="Issues you flag will show up here.">
+        <svg lucideFlag></svg>
+      </app-empty-state>
+    } @else {
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Person</th>
+              <th>What went wrong</th>
+              <th>When</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of mine(); track r.id) {
+              <tr>
+                <td class="cell-main">{{ r.reviewee.name }}</td>
+                <td>{{ r.comment }}</td>
+                <td [title]="formatDateTime(r.createdAt)">{{ timeAgo(r.createdAt) }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+</div>
