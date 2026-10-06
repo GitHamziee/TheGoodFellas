@@ -11,7 +11,7 @@ router.use(authenticate);
 // data lives in these two endpoints anyway, so no masking is needed beyond the role gate.
 router.get(
   '/junior-closers',
-  requireRole('ADMIN', 'TEAM_LEAD'),
+  requireRole('ADMIN', 'MANAGER', 'TEAM_LEAD'),
   asyncHandler(async (_req, res) => {
     const rows = await analyticsService.juniorCloserAnalytics();
     return apiSuccess(res, { rows });
@@ -20,7 +20,7 @@ router.get(
 
 router.get(
   '/closers',
-  requireRole('ADMIN', 'TEAM_LEAD'),
+  requireRole('ADMIN', 'MANAGER', 'TEAM_LEAD'),
   asyncHandler(async (_req, res) => {
     const rows = await analyticsService.closerAnalytics();
     return apiSuccess(res, { rows });
@@ -30,7 +30,7 @@ router.get(
 // Admin-only — Retention isn't in Team Lead's oversight scope (Junior Closer/Closer only).
 router.get(
   '/retention',
-  requireRole('ADMIN'),
+  requireRole('ADMIN', 'MANAGER'),
   asyncHandler(async (_req, res) => {
     const rows = await analyticsService.retentionAnalytics();
     return apiSuccess(res, { rows });
@@ -41,7 +41,7 @@ router.get(
 // kept out of the Team Lead's module even though /closers itself is shared with them.
 router.get(
   '/closers/plans',
-  requireRole('ADMIN'),
+  requireRole('ADMIN', 'MANAGER'),
   asyncHandler(async (_req, res) => {
     const rows = await analyticsService.closerPlanAnalytics();
     return apiSuccess(res, { rows });
@@ -51,7 +51,7 @@ router.get(
 // Admin-only — revenue by plan type, same "business totals" category as /overall.
 router.get(
   '/clients/plans',
-  requireRole('ADMIN'),
+  requireRole('ADMIN', 'MANAGER'),
   asyncHandler(async (_req, res) => {
     const rows = await analyticsService.clientPlanAnalytics();
     return apiSuccess(res, { rows });
@@ -61,7 +61,7 @@ router.get(
 // Admin-only — includes payment/business totals, out of scope for Team Lead's module.
 router.get(
   '/overall',
-  requireRole('ADMIN'),
+  requireRole('ADMIN', 'MANAGER'),
   asyncHandler(async (_req, res) => {
     const overall = await analyticsService.overallAnalytics();
     return apiSuccess(res, { overall });
@@ -71,7 +71,7 @@ router.get(
 // Admin-only — visibility into parked closer drafts, not part of Team Lead's oversight scope.
 router.get(
   '/drafts',
-  requireRole('ADMIN'),
+  requireRole('ADMIN', 'MANAGER'),
   asyncHandler(async (_req, res) => {
     const drafts = await analyticsService.draftsAnalytics();
     return apiSuccess(res, { drafts });
@@ -81,7 +81,7 @@ router.get(
 // Admin-only — chargeback/revenue-loss reporting, same "business totals" category as /overall.
 router.get(
   '/charge-backs',
-  requireRole('ADMIN'),
+  requireRole('ADMIN', 'MANAGER'),
   asyncHandler(async (_req, res) => {
     const chargeBacks = await analyticsService.chargeBackAnalytics();
     return apiSuccess(res, { chargeBacks });
@@ -92,7 +92,7 @@ router.get(
 // Lead like the outcome analytics above (no revenue/expense data in these either).
 router.get(
   '/qa-junior-closers',
-  requireRole('ADMIN', 'TEAM_LEAD'),
+  requireRole('ADMIN', 'MANAGER', 'TEAM_LEAD'),
   asyncHandler(async (_req, res) => {
     const rows = await analyticsService.qaJuniorAnalytics();
     return apiSuccess(res, { rows });
@@ -101,7 +101,7 @@ router.get(
 
 router.get(
   '/qa-closers',
-  requireRole('ADMIN', 'TEAM_LEAD'),
+  requireRole('ADMIN', 'MANAGER', 'TEAM_LEAD'),
   asyncHandler(async (_req, res) => {
     const rows = await analyticsService.qaCloserAnalytics();
     return apiSuccess(res, { rows });
@@ -110,7 +110,7 @@ router.get(
 
 router.get(
   '/call-reviews-junior',
-  requireRole('ADMIN', 'TEAM_LEAD'),
+  requireRole('ADMIN', 'MANAGER', 'TEAM_LEAD'),
   asyncHandler(async (_req, res) => {
     const issues = await analyticsService.callReviewJuniorAnalytics();
     return apiSuccess(res, { issues });
@@ -119,7 +119,7 @@ router.get(
 
 router.get(
   '/call-reviews-closer',
-  requireRole('ADMIN', 'TEAM_LEAD'),
+  requireRole('ADMIN', 'MANAGER', 'TEAM_LEAD'),
   asyncHandler(async (_req, res) => {
     const issues = await analyticsService.callReviewCloserAnalytics();
     return apiSuccess(res, { issues });

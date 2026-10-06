@@ -24,15 +24,6 @@
     <div class="success"><svg lucideCircleCheck></svg>{{ notice() }}</div>
   }
 
-  @if (!loading() && leads().length > 0) {
-    <div class="locked">
-      <svg lucideLock></svg>
-      <span>
-        Contact details, SSN and banking information stay hidden until you accept a lead — you're seeing a preview only.
-      </span>
-    </div>
-  }
-
   <div class="toolbar">
     <app-search-box
       [value]="view.search()"
@@ -143,23 +134,10 @@
   </div>
 </div>
 
-<!-- Preview -->
+<!-- Full lead detail -->
 @if (selected(); as lead) {
-  <app-modal title="Lead preview" [subtitle]="lead.customerName" (close)="selected.set(null)">
-    <div class="locked">
-      <svg lucideLock></svg>
-      <span>This is a preview. Phone, email, address, SSN and banking details unlock once you accept.</span>
-    </div>
-
-    <div class="detail-grid" style="margin-top: 1.1rem;">
-      <app-detail label="Customer" [value]="lead.customerName" />
-      <app-detail label="State" [value]="lead.state" />
-      <app-detail label="Zipcode" [value]="lead.zipcode" />
-      <app-detail label="Need" [value]="humanizeEnum(lead.need)" />
-      <app-detail label="Marital status" [value]="humanizeEnum(lead.maritalStatus)" />
-      <app-detail label="Closer" [value]="lead.closer?.name" />
-      <app-detail label="Received" [value]="timeAgo(lead.createdAt)" />
-    </div>
+  <app-modal title="Lead details" [subtitle]="lead.customerName" (close)="selected.set(null)">
+    <app-lead-detail [lead]="lead" />
 
     <div footer>
       <button

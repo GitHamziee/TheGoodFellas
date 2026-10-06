@@ -81,6 +81,9 @@
                 <td>
                   <div class="cell-main">{{ lead.customerName }}</div>
                   <div class="cell-sub">{{ formatPhone(lead.phone) }} · {{ lead.state }}</div>
+                  @if (lead.suggestedClient; as suggested) {
+                    <div class="cell-sub">Suggested client: {{ suggested.name }}</div>
+                  }
                 </td>
                 <td class="hide-sm">
                   @if (lead.closer) {
@@ -89,6 +92,13 @@
                         {{ getInitials(lead.closer.name) }}
                       </span>
                       <span class="nm">{{ lead.closer.name }}</span>
+                    </div>
+                  } @else if (lead.retention) {
+                    <div class="person">
+                      <span class="avatar-sm" [class]="getAvatarTone(lead.retention.id)">
+                        {{ getInitials(lead.retention.name) }}
+                      </span>
+                      <span class="nm">{{ lead.retention.name }}</span>
                     </div>
                   } @else {
                     <span class="chip">CPL @if (lead.dCode) { · {{ lead.dCode }} }</span>
@@ -204,7 +214,7 @@
     </div>
 
     <div class="pick-list">
-      @if (lead.leadType !== 'CPL' && lead.closer; as closer) {
+      @if (lead.closer; as closer) {
         <button
           type="button"
           class="pick-row"
@@ -243,6 +253,30 @@
           }
         </button>
       }
+
+      @if (lead.retention; as retention) {
+        <button
+          type="button"
+          class="pick-row"
+          [class.chosen]="returnTarget() === 'RETENTION'"
+          (click)="returnTarget.set('RETENTION')"
+        >
+          <span class="avatar-sm" [class]="getAvatarTone(retention.id)">
+            {{ getInitials(retention.name) }}
+          </span>
+          <span class="who">
+            <span class="cell-main">{{ retention.name }} — Retention</span>
+            <span class="cell-sub">Sends it back to the shared Retention queue</span>
+          </span>
+          @if (returnTarget() === 'RETENTION') {
+            <svg lucideCircleCheck class="tick"></svg>
+          }
+        </button>
+      }
+
+      @if (!lead.closer && !lead.juniorCloser && !lead.retention) {
+        <div class="warn">This lead has no closer, junior closer, or retention person to send it back to.</div>
+      }
     </div>
 
     <div class="form-grid">
@@ -262,7 +296,7 @@
       <button
         type="button"
         class="btn"
-        [disabled]="!returnReason().trim() || busyId() === lead.id"
+        [disabled]="!returnReason().trim() || !returnTarget() || busyId() === lead.id"
         (click)="confirmReturn()"
       >
         @if (busyId() === lead.id) {
@@ -284,6 +318,9 @@
   >
     @if (error()) {
       <div class="error">{{ error() }}</div>
+    }
+    @if (lead.suggestedClient; as suggested) {
+      <div class="warn">Pre-selected {{ suggested.name }} — suggested when this lead was submitted. Pick someone else if it doesn't fit.</div>
     }
 
     <app-search-box

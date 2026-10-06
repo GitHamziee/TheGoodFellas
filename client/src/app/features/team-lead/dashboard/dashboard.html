@@ -2,7 +2,7 @@
   <div class="page-head">
     <div>
       <h1>Welcome back{{ firstName() ? ', ' + firstName() : '' }}</h1>
-      <p class="sub">Oversight of the Junior Closer and Closer pipeline, no financials attached.</p>
+      <p class="sub">Oversight of the Junior Closer pipeline, no financials attached.</p>
     </div>
     <div class="page-head-actions">
       <a class="btn" routerLink="/team-lead/submitted-leads"><svg lucideSend></svg> View submitted leads</a>
@@ -49,7 +49,8 @@
               <span class="who">
                 <span class="nm">{{ lead.customerName }}</span>
                 <span class="mt">
-                  {{ lead.juniorCloser?.name || '—' }} → {{ lead.closer?.name || '—' }}
+                  {{ lead.juniorCloser?.name || '—' }}
+                  @if (lead.closer) { → {{ lead.closer.name }} }
                 </span>
               </span>
               <span class="chip"><svg lucideClock></svg>{{ timeAgo(lead.createdAt) }}</span>
@@ -67,13 +68,6 @@
         <a class="feed-row feed-row--link" routerLink="/team-lead/analytics/junior-closers">
           <span class="who">
             <span class="nm">Junior Closers</span>
-            <span class="mt">Accepted / rejected outcomes per person</span>
-          </span>
-          <span class="chip"><svg lucideChartColumn></svg>View</span>
-        </a>
-        <a class="feed-row feed-row--link" routerLink="/team-lead/analytics/closers">
-          <span class="who">
-            <span class="nm">Closers</span>
             <span class="mt">Accepted / rejected outcomes per person</span>
           </span>
           <span class="chip"><svg lucideChartColumn></svg>View</span>

@@ -277,9 +277,13 @@ export async function draftsAnalytics() {
       id: true,
       customerName: true,
       draftReason: true,
+      draftReasonNote: true,
       createdAt: true,
       updatedAt: true,
       closer: { select: { id: true, name: true, email: true } },
+      // Null when the closer built the lead from scratch (self- or AI-sourced) — a CPA
+      // draft that started with a Junior Closer intake still carries it.
+      juniorCloser: { select: { id: true, name: true, email: true } },
     },
     orderBy: { updatedAt: 'asc' },
   });
@@ -310,11 +314,13 @@ export async function draftsAnalytics() {
       id: d.id,
       customerName: d.customerName,
       draftReason: d.draftReason,
+      draftReasonNote: d.draftReasonNote,
       createdAt: d.createdAt,
       updatedAt: d.updatedAt,
       ageDays: ageDays(d.updatedAt),
       // Guaranteed non-null per the comment at the top of this function.
       closer: { id: d.closer!.id, name: d.closer!.name },
+      juniorCloser: d.juniorCloser ? { id: d.juniorCloser.id, name: d.juniorCloser.name } : null,
     })),
   };
 }

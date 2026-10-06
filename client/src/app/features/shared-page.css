@@ -1514,7 +1514,8 @@ tr.expand-row td {
 /* Sent back for correction — amber like SUBMITTED (it's mid-pipeline, not a failure),
    but outlined so it's distinguishable at a glance in a mixed list. */
 .badge--returned_to_junior,
-.badge--returned_to_closer {
+.badge--returned_to_closer,
+.badge--returned_to_retention {
   background: var(--warning-50);
   color: var(--warning-700);
   box-shadow: inset 0 0 0 1px var(--warning-600);
@@ -1971,6 +1972,33 @@ tr.expand-row td {
 .chart-legend .sw--good { background: var(--chart-good); }
 .chart-legend .sw--bad  { background: var(--chart-bad); }
 .chart-legend .sw--idle { background: var(--chart-idle); }
+
+/* Plain label + count list — a straight tally where a proportion bar would add
+   nothing (e.g. how many parked leads sit in each disposition). */
+.reason-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.reason-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.9rem;
+  padding: 0.5rem 0.5rem;
+  border-radius: var(--radius-sm);
+  transition: background 0.12s ease;
+}
+
+.reason-summary-row:hover { background: var(--gray-50); }
+
+.reason-summary-row strong {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
 
 /* Inline proportion meter used in analytics tables — same colours, same
    2px surface gap, just shrunk to fit a table cell. */

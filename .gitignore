@@ -12,6 +12,9 @@ yarn-error.log
 /client/.angular
 /server/dist
 
+# Chat file uploads — user content, not source
+/server/uploads
+
 # IDEs and editors
 .idea/
 .vscode/*

@@ -126,6 +126,7 @@ const STATUS_LABEL: Record<LeadStatus, string> = {
   REJECTED: 'Rejected',
   RETURNED_TO_JUNIOR: 'Sent back — Junior',
   RETURNED_TO_CLOSER: 'Sent back — Closer',
+  RETURNED_TO_RETENTION: 'Sent back — Retention',
   ASSIGNED_EXTERNAL: 'Assigned — External',
   DRAFT: 'Draft',
   CHARGED_BACK: 'Charged Back',

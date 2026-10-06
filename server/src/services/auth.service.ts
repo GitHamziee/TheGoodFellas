@@ -4,8 +4,9 @@ import prisma from "../lib/prisma";
 import { signToken } from "../lib/jwt";
 import { isNonEmptyString, isValidEmail, isValidPassword } from "../lib/validation";
 import { parseCarriers, parseStates } from "../lib/client-coverage";
+import { IP_EXEMPT_ROLES, isIpWhitelisted } from "../lib/ip-whitelist";
 
-type ServiceResult<T> = { data: T; status?: never } | { error: string; status: number };
+type ServiceResult<T> = { data: T; status?: never; code?: never } | { error: string; status: number; code?: string };
 
 const SALT_ROUNDS = 10;
 
@@ -43,7 +44,7 @@ function publicUser(user: {
   };
 }
 
-export async function login(email: unknown, password: unknown): Promise<ServiceResult<{ token: string; user: ReturnType<typeof publicUser> }>> {
+export async function login(email: unknown, password: unknown, ip: string): Promise<ServiceResult<{ token: string; user: ReturnType<typeof publicUser> }>> {
   if (typeof email !== "string" || typeof password !== "string") {
     return { error: "Invalid email or password", status: 401 };
   }
@@ -54,11 +55,20 @@ export async function login(email: unknown, password: unknown): Promise<ServiceR
   const matches = await bcrypt.compare(password, user.password);
   if (!matches) return { error: "Invalid email or password", status: 401 };
 
+  // Checked after the password so a blocked IP can't be used to probe which emails exist.
+  if (!IP_EXEMPT_ROLES.includes(user.role) && !(await isIpWhitelisted(ip))) {
+    return {
+      error: "This network is not authorized to use the app. Contact your admin to whitelist your IP.",
+      status: 403,
+      code: "IP_NOT_WHITELISTED",
+    };
+  }
+
   const token = signToken({ sub: user.id, role: user.role, tokenVersion: user.tokenVersion });
   return { data: { token, user: publicUser(user) } };
 }
 
-const STAFF_ROLES: Role[] = ["JUNIOR_CLOSER", "CLOSER", "ADMIN", "CLIENT", "TEAM_LEAD"];
+const STAFF_ROLES: Role[] = ["JUNIOR_CLOSER", "CLOSER", "ADMIN", "CLIENT", "TEAM_LEAD", "MANAGER"];
 // minimumPremium isn't a plan cost, but shares the same nullable-non-negative-whole-dollar
 // validation, so it rides the same parse loop as the four plan costs below.
 const PLAN_COST_KEYS = ["levelCost", "gradedCost", "modifiedCost", "giCost", "minimumPremium"] as const;

@@ -69,13 +69,14 @@
 
             <label>
               Date of birth
-              <input type="date" name="dob" [(ngModel)]="form.dob" />
+              <input type="date" name="dob" [min]="minDob" [max]="todayIso" [(ngModel)]="form.dob" />
             </label>
 
             <label>
               Social Security Number
-              <input type="text" name="ssn" placeholder="123-00-1234" [(ngModel)]="form.ssn" />
-              <span class="hint">9 digits — stored in the format 123-00-1234.</span>
+              <input type="text" name="ssn" inputmode="numeric" maxlength="9" placeholder="123456789"
+                [ngModel]="form.ssn" (ngModelChange)="onSsnChange($event)" />
+              <span class="hint">Exactly 9 digits.</span>
             </label>
           </div>
         </div>
@@ -114,28 +115,79 @@
         <div class="section">
           <h2 class="section-title">Banking</h2>
           <div class="form-grid">
-            <label>
-              Bank name
-              <input type="text" name="bankName" [(ngModel)]="form.bankName" />
-            </label>
-
-            <label>
-              Account type
-              <app-select [options]="accountTypeOptions" [ngModel]="form.accountType" name="accountType"
-                (ngModelChange)="form.accountType = $event" placeholder="Select an account type…" />
-            </label>
-
-            <label>
-              Routing number
-              <input type="text" name="routingNumber" [(ngModel)]="form.routingNumber" />
-              <span class="hint">Exactly 9 digits.</span>
-            </label>
-
-            <label>
-              Account number
-              <input type="text" name="accountNumber" [(ngModel)]="form.accountNumber" />
+            <label class="full">
+              Payment method
+              <app-select [options]="paymentMethodOptions" [ngModel]="form.paymentMethod" name="paymentMethod"
+                (ngModelChange)="form.paymentMethod = $event" placeholder="Select a payment method…" />
             </label>
           </div>
+
+          @if (form.paymentMethod === 'BANK_ACCOUNT') {
+            <div class="form-grid">
+              <label>
+                Bank name
+                <input type="text" name="bankName" [(ngModel)]="form.bankName" />
+              </label>
+
+              <label>
+                Account type
+                <app-select [options]="accountTypeOptions" [ngModel]="form.accountType" name="accountType"
+                  (ngModelChange)="form.accountType = $event" placeholder="Select an account type…" />
+              </label>
+
+              <label>
+                Joint or single account
+                <app-select [options]="accountOwnershipOptions" [ngModel]="form.accountOwnership" name="accountOwnership"
+                  (ngModelChange)="form.accountOwnership = $event" placeholder="Select…" />
+              </label>
+
+              <label>
+                Account opening state
+                <input type="text" name="accountOpeningState" [(ngModel)]="form.accountOpeningState" />
+              </label>
+
+              <label>
+                Routing number
+                <input type="text" name="routingNumber" inputmode="numeric" maxlength="9" placeholder="123456789"
+                  [ngModel]="form.routingNumber" (ngModelChange)="onRoutingNumberChange($event)"
+                [class.invalid]="routingInvalid()" />
+                @if (routingInvalid()) {
+                  <span class="field-error">Routing number must be exactly 9 digits.</span>
+                }
+                <span class="hint">Exactly 9 digits.</span>
+              </label>
+
+              <label>
+                Account number
+                <input type="text" name="accountNumber" inputmode="numeric" maxlength="17"
+                  [ngModel]="form.accountNumber" (ngModelChange)="onAccountNumberChange($event)" />
+                <span class="hint">3 to 17 digits.</span>
+              </label>
+            </div>
+          }
+
+          @if (form.paymentMethod === 'CARD') {
+            <div class="form-grid">
+              <label>
+                Card type
+                <app-select [options]="cardTypeOptions" [ngModel]="form.cardType" name="cardType"
+                  (ngModelChange)="form.cardType = $event" placeholder="Select a card type…" />
+              </label>
+
+              <label>
+                Card number
+                <input type="text" name="cardNumber" inputmode="numeric" maxlength="19"
+                  [ngModel]="form.cardNumber" (ngModelChange)="onCardNumberChange($event)" />
+                <span class="hint">13 to 19 digits.</span>
+              </label>
+
+              <label>
+                Expiry
+                <input type="text" name="cardExpiry" inputmode="numeric" maxlength="5" placeholder="MM/YY"
+                  [ngModel]="form.cardExpiry" (ngModelChange)="onCardExpiryChange($event)" />
+              </label>
+            </div>
+          }
         </div>
       </div>
 

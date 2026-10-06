@@ -31,33 +31,34 @@ router.get(
   })
 );
 
-// Admin needs it for the "assign to retention person" dropdown; Retention needs it for the
-// Retention queue's "filter by teammate" dropdown.
+// Admin/Manager need it for the "assign to retention person" dropdown; Retention needs it
+// for the Retention queue's "filter by teammate" dropdown.
 router.get(
   "/retention",
-  requireRole("ADMIN", "RETENTION"),
+  requireRole("ADMIN", "MANAGER", "RETENTION"),
   asyncHandler(async (_req, res) => {
     const retention = await userService.listRetention();
     return apiSuccess(res, { retention });
   })
 );
 
-// Admins need the client list for the "assign to client" step.
+// Admin/Manager need the client list for the "assign to client" step. Closer/Retention
+// need it for the optional "suggested client" hint on their own lead forms.
 router.get(
   "/clients",
-  requireRole("ADMIN"),
+  requireRole("ADMIN", "MANAGER", "CLOSER", "RETENTION"),
   asyncHandler(async (_req, res) => {
     const clients = await userService.listClients();
     return apiSuccess(res, { clients });
   })
 );
 
-// State Sheet — every CLOSER/TEAM_LEAD/ADMIN can see which clients cover which states
-// and the carriers available there. Registered ahead of the generic "/:id" below so the
-// literal path wins the match.
+// State Sheet — every CLOSER/TEAM_LEAD/RETENTION/ADMIN/MANAGER can see which clients cover
+// which states and the carriers available there. Registered ahead of the generic "/:id"
+// below so the literal path wins the match.
 router.get(
   "/state-sheet",
-  requireRole("ADMIN", "CLOSER", "TEAM_LEAD"),
+  requireRole("ADMIN", "MANAGER", "CLOSER", "TEAM_LEAD", "RETENTION"),
   asyncHandler(async (_req, res) => {
     const clients = await userService.listClientCoverage();
     return apiSuccess(res, { clients });

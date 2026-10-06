@@ -11,10 +11,11 @@ import {
   LucideThumbsUp,
 } from '@lucide/angular';
 import { LeadService } from '../../../core/services/lead.service';
-import { LeadPreview } from '../../../core/models/lead.model';
+import { Lead } from '../../../core/models/lead.model';
 import { createListView } from '../../../core/list-view';
 import { getAvatarTone, getInitials, humanizeEnum, isToday, timeAgo } from '../../../core/format-utils';
 import { Modal } from '../../../shared/ui/modal';
+import { LeadDetail } from '../../../shared/lead-detail';
 import { Detail, EmptyState, Pagination, SearchBox, SkeletonRows, StatTile } from '../../../shared/ui/ui';
 
 @Component({
@@ -22,6 +23,7 @@ import { Detail, EmptyState, Pagination, SearchBox, SkeletonRows, StatTile } fro
   imports: [
     FormsModule,
     Modal,
+    LeadDetail,
     Detail,
     StatTile,
     SearchBox,
@@ -42,15 +44,15 @@ import { Detail, EmptyState, Pagination, SearchBox, SkeletonRows, StatTile } fro
 export class AssignedLeads implements OnInit {
   private readonly leadService = inject(LeadService);
 
-  readonly leads = signal<LeadPreview[]>([]);
+  readonly leads = signal<Lead[]>([]);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
   readonly notice = signal<string | null>(null);
   readonly busyId = signal<string | null>(null);
 
-  readonly selected = signal<LeadPreview | null>(null);
+  readonly selected = signal<Lead | null>(null);
   /** Non-null while the reject dialog is collecting a reason. */
-  readonly rejecting = signal<LeadPreview | null>(null);
+  readonly rejecting = signal<Lead | null>(null);
   rejectReason = '';
 
   readonly humanizeEnum = humanizeEnum;
@@ -58,14 +60,15 @@ export class AssignedLeads implements OnInit {
   readonly getInitials = getInitials;
   readonly getAvatarTone = getAvatarTone;
 
-  readonly view = createListView<LeadPreview>({
+  readonly view = createListView<Lead>({
     source: this.leads,
     searchFields: (l) => [l.customerName, l.state, l.zipcode, l.need, l.closer?.name],
     sorters: {
       customerName: (l) => l.customerName,
       createdAt: (l) => new Date(l.createdAt).getTime(),
+      updatedAt: (l) => new Date(l.updatedAt ?? l.createdAt).getTime(),
     },
-    initialSort: { key: 'createdAt', dir: 'desc' },
+    initialSort: { key: 'updatedAt', dir: 'desc' },
     pageSize: 10,
   });
 
@@ -99,7 +102,7 @@ export class AssignedLeads implements OnInit {
     return this.view.sortDir() === 'asc' ? '↑' : '↓';
   }
 
-  async accept(lead: LeadPreview, event?: Event): Promise<void> {
+  async accept(lead: Lead, event?: Event): Promise<void> {
     event?.stopPropagation();
     this.error.set(null);
     this.busyId.set(lead.id);
@@ -116,7 +119,7 @@ export class AssignedLeads implements OnInit {
     }
   }
 
-  openReject(lead: LeadPreview, event?: Event): void {
+  openReject(lead: Lead, event?: Event): void {
     event?.stopPropagation();
     this.error.set(null);
     this.rejectReason = '';

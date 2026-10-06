@@ -2,7 +2,7 @@
   <div class="page-head">
     <div>
       <h1>Team</h1>
-      <p class="sub">Internal staff accounts — Junior Closers, Closers, Team Leads, and Admins.</p>
+      <p class="sub">Internal staff accounts — Junior Closers, Closers, Team Leads, Managers, and Admins.</p>
     </div>
     <div class="page-head-actions">
       <button type="button" class="btn" (click)="openCreate()">
@@ -23,6 +23,9 @@
     </app-stat-tile>
     <app-stat-tile [value]="stats().teamLeads" label="Team leads" tone="tone-e">
       <svg lucideUsers></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().managers" label="Managers" tone="tone-gold">
+      <svg lucideShieldCheck></svg>
     </app-stat-tile>
     <app-stat-tile [value]="stats().admins" label="Admins" tone="tone-b">
       <svg lucideShieldCheck></svg>

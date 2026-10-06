@@ -17,7 +17,8 @@ async function upsertUser(
     | "TEAM_LEAD"
     | "QA_JUNIOR_CLOSER"
     | "QA_CLOSER"
-    | "RETENTION",
+    | "RETENTION"
+    | "MANAGER",
   pricing?: { levelCost: number; gradedCost: number; modifiedCost: number; giCost: number },
 ) {
   const password = await bcrypt.hash("Password1", 10);
@@ -124,6 +125,7 @@ async function main() {
     giCost: 3_100,
   });
   await upsertUser("teamlead@thegoodfellas.dev", "Taylor Lead", "TEAM_LEAD");
+  await upsertUser("manager@thegoodfellas.dev", "Morgan Manager", "MANAGER");
   const qaJunior = await upsertUser("qa.junior@thegoodfellas.dev", "Quinn Abara", "QA_JUNIOR_CLOSER");
   const qaCloser = await upsertUser("qa.closer@thegoodfellas.dev", "Quentin Ashby", "QA_CLOSER");
   // Two accounts (not one) so the cross-edit "filter to a teammate and work their lead"

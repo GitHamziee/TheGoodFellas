@@ -53,30 +53,6 @@ export class QaReviewHistory implements OnInit {
     { label: 'Fail', value: 'FAIL' },
   ];
 
-  readonly juniorDetailRows = computed(() => {
-    const sel = this.selected();
-    if (!sel || this.lane() !== 'JUNIOR_CLOSER') return [];
-    const j = sel.lead as QaJuniorLeadRow;
-    const row = (k: string, v: unknown, formatted?: string) =>
-      v === null || v === undefined || v === '' ? null : { k, v: formatted ?? String(v) };
-    return [
-      row('Phone', j.phone, formatPhone(j.phone)),
-      row('State', j.state),
-      row('Zipcode', j.zipcode),
-      row('Marital status', j.maritalStatus),
-      row('Gender', j.gender),
-      row('Date of birth', j.dob),
-      row('Age', j.age),
-      row('Smoker', j.smoker, j.smoker === null || j.smoker === undefined ? undefined : j.smoker ? 'Yes' : 'No'),
-      row('Health conditions', j.healthConditions),
-      row('Need', j.need),
-      row('Income source', j.incomeSource),
-      row('Annual income', j.annualIncome),
-      row('Junior closer notes', j.juniorNotes),
-      row('D-code', j.dCode),
-    ].filter((r): r is { k: string; v: string } => r !== null);
-  });
-
   async ngOnInit(): Promise<void> {
     this.loading.set(true);
     try {

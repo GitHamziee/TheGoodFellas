@@ -1,4 +1,4 @@
-import { AccountType, DCode, DraftReason, IncomeSource, LeadNeed, PayerType, PlanType, RetiredIncomeType } from './models/lead.model';
+import { AccountOwnership, AccountType, CardType, DCode, DraftReason, IncomeSource, LeadNeed, PayerType, PaymentMethod, PlanType, RetiredIncomeType } from './models/lead.model';
 
 /** Shared by Junior intake and Closer enrichment — same field, same options, both forms. */
 export const MARITAL_STATUS_OPTIONS: { value: string; label: string }[] = [
@@ -48,6 +48,22 @@ export const PAYER_OPTIONS: { value: PayerType; label: string }[] = [
   { value: 'SOMEONE_ELSE', label: 'Someone else' },
 ];
 
+export const PAYMENT_METHOD_OPTIONS: { value: PaymentMethod; label: string }[] = [
+  { value: 'BANK_ACCOUNT', label: 'Bank account' },
+  { value: 'CARD', label: 'Card' },
+];
+
+export const CARD_TYPE_OPTIONS: { value: CardType; label: string }[] = [
+  { value: 'CREDIT', label: 'Credit card' },
+  { value: 'DEBIT', label: 'Debit card' },
+  { value: 'DIRECT_EXPRESS', label: 'Direct Express card' },
+];
+
+export const ACCOUNT_OWNERSHIP_OPTIONS: { value: AccountOwnership; label: string }[] = [
+  { value: 'SINGLE', label: 'Single account' },
+  { value: 'JOINT', label: 'Joint account' },
+];
+
 /** The four plan types a closer picks from during enrichment — see User.levelCost etc.
  * on the server for the per-client cost of each. `humanizeEnum` would render GI as "Gi",
  * so this carries its own labels rather than reusing that helper. */
@@ -73,9 +89,24 @@ export const D_CODE_OPTIONS: { value: DCode; label: string }[] = [
 ];
 
 export const DRAFT_REASON_OPTIONS: { value: DraftReason; label: string }[] = [
-  { value: 'MISSING_INFO', label: 'Missing info' },
-  { value: 'CLIENT_NOT_REACHABLE', label: 'Client not reachable' },
-  { value: 'NEEDS_FOLLOW_UP', label: 'Needs follow-up' },
-  { value: 'PENDING_DOCUMENTATION', label: 'Pending documentation' },
-  { value: 'OTHER', label: 'Other' },
+  { value: 'LOST_ON_SOCIAL', label: 'Lost on social' },
+  { value: 'LOST_ON_ACCOUNT', label: 'Lost on account' },
+  { value: 'LOST_ON_PRICES', label: 'Lost on prices' },
+  { value: 'DEMENTIA_ALZHEIMERS', label: "Dementia/Alzheimer's" },
+  { value: 'NOT_A_DM', label: 'Not a DM' },
+  { value: 'DNC', label: 'DNC' },
+  { value: 'BAD_STATE', label: 'Bad state' },
+  { value: 'CALLBACK', label: 'Callback' },
+  { value: 'HUNGUP', label: 'Hungup' },
+  { value: 'OVER_AGE', label: 'Over age' },
+  { value: 'CLOSED_DEAD_DEAL', label: 'Closed - dead deal' },
+  { value: 'NOT_IN_SERVICE', label: 'Not in service' },
+  { value: 'OTHER', label: 'Other (type manually)' },
 ];
+
+/** `humanizeEnum` would mangle acronyms here (DNC -> "Dnc", NOT_A_DM -> "Not a dm") the
+ * same way it botches PlanType's GI — see PLAN_TYPE_LABEL above. Wherever a draft reason
+ * is displayed, look it up here instead of calling humanizeEnum on the raw value. */
+export const DRAFT_REASON_LABEL: Record<DraftReason, string> = Object.fromEntries(
+  DRAFT_REASON_OPTIONS.map((o) => [o.value, o.label]),
+) as Record<DraftReason, string>;

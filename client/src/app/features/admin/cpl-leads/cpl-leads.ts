@@ -162,8 +162,9 @@ export class AdminCplLeads implements OnInit {
     sorters: {
       customerName: (l) => l.customerName,
       createdAt: (l) => new Date(l.createdAt).getTime(),
+      updatedAt: (l) => new Date(l.updatedAt ?? l.createdAt).getTime(),
     },
-    initialSort: { key: 'createdAt', dir: 'desc' },
+    initialSort: { key: 'updatedAt', dir: 'desc' },
     pageSize: 10,
   });
 
@@ -287,6 +288,27 @@ export class AdminCplLeads implements OnInit {
     this.dateFrom.set('');
     this.dateTo.set('');
     this.view.page.set(1);
+  }
+
+  /**
+   * Records the client's accept decision on their behalf — the normal path is the client
+   * logging in and accepting it themselves, but that decision is often made over a phone
+   * call in practice, so admin needs a way to record it without waiting on the client's login.
+   */
+  async approveLead(lead: Lead, event?: Event): Promise<void> {
+    event?.stopPropagation();
+    this.error.set(null);
+    this.busyId.set(lead.id);
+    try {
+      const updated = await this.leadService.approveLead(lead.id);
+      this.leads.update((rows) => rows.map((l) => (l.id === lead.id ? updated : l)));
+      if (this.detailLead()?.id === lead.id) this.detailLead.set(updated);
+      this.notice.set(`${lead.customerName} approved on behalf of ${updated.client?.name ?? 'the client'}.`);
+    } catch (err: any) {
+      this.error.set(err?.error?.error ?? 'Could not approve this lead.');
+    } finally {
+      this.busyId.set(null);
+    }
   }
 
   // ─── Assign ────────────────────────────────────────────────

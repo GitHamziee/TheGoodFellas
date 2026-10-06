@@ -100,7 +100,29 @@
                 @if (item.message.deleted) {
                   <span class="wa-deleted">This message was deleted</span>
                 } @else {
-                  <span class="wa-text">{{ item.message.body }}</span>
+                  @if (item.message.attachment; as attachment) {
+                    @if (isImage(attachment)) {
+                      <button type="button" class="wa-image" (click)="downloadAttachment(attachment)">
+                        @if (previewUrlFor(item.message); as src) {
+                          <img [src]="src" [alt]="attachment.name" />
+                        } @else {
+                          <span class="wa-image-loading"><svg lucideLoaderCircle></svg></span>
+                        }
+                      </button>
+                    } @else {
+                      <button type="button" class="wa-file" (click)="downloadAttachment(attachment)">
+                        <span class="wa-file-icon"><svg lucideFile></svg></span>
+                        <span class="wa-file-info">
+                          <span class="wa-file-name">{{ attachment.name }}</span>
+                          <span class="wa-file-size">{{ formatFileSize(attachment.size) }}</span>
+                        </span>
+                        <svg class="wa-file-download" lucideDownload></svg>
+                      </button>
+                    }
+                  }
+                  @if (item.message.body) {
+                    <span class="wa-text">{{ item.message.body }}</span>
+                  }
                 }
 
                 <span class="wa-meta">
@@ -149,6 +171,26 @@
     </div>
 
     <footer class="wa-composer">
+      <input
+        #fileInput
+        type="file"
+        hidden
+        (change)="onFileSelected($event)"
+      />
+      <button
+        type="button"
+        class="wa-attach"
+        [disabled]="!activeRoom() || uploading()"
+        (click)="triggerFilePick()"
+        aria-label="Attach a file"
+        title="Attach a file"
+      >
+        @if (uploading()) {
+          <svg class="wa-spin" lucideLoaderCircle></svg>
+        } @else {
+          <svg lucidePaperclip></svg>
+        }
+      </button>
       <textarea
         rows="1"
         placeholder="Type a message"

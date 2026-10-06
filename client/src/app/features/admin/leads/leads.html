@@ -116,9 +116,10 @@
                 Status <span class="arrow">{{ sortArrow('status') }}</span>
               </th>
               <th class="hide-md">Payment</th>
-              <th class="sortable right" (click)="view.toggleSort('createdAt')">
+              <th class="sortable" (click)="view.toggleSort('createdAt')">
                 Created <span class="arrow">{{ sortArrow('createdAt') }}</span>
               </th>
+              <th class="right">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -176,8 +177,60 @@
                     <span class="empty">—</span>
                   }
                 </td>
-                <td class="right">
+                <td>
                   <span class="chip"><svg lucideClock></svg>{{ timeAgo(lead.createdAt) }}</span>
+                </td>
+                <td (click)="$event.stopPropagation()">
+                  <div class="row-actions">
+                    @if (lead.status === 'SUBMITTED' || lead.status === 'REJECTED') {
+                      <button
+                        type="button"
+                        class="btn btn--sm btn--icon btn--ghost"
+                        title="Send back"
+                        aria-label="Send back"
+                        (click)="openReturn(lead, $event)"
+                      >
+                        <svg lucideUndo2></svg>
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn--sm btn--icon btn--ghost"
+                        title="Assign external"
+                        aria-label="Assign external"
+                        (click)="openAssignExternal(lead, $event)"
+                      >
+                        <svg lucideBuilding2></svg>
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn--sm btn--icon"
+                        title="Assign"
+                        aria-label="Assign"
+                        (click)="openAssign(lead, $event)"
+                      >
+                        <svg lucideUserCheck></svg>
+                      </button>
+                    }
+                    @if (lead.status === 'ASSIGNED') {
+                      <button
+                        type="button"
+                        class="btn btn--sm btn--success"
+                        title="Approve on the client's behalf"
+                        [disabled]="busyId() === lead.id"
+                        (click)="approveLead(lead, $event)"
+                      >
+                        @if (busyId() === lead.id) {
+                          <span class="spinner"></span>
+                        } @else {
+                          <svg lucideCircleCheck></svg>
+                        }
+                        Approve
+                      </button>
+                    }
+                    @if (lead.status !== 'SUBMITTED' && lead.status !== 'REJECTED' && lead.status !== 'ASSIGNED') {
+                      <span class="empty">—</span>
+                    }
+                  </div>
                 </td>
               </tr>
             }
@@ -205,6 +258,31 @@
     <app-lead-detail [lead]="lead" [unmasked]="true" />
 
     <div footer>
+      @if (lead.status === 'SUBMITTED' || lead.status === 'REJECTED') {
+        <button type="button" class="btn btn--ghost" (click)="selected.set(null); openReturn(lead)">
+          <svg lucideUndo2></svg> Send back
+        </button>
+        <button type="button" class="btn btn--ghost" (click)="selected.set(null); openAssignExternal(lead)">
+          <svg lucideBuilding2></svg> Assign to external
+        </button>
+        <button type="button" class="btn" (click)="selected.set(null); openAssign(lead)">
+          <svg lucideUserCheck></svg> Assign to client
+        </button>
+      }
+      @if (lead.status === 'ASSIGNED') {
+        <button
+          type="button"
+          class="btn btn--success"
+          [disabled]="busyId() === lead.id"
+          (click)="approveLead(lead, $event)"
+        >
+          @if (busyId() === lead.id) {
+            <span class="spinner"></span> Approving…
+          } @else {
+            <svg lucideCircleCheck></svg> Approve on the client's behalf
+          }
+        </button>
+      }
       @if (lead.status === 'ACCEPTED' || lead.status === 'ASSIGNED_EXTERNAL') {
         @if (lead.paymentStatus === 'PAID') {
           @if (lead.status === 'ACCEPTED') {
@@ -229,6 +307,204 @@
           <span class="hint">Select this lead in the list and use "Mark Paid" to record the amount received.</span>
         }
       }
+    </div>
+  </app-modal>
+}
+
+<!-- Send back for correction -->
+@if (returnLead(); as lead) {
+  <app-modal title="Send back for editing" [subtitle]="lead.customerName" (close)="returnLead.set(null)">
+    @if (error()) {
+      <div class="error">{{ error() }}</div>
+    }
+    <div class="warn">
+      This lead reappears for them to correct. It comes straight back to you once they resubmit.
+    </div>
+
+    <div class="pick-list">
+      @if (lead.closer; as closer) {
+        <button
+          type="button"
+          class="pick-row"
+          [class.chosen]="returnTarget() === 'CLOSER'"
+          (click)="returnTarget.set('CLOSER')"
+        >
+          <span class="avatar-sm" [class]="getAvatarTone(closer.id)">
+            {{ getInitials(closer.name) }}
+          </span>
+          <span class="who">
+            <span class="cell-main">{{ closer.name }} — Closer</span>
+            <span class="cell-sub">Policy, billing and beneficiary detail</span>
+          </span>
+          @if (returnTarget() === 'CLOSER') {
+            <svg lucideCircleCheck class="tick"></svg>
+          }
+        </button>
+      }
+
+      @if (lead.juniorCloser; as junior) {
+        <button
+          type="button"
+          class="pick-row"
+          [class.chosen]="returnTarget() === 'JUNIOR_CLOSER'"
+          (click)="returnTarget.set('JUNIOR_CLOSER')"
+        >
+          <span class="avatar-sm" [class]="getAvatarTone(junior.id)">
+            {{ getInitials(junior.name) }}
+          </span>
+          <span class="who">
+            <span class="cell-main">{{ junior.name }} — Junior Closer</span>
+            <span class="cell-sub">Original intake detail</span>
+          </span>
+          @if (returnTarget() === 'JUNIOR_CLOSER') {
+            <svg lucideCircleCheck class="tick"></svg>
+          }
+        </button>
+      }
+    </div>
+
+    <div class="form-grid">
+      <label class="full">
+        What needs fixing?
+        <textarea
+          rows="3"
+          name="returnReason"
+          [ngModel]="returnReason()"
+          (ngModelChange)="returnReason.set($event)"
+          placeholder="e.g. Date of birth doesn't match the recording — please re-check."
+        ></textarea>
+      </label>
+    </div>
+
+    <div footer>
+      <button
+        type="button"
+        class="btn"
+        [disabled]="!returnReason().trim() || busyId() === lead.id"
+        (click)="confirmReturn()"
+      >
+        @if (busyId() === lead.id) {
+          <span class="spinner"></span> Sending…
+        } @else {
+          <svg lucideUndo2></svg> Send back
+        }
+      </button>
+    </div>
+  </app-modal>
+}
+
+<!-- Assign -->
+@if (assignLead(); as lead) {
+  <app-modal
+    title="Assign lead"
+    [subtitle]="'Choose which client receives ' + lead.customerName"
+    (close)="assignLead.set(null)"
+  >
+    @if (error()) {
+      <div class="error">{{ error() }}</div>
+    }
+
+    <app-search-box
+      [value]="clientSearch()"
+      placeholder="Search clients by name or email…"
+      (valueChange)="clientSearch.set($event)"
+    />
+
+    <div class="pick-list">
+      @for (client of filteredClients(); track client.id) {
+        <button
+          type="button"
+          class="pick-row"
+          [class.chosen]="chosenClientId() === client.id"
+          (click)="chosenClientId.set(client.id)"
+        >
+          <span class="avatar-sm" [class]="getAvatarTone(client.id)">{{ getInitials(client.name) }}</span>
+          <span class="who">
+            <span class="cell-main">{{ client.name }}</span>
+            <span class="cell-sub">{{ client.email }}</span>
+          </span>
+          @if (chosenClientId() === client.id) {
+            <svg lucideCircleCheck class="tick"></svg>
+          }
+        </button>
+      } @empty {
+        <app-empty-state title="No clients match" hint="Clear the search to see everyone.">
+          <svg lucideUserCheck></svg>
+        </app-empty-state>
+      }
+    </div>
+
+    <div footer>
+      <button
+        type="button"
+        class="btn"
+        [disabled]="!chosenClientId() || busyId() === lead.id"
+        (click)="confirmAssign()"
+      >
+        @if (busyId() === lead.id) {
+          <span class="spinner"></span> Assigning…
+        } @else {
+          <svg lucideUserCheck></svg> Confirm assignment
+        }
+      </button>
+    </div>
+  </app-modal>
+}
+
+<!-- Assign external -->
+@if (assignExternalLead(); as lead) {
+  <app-modal
+    title="Assign to external client"
+    [subtitle]="'Choose which external client receives ' + lead.customerName"
+    (close)="assignExternalLead.set(null)"
+  >
+    @if (error()) {
+      <div class="error">{{ error() }}</div>
+    }
+
+    <app-search-box
+      [value]="externalClientSearch()"
+      placeholder="Search external clients by name, company, or email…"
+      (valueChange)="externalClientSearch.set($event)"
+    />
+
+    <div class="pick-list">
+      @for (client of filteredExternalClients(); track client.id) {
+        <button
+          type="button"
+          class="pick-row"
+          [class.chosen]="chosenExternalClientId() === client.id"
+          (click)="chosenExternalClientId.set(client.id)"
+        >
+          <span class="avatar-sm" [class]="getAvatarTone(client.id)">{{ getInitials(client.name) }}</span>
+          <span class="who">
+            <span class="cell-main">{{ client.name }}</span>
+            <span class="cell-sub">{{ client.company || client.email || 'No contact info' }}</span>
+          </span>
+          @if (chosenExternalClientId() === client.id) {
+            <svg lucideCircleCheck class="tick"></svg>
+          }
+        </button>
+      } @empty {
+        <app-empty-state title="No external clients match" hint="Clear the search to see everyone.">
+          <svg lucideBuilding2></svg>
+        </app-empty-state>
+      }
+    </div>
+
+    <div footer>
+      <button
+        type="button"
+        class="btn"
+        [disabled]="!chosenExternalClientId() || busyId() === lead.id"
+        (click)="confirmAssignExternal()"
+      >
+        @if (busyId() === lead.id) {
+          <span class="spinner"></span> Assigning…
+        } @else {
+          <svg lucideBuilding2></svg> Confirm assignment
+        }
+      </button>
     </div>
   </app-modal>
 }

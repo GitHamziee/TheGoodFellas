@@ -11,9 +11,13 @@ import type { ChatRoom, Role } from "@prisma/client";
  *   JUNIOR_CLOSER → JUNIOR_CLOSERS only
  *   TEAM_LEAD     → CLOSERS + JUNIOR_CLOSERS + TEAM_LEADS — oversees both roles, so it
  *                   sits in both of their channels (talks to Closer, Junior Closer, and
- *                   Admin there) plus its own channel for team-lead-to-team-lead + admin
- *   RETENTION     → RETENTION only (its own channel, same pattern as TEAM_LEADS)
+ *                   Admin there) plus its own channel, labelled "Management" (Team Lead +
+ *                   Manager + Admin — see ROOM_LABEL below)
+ *   RETENTION     → RETENTION only, labelled "Retention Department" (Retention + Manager
+ *                   + Admin — same pattern as TEAM_LEADS)
  *   ADMIN         → all four (this is how each group talks to admin)
+ *   MANAGER       → all four, same as ADMIN (everything but Clients/Team/External
+ *                   Clients/Expenses — chat isn't part of that exclusion)
  *   CLIENT        → none (clients are outside the org, no chat access at all)
  *   QA_JUNIOR_CLOSER, QA_CLOSER → none (internal metrics roles, not part of team chat)
  */
@@ -28,6 +32,7 @@ export function roomsFor(role: Role): ChatRoom[] {
     case "RETENTION":
       return ["RETENTION"];
     case "ADMIN":
+    case "MANAGER":
       return ["CLOSERS", "JUNIOR_CLOSERS", "TEAM_LEADS", "RETENTION"];
     case "CLIENT":
     case "QA_JUNIOR_CLOSER":
@@ -47,11 +52,15 @@ export function parseRoom(value: unknown): ChatRoom | null {
   return typeof value === "string" && ROOM_VALUES.includes(value) ? (value as ChatRoom) : null;
 }
 
+// Display names only — the ChatRoom enum values themselves (TEAM_LEADS, RETENTION) stay
+// as-is so this isn't a data migration, just a relabel. TEAM_LEADS -> "Management" reflects
+// who's actually in it (Team Lead + Manager + Admin); RETENTION -> "Retention Department"
+// per the same request, membership already being exactly Admin/Manager/Retention below.
 export const ROOM_LABEL: Record<ChatRoom, string> = {
   CLOSERS: "Closers",
   JUNIOR_CLOSERS: "Junior Closers",
-  TEAM_LEADS: "Team Leads",
-  RETENTION: "Retention",
+  TEAM_LEADS: "Management",
+  RETENTION: "Retention Department",
 };
 
 /** Socket.IO room name — namespaced so it can't collide with any future per-user room. */

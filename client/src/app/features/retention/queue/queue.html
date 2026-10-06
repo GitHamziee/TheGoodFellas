@@ -74,7 +74,12 @@
             @for (lead of view.rows(); track lead.id) {
               <tr class="clickable">
                 <td>
-                  <div class="cell-main">{{ lead.customerName }}</div>
+                  <div class="cell-main">
+                    {{ lead.customerName }}
+                    @if (lead.status === 'DRAFT' || lead.status === 'RETURNED_TO_RETENTION') {
+                      <app-status-badge [status]="lead.status" />
+                    }
+                  </div>
                   <div class="cell-sub">{{ lead.carrierName || '—' }}</div>
                 </td>
                 <td class="hide-sm">{{ formatPhone(lead.phone) }}</td>

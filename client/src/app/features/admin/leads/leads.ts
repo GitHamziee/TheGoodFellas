@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import {
   LucideBanknote,
   LucideBanknoteX,
+  LucideBuilding2,
   LucideCircleCheck,
   LucideCircleX,
   LucideClock,
@@ -10,10 +11,14 @@ import {
   LucideInbox,
   LucideLayers,
   LucideSend,
+  LucideUndo2,
+  LucideUserCheck,
   LucideWallet,
 } from '@lucide/angular';
 import { LeadService } from '../../../core/services/lead.service';
 import { UserService } from '../../../core/services/user.service';
+import { ExternalClientService } from '../../../core/services/external-client.service';
+import { ExternalClient } from '../../../core/models/external-client.model';
 import { Lead, LeadStatus } from '../../../core/models/lead.model';
 import { createListView } from '../../../core/list-view';
 import { formatPhone, formatPkr, getAvatarTone, getInitials, timeAgo } from '../../../core/format-utils';
@@ -41,6 +46,12 @@ const STATUS_FILTERS: { label: string; value: string }[] = [
   { label: 'Charged Back', value: 'CHARGED_BACK' },
 ];
 
+interface LookupUser {
+  id: string;
+  name: string;
+  email: string;
+}
+
 @Component({
   selector: 'app-admin-leads',
   imports: [
@@ -65,20 +76,40 @@ const STATUS_FILTERS: { label: string; value: string }[] = [
     LucideBanknoteX,
     LucideClock,
     LucideFileText,
+    LucideUndo2,
+    LucideBuilding2,
+    LucideUserCheck,
   ],
   templateUrl: './leads.html',
 })
 export class AdminLeads implements OnInit {
   private readonly leadService = inject(LeadService);
   private readonly userService = inject(UserService);
+  private readonly externalClientService = inject(ExternalClientService);
 
   readonly leads = signal<Lead[]>([]);
+  readonly clients = signal<LookupUser[]>([]);
+  readonly externalClients = signal<ExternalClient[]>([]);
   readonly loading = signal(true);
   readonly busyId = signal<string | null>(null);
   readonly error = signal<string | null>(null);
   readonly notice = signal<string | null>(null);
   readonly selected = signal<Lead | null>(null);
   readonly closerFilter = signal('');
+
+  /** Which lead each queue-style modal is acting on — only one is ever open at a time. */
+  readonly assignLead = signal<Lead | null>(null);
+  readonly assignExternalLead = signal<Lead | null>(null);
+  readonly returnLead = signal<Lead | null>(null);
+
+  readonly clientSearch = signal('');
+  readonly chosenClientId = signal('');
+  readonly externalClientSearch = signal('');
+  readonly chosenExternalClientId = signal('');
+
+  /** Who to send the lead back to, and what they need to fix. */
+  readonly returnTarget = signal<'JUNIOR_CLOSER' | 'CLOSER'>('CLOSER');
+  readonly returnReason = signal('');
 
   readonly statusFilters = STATUS_FILTERS;
   readonly getInitials = getInitials;
@@ -132,8 +163,9 @@ export class AdminLeads implements OnInit {
       customerName: (l) => l.customerName,
       status: (l) => l.status,
       createdAt: (l) => new Date(l.createdAt).getTime(),
+      updatedAt: (l) => new Date(l.updatedAt ?? l.createdAt).getTime(),
     },
-    initialSort: { key: 'createdAt', dir: 'desc' },
+    initialSort: { key: 'updatedAt', dir: 'desc' },
     pageSize: 12,
   });
 
@@ -209,8 +241,35 @@ export class AdminLeads implements OnInit {
     this.selectedIds.set(new Set());
   }
 
+  /** Client dropdown, narrowed by the search box inside the assign modal. */
+  readonly filteredClients = computed(() => {
+    const term = this.clientSearch().trim().toLowerCase();
+    if (!term) return this.clients();
+    return this.clients().filter(
+      (c) => c.name.toLowerCase().includes(term) || c.email.toLowerCase().includes(term),
+    );
+  });
+
+  /** External client dropdown, narrowed by the search box inside the assign-external modal. */
+  readonly filteredExternalClients = computed(() => {
+    const term = this.externalClientSearch().trim().toLowerCase();
+    if (!term) return this.externalClients();
+    return this.externalClients().filter(
+      (c) =>
+        c.name.toLowerCase().includes(term) ||
+        (c.company ?? '').toLowerCase().includes(term) ||
+        (c.email ?? '').toLowerCase().includes(term),
+    );
+  });
+
   async ngOnInit(): Promise<void> {
-    await this.refresh();
+    const [clients, externalClients] = await Promise.all([
+      this.userService.listClients(),
+      this.externalClientService.list(),
+      this.refresh(),
+    ]);
+    this.clients.set(clients);
+    this.externalClients.set(externalClients);
   }
 
   async refresh(): Promise<void> {
@@ -224,9 +283,118 @@ export class AdminLeads implements OnInit {
     }
   }
 
+  // ─── Assign ────────────────────────────────────────────────
+  openAssign(lead: Lead, event?: Event): void {
+    event?.stopPropagation();
+    this.error.set(null);
+    this.clientSearch.set('');
+    this.chosenClientId.set(lead.suggestedClientId ?? '');
+    this.assignLead.set(lead);
+  }
+
+  async confirmAssign(): Promise<void> {
+    const lead = this.assignLead();
+    const clientId = this.chosenClientId();
+    if (!lead || !clientId) return;
+
+    this.error.set(null);
+    this.busyId.set(lead.id);
+    try {
+      const updated = await this.leadService.assignLead(lead.id, clientId);
+      this.leads.update((rows) => rows.map((l) => (l.id === lead.id ? updated : l)));
+      if (this.selected()?.id === lead.id) this.selected.set(updated);
+      this.assignLead.set(null);
+      this.notice.set(`${lead.customerName} assigned to ${updated.client?.name ?? 'client'}.`);
+    } catch (err: any) {
+      this.error.set(err?.error?.error ?? 'Could not assign the lead.');
+    } finally {
+      this.busyId.set(null);
+    }
+  }
+
+  // ─── Assign external ──────────────────────────────────────
+  openAssignExternal(lead: Lead, event?: Event): void {
+    event?.stopPropagation();
+    this.error.set(null);
+    this.externalClientSearch.set('');
+    this.chosenExternalClientId.set('');
+    this.assignExternalLead.set(lead);
+  }
+
+  async confirmAssignExternal(): Promise<void> {
+    const lead = this.assignExternalLead();
+    const externalClientId = this.chosenExternalClientId();
+    if (!lead || !externalClientId) return;
+
+    this.error.set(null);
+    this.busyId.set(lead.id);
+    try {
+      const updated = await this.leadService.assignLeadExternal(lead.id, externalClientId);
+      this.leads.update((rows) => rows.map((l) => (l.id === lead.id ? updated : l)));
+      if (this.selected()?.id === lead.id) this.selected.set(updated);
+      this.assignExternalLead.set(null);
+      this.notice.set(`${lead.customerName} assigned to ${updated.externalClient?.name ?? 'external client'}.`);
+    } catch (err: any) {
+      this.error.set(err?.error?.error ?? 'Could not assign the lead.');
+    } finally {
+      this.busyId.set(null);
+    }
+  }
+
+  // ─── Send back for correction ──────────────────────────────
+  openReturn(lead: Lead, event?: Event): void {
+    event?.stopPropagation();
+    this.error.set(null);
+    this.returnTarget.set('CLOSER');
+    this.returnReason.set('');
+    this.returnLead.set(lead);
+  }
+
+  async confirmReturn(): Promise<void> {
+    const lead = this.returnLead();
+    const reason = this.returnReason().trim();
+    if (!lead || !reason) return;
+
+    this.error.set(null);
+    this.busyId.set(lead.id);
+    try {
+      const updated = await this.leadService.returnLead(lead.id, this.returnTarget(), reason);
+      this.leads.update((rows) => rows.map((l) => (l.id === lead.id ? updated : l)));
+      if (this.selected()?.id === lead.id) this.selected.set(updated);
+      this.returnLead.set(null);
+      const who = this.returnTarget() === 'JUNIOR_CLOSER' ? lead.juniorCloser?.name : lead.closer?.name;
+      this.notice.set(`${lead.customerName} sent back to ${who ?? 'the team'} to fix.`);
+    } catch (err: any) {
+      this.error.set(err?.error?.error ?? 'Could not send the lead back.');
+    } finally {
+      this.busyId.set(null);
+    }
+  }
+
   setCloserFilter(value: string): void {
     this.closerFilter.set(value);
     this.view.page.set(1);
+  }
+
+  /**
+   * Records the client's accept decision on their behalf — the normal path is the client
+   * logging in and accepting it themselves, but that decision is often made over a phone
+   * call in practice, so admin needs a way to record it without waiting on the client's login.
+   */
+  async approveLead(lead: Lead, event?: Event): Promise<void> {
+    event?.stopPropagation();
+    this.error.set(null);
+    this.busyId.set(lead.id);
+    try {
+      const updated = await this.leadService.approveLead(lead.id);
+      this.leads.update((rows) => rows.map((l) => (l.id === lead.id ? updated : l)));
+      if (this.selected()?.id === lead.id) this.selected.set(updated);
+      this.notice.set(`${lead.customerName} approved on behalf of ${updated.client?.name ?? 'the client'}.`);
+    } catch (err: any) {
+      this.error.set(err?.error?.error ?? 'Could not approve this lead.');
+    } finally {
+      this.busyId.set(null);
+    }
   }
 
   sortArrow(key: string): string {

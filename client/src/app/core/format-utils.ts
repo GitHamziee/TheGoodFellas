@@ -42,6 +42,41 @@ export function toDateInput(dateStr: string | null | undefined): string {
   return isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
 }
 
+/** Today in the yyyy-MM-dd shape a `<input type="date">` min/max expects. Native date
+ * inputs have no digit limit on the year segment without one — leave it unset and Chrome
+ * lets you keep typing past 4 digits (e.g. a year of "221465"). */
+export function todayDateInput(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/** Strips non-digit characters and caps length as you type — for SSN/routing/account/card
+ * inputs where the server enforces an exact digit count; this just stops garbage before
+ * it gets there (a plain text input has no digit-count limit on its own). */
+export function sanitizeDigits(value: string, maxLength: number): string {
+  return value.replace(/\D/g, '').slice(0, maxLength);
+}
+
+/** Formats free-typed digits into MM/YY as the user types (e.g. "1225" -> "12/25"). */
+export function formatCardExpiry(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 4);
+  if (digits.length <= 2) return digits;
+  return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+}
+
+/** Whole years between a date of birth and today — undefined if the dob is missing/invalid. */
+export function calculateAge(dob: string | null | undefined): number | undefined {
+  if (!dob) return undefined;
+  const birth = new Date(dob);
+  if (isNaN(birth.getTime())) return undefined;
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const hadBirthdayThisYear =
+    today.getMonth() > birth.getMonth() ||
+    (today.getMonth() === birth.getMonth() && today.getDate() >= birth.getDate());
+  if (!hadBirthdayThisYear) age--;
+  return age >= 0 ? age : undefined;
+}
+
 export function getInitials(name: string | null | undefined): string {
   if (!name) return '?';
   return name
@@ -112,6 +147,20 @@ export function maskAccount(value: string | null | undefined): string {
 /** "1 closer" / "3 closers" — pass an already-pluralized noun as `plural` for irregular cases. */
 export function pluralize(count: number, singular: string, plural: string = `${singular}s`): string {
   return `${count.toLocaleString('en-US')} ${count === 1 ? singular : plural}`;
+}
+
+/** "842 B" / "3.1 KB" / "4.2 MB" — one decimal place above the smallest unit. */
+export function formatFileSize(bytes: number | null | undefined): string {
+  if (bytes === null || bytes === undefined) return '—';
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ['KB', 'MB', 'GB'];
+  let value = bytes / 1024;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  return `${value.toFixed(1)} ${units[unitIndex]}`;
 }
 
 export function orDash(value: string | number | null | undefined): string {

@@ -96,8 +96,11 @@ export class AdminQueue implements OnInit {
   readonly chosenExternalClientId = signal('');
   readonly draft = signal<EditDraft | null>(null);
 
-  /** Who to send the lead back to, and what they need to fix. */
-  readonly returnTarget = signal<'JUNIOR_CLOSER' | 'CLOSER'>('CLOSER');
+  /** Who to send the lead back to, and what they need to fix. Null only if a lead somehow
+   *  has none of closer/junior closer/retention on it — the "Send back" action stays
+   *  disabled in that case rather than guessing a target. A RETENTION lead only ever
+   *  offers the RETENTION option (see queue.html) — it never has a closer or junior closer. */
+  readonly returnTarget = signal<'JUNIOR_CLOSER' | 'CLOSER' | 'RETENTION' | null>(null);
   readonly returnReason = signal('');
 
   readonly statusFilters = [
@@ -118,8 +121,9 @@ export class AdminQueue implements OnInit {
     sorters: {
       customerName: (l) => l.customerName,
       createdAt: (l) => new Date(l.createdAt).getTime(),
+      updatedAt: (l) => new Date(l.updatedAt ?? l.createdAt).getTime(),
     },
-    initialSort: { key: 'createdAt', dir: 'desc' },
+    initialSort: { key: 'updatedAt', dir: 'desc' },
     pageSize: 10,
   });
 
@@ -193,7 +197,9 @@ export class AdminQueue implements OnInit {
     event?.stopPropagation();
     this.error.set(null);
     this.clientSearch.set('');
-    this.chosenClientId.set('');
+    // Pre-select whoever the closer/retention person suggested — a convenience only, admin
+    // can still pick someone else before confirming.
+    this.chosenClientId.set(lead.suggestedClientId ?? '');
     this.assignLead.set(lead);
   }
 
@@ -251,7 +257,10 @@ export class AdminQueue implements OnInit {
   openReturn(lead: Lead, event?: Event): void {
     event?.stopPropagation();
     this.error.set(null);
-    this.returnTarget.set(lead.leadType === 'CPL' ? 'JUNIOR_CLOSER' : 'CLOSER');
+    // Default to whichever party actually exists on the lead.
+    this.returnTarget.set(
+      lead.closer ? 'CLOSER' : lead.juniorCloser ? 'JUNIOR_CLOSER' : lead.retention ? 'RETENTION' : null,
+    );
     this.returnReason.set('');
     this.returnLead.set(lead);
   }
@@ -259,16 +268,20 @@ export class AdminQueue implements OnInit {
   async confirmReturn(): Promise<void> {
     const lead = this.returnLead();
     const reason = this.returnReason().trim();
-    if (!lead || !reason) return;
+    const target = this.returnTarget();
+    if (!lead || !reason || !target) return;
 
     this.error.set(null);
     this.busyId.set(lead.id);
     try {
-      await this.leadService.returnLead(lead.id, this.returnTarget(), reason);
+      await this.leadService.returnLead(lead.id, target, reason);
       // It's now with the junior closer or closer, so it leaves the admin queue.
       this.leads.update((rows) => rows.filter((l) => l.id !== lead.id));
       this.returnLead.set(null);
-      const who = this.returnTarget() === 'JUNIOR_CLOSER' ? lead.juniorCloser?.name : lead.closer?.name;
+      const who =
+        target === 'JUNIOR_CLOSER' ? lead.juniorCloser?.name
+        : target === 'CLOSER' ? lead.closer?.name
+        : lead.retention?.name;
       this.notice.set(`${lead.customerName} sent back to ${who ?? 'the team'} to fix.`);
     } catch (err: any) {
       this.error.set(err?.error?.error ?? 'Could not send the lead back.');

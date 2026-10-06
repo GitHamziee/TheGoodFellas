@@ -18,6 +18,9 @@ enum Role {
   QA_JUNIOR_CLOSER
   QA_CLOSER
   RETENTION
+  // Everything an Admin can do except manage Client accounts, Team accounts, External
+  // Clients, and Expenses — see nav-config.ts's MANAGER entry for the exact page list.
+  MANAGER
 }
 
 // Pass/fail verdict on a QA review — see LeadReview and CallReview below. Internal
@@ -32,8 +35,11 @@ enum ReviewOutcome {
 // ASSIGNED           — admin assigned to a client, waiting for accept/reject
 // ACCEPTED           — client accepted (payment tracked separately via paymentStatus)
 // REJECTED           — client rejected, back with admin to edit/reassign
-// RETURNED_TO_JUNIOR — admin sent it back to the junior closer to correct their intake
-// RETURNED_TO_CLOSER — admin sent it back to the closer to correct their enrichment
+// RETURNED_TO_JUNIOR    — admin sent it back to the junior closer to correct their intake
+// RETURNED_TO_CLOSER    — admin sent it back to the closer to correct their enrichment
+// RETURNED_TO_RETENTION — admin sent a RETENTION lead back to the retention team to correct
+//                         it — the only valid return target for a RETENTION lead, since it
+//                         never has a junior closer or closer to send it back to instead
 // ASSIGNED_EXTERNAL  — admin handed it to an ExternalClient (no login, no accept/reject —
 //                      terminal, like ACCEPTED, and payment-trackable the same way)
 // DRAFT              — closer parked a half-baked enrichment instead of submitting; stays
@@ -53,6 +59,7 @@ enum LeadStatus {
   REJECTED
   RETURNED_TO_JUNIOR
   RETURNED_TO_CLOSER
+  RETURNED_TO_RETENTION
   ASSIGNED_EXTERNAL
   DRAFT
   CHARGED_BACK
@@ -60,10 +67,18 @@ enum LeadStatus {
 
 // Why the closer parked the lead instead of finishing it — required when saving a draft.
 enum DraftReason {
-  MISSING_INFO
-  CLIENT_NOT_REACHABLE
-  NEEDS_FOLLOW_UP
-  PENDING_DOCUMENTATION
+  LOST_ON_SOCIAL
+  LOST_ON_ACCOUNT
+  LOST_ON_PRICES
+  DEMENTIA_ALZHEIMERS
+  NOT_A_DM
+  DNC
+  BAD_STATE
+  CALLBACK
+  HUNGUP
+  OVER_AGE
+  CLOSED_DEAD_DEAL
+  NOT_IN_SERVICE
   OTHER
 }
 
@@ -121,6 +136,22 @@ enum AccountType {
 enum PayerType {
   SELF
   SOMEONE_ELSE
+}
+
+enum PaymentMethod {
+  BANK_ACCOUNT
+  CARD
+}
+
+enum CardType {
+  CREDIT
+  DEBIT
+  DIRECT_EXPRESS
+}
+
+enum AccountOwnership {
+  SINGLE
+  JOINT
 }
 
 // The four insurance plan types the closer picks from during enrichment. Fixed set,
@@ -184,6 +215,7 @@ model User {
   closerLeads       Lead[]        @relation("CloserLeads")
   clientLeads       Lead[]        @relation("ClientLeads")
   retentionLeads    Lead[]        @relation("RetentionLeads")
+  suggestedClientLeads Lead[]     @relation("SuggestedClientLeads")
   clientChargeBacks ChargeBack[]  @relation("ClientChargeBacks")
   chatMessages      ChatMessage[]
   chatReads         ChatRead[]
@@ -222,6 +254,11 @@ model Lead {
   // Set only for RETENTION leads — who Admin handed a form-submitted lead to. Null while an
   // imported lead is still sitting unassigned in the admin retention-import queue.
   retentionId      String?
+  // Non-binding hint a Closer or Retention person can set on a lead they build/enrich
+  // themselves — "I think this fits Client X" — so Admin has a heads-up in the queue.
+  // Never gates or performs the actual assignment; Admin still explicitly assigns via
+  // assignLeadToClient, which can pick a different client entirely.
+  suggestedClientId String?
 
   // CPA = today's pipeline. CPL leads never leave this default field set — no
   // enrichment step exists for them, not even Admin fills in Closer-only fields.
@@ -283,18 +320,28 @@ model Lead {
   initialDraftDate DateTime?
   futureDraftDate  DateTime?
   payer            PayerType?
+  // Bank account vs card — gates which of the two field groups below applies.
+  paymentMethod    PaymentMethod?
   bankName         String? // Payer = SELF
   accountTitle     String? // both
   payerSocial      String? // Payer = SOMEONE_ELSE
   accountType      AccountType?
+  accountOwnership AccountOwnership?
+  // State the bank account was opened in — not necessarily the customer's current state.
+  accountOpeningState String?
   routingNumber    String?
   accountNumber    String?
+  cardType         CardType?
+  cardNumber       String?
+  cardExpiry       String? // MM/YY
 
   closerNotes String?
 
   // Set when the closer parks a NEW/DRAFT lead instead of submitting it. Cleared on
   // final submit. See DraftReason above for the enum values.
   draftReason DraftReason?
+  // Free-text reason, only set when draftReason = OTHER (the closer typed it manually).
+  draftReasonNote String?
 
   // ─── Admin ───
   rejectionReason String?
@@ -321,6 +368,7 @@ model Lead {
   client         User?           @relation("ClientLeads", fields: [clientId], references: [id], onDelete: SetNull)
   externalClient ExternalClient? @relation("ExternalClientLeads", fields: [externalClientId], references: [id], onDelete: SetNull)
   retention      User?           @relation("RetentionLeads", fields: [retentionId], references: [id], onDelete: Cascade)
+  suggestedClient User?          @relation("SuggestedClientLeads", fields: [suggestedClientId], references: [id], onDelete: SetNull)
   incomePayment  IncomePayment?  @relation(fields: [incomePaymentId], references: [id], onDelete: SetNull)
   chargeBacks    ChargeBack[]
   qaReviews      LeadReview[]
@@ -329,6 +377,7 @@ model Lead {
   @@index([closerId])
   @@index([clientId])
   @@index([externalClientId])
+  @@index([suggestedClientId])
   @@index([retentionId])
   @@index([status])
   @@index([createdAt])
@@ -425,6 +474,16 @@ model Expense {
   @@index([date])
 }
 
+// Admin-managed roster of office IPs allowed to use the app. ADMIN and CLIENT accounts
+// bypass this check entirely (see IP_EXEMPT_ROLES in lib/ip-whitelist.ts); every other
+// role is rejected — at login and on every subsequent request — from an IP not listed here.
+model WhitelistedIp {
+  id        String   @id @default(cuid())
+  ipAddress String   @unique
+  label     String?
+  createdAt DateTime @default(now())
+}
+
 // A non-auth bookkeeping record for a lead destination outside the org — never logs
 // in, has no password/role/tokenVersion. Admin-managed roster; leads assigned here go
 // to ASSIGNED_EXTERNAL instead of the normal accept/reject-gated ASSIGNED.
@@ -480,10 +539,20 @@ model ChatMessage {
   id        String    @id @default(cuid())
   room      ChatRoom
   senderId  String
+  // May be empty when the message is a bare file upload with no caption typed alongside it.
   body      String
   editedAt  DateTime?
   deletedAt DateTime?
   createdAt DateTime  @default(now())
+
+  // Optional file/doc attachment — set together, all-or-nothing. attachmentPath is the
+  // randomized on-disk filename (server/uploads/chat/) and is never sent to the client;
+  // downloads go through the authenticated /api/chat/attachments/:id route instead, which
+  // is how room membership stays enforced for files the same way it is for message text.
+  attachmentName String?
+  attachmentType String?
+  attachmentSize Int?
+  attachmentPath String?
 
   sender User @relation(fields: [senderId], references: [id], onDelete: Cascade)
 

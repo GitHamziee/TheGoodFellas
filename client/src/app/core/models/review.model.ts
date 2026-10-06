@@ -1,4 +1,4 @@
-import { Lead, LeadIntakeEdit } from './lead.model';
+import { Lead } from './lead.model';
 
 export type ReviewOutcome = 'PASS' | 'FAIL';
 
@@ -20,9 +20,9 @@ export interface LeadReviewRow<TLead> {
   lead: TLead;
 }
 
-/** QA_JUNIOR_CLOSER's queue/history row — same unmasked-intake shape as the Junior
- * Closer's own "sent back to me" edit view (see JUNIOR_EDIT_SELECT server-side). */
-export type QaJuniorLeadRow = LeadIntakeEdit;
+/** QA_JUNIOR_CLOSER's queue/history row — full lead detail, same as QA_CLOSER's (see
+ * FULL_INCLUDE server-side). */
+export type QaJuniorLeadRow = Lead;
 
 /** QA_CLOSER's queue/history row — full lead detail, same as an Admin/active-Closer view. */
 export type QaCloserLeadRow = Lead;

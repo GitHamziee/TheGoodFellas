@@ -68,8 +68,9 @@ export class ClientLeadHistory implements OnInit {
       customerName: (l) => l.customerName,
       coverageAmount: (l) => l.coverageAmount ?? 0,
       createdAt: (l) => new Date(l.createdAt).getTime(),
+      updatedAt: (l) => new Date(l.updatedAt ?? l.createdAt).getTime(),
     },
-    initialSort: { key: 'createdAt', dir: 'desc' },
+    initialSort: { key: 'updatedAt', dir: 'desc' },
     pageSize: 12,
   });
 

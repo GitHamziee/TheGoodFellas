@@ -39,9 +39,10 @@ interface StateRow {
   breakdown: ClientBreakdown[];
 }
 
-/** Mounted at /admin/state-sheet, /closer/state-sheet and /team-lead/state-sheet — one
- * component shared across roles, the same way analytics-junior/analytics-closer are.
- * Read-only: editing coverage happens on the admin Users page. */
+/** Mounted at /admin/state-sheet, /manager/state-sheet, /closer/state-sheet,
+ * /team-lead/state-sheet and /retention/state-sheet — one component shared across roles,
+ * the same way analytics-junior/analytics-closer are. Read-only: editing coverage happens
+ * on the admin Users page. */
 @Component({
   selector: 'app-state-sheet',
   imports: [

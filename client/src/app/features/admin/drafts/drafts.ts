@@ -9,7 +9,8 @@ import {
 import { LeadService } from '../../../core/services/lead.service';
 import { Lead } from '../../../core/models/lead.model';
 import { createListView } from '../../../core/list-view';
-import { formatPhone, getAvatarTone, getInitials, humanizeEnum, timeAgo } from '../../../core/format-utils';
+import { formatPhone, getAvatarTone, getInitials, timeAgo } from '../../../core/format-utils';
+import { DRAFT_REASON_LABEL } from '../../../core/lead-options';
 import { Modal } from '../../../shared/ui/modal';
 import { EmptyState, Pagination, SearchBox, SkeletonRows, StatTile } from '../../../shared/ui/ui';
 import { LeadDetail } from '../../../shared/lead-detail';
@@ -41,7 +42,7 @@ export class AdminDrafts implements OnInit {
   readonly selected = signal<Lead | null>(null);
 
   readonly formatPhone = formatPhone;
-  readonly humanizeEnum = humanizeEnum;
+  readonly draftReasonLabel = DRAFT_REASON_LABEL;
   readonly timeAgo = timeAgo;
   readonly getInitials = getInitials;
   readonly getAvatarTone = getAvatarTone;

@@ -9,7 +9,7 @@ import {
 } from '@lucide/angular';
 import { LeadService } from '../../../core/services/lead.service';
 import { AuthService } from '../../../core/services/auth.service';
-import { Lead, LeadPreview } from '../../../core/models/lead.model';
+import { Lead } from '../../../core/models/lead.model';
 import {
   formatMoney,
   getAvatarTone,
@@ -40,7 +40,7 @@ export class ClientDashboard implements OnInit {
   private readonly leadService = inject(LeadService);
   private readonly auth = inject(AuthService);
 
-  readonly previews = signal<LeadPreview[]>([]);
+  readonly previews = signal<Lead[]>([]);
   readonly history = signal<Lead[]>([]);
   readonly loading = signal(true);
 
@@ -63,10 +63,10 @@ export class ClientDashboard implements OnInit {
     };
   });
 
-  /** Oldest offers first — those are the ones the team is waiting on. */
+  /** Newest offers first. */
   readonly awaiting = computed(() =>
     [...this.previews()]
-      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, 5),
   );
 

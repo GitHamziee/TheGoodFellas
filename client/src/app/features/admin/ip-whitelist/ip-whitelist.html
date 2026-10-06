@@ -1,0 +1,127 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <p class="sub">
+        Admin and Client accounts can sign in from anywhere. Every other role only works from an IP
+        whitelisted here. Don't know your office's IP — use "Add this network" from a computer sitting on it.
+      </p>
+    </div>
+    <div class="page-head-actions">
+      <button type="button" class="btn btn--ghost" [disabled]="detecting()" (click)="addCurrentNetwork()">
+        @if (detecting()) {
+          <span class="spinner"></span> Detecting…
+        } @else {
+          <svg lucideWifi></svg> Add this network
+        }
+      </button>
+      <button type="button" class="btn" (click)="openCreate()">
+        <svg lucidePlus></svg> Whitelist an IP
+      </button>
+    </div>
+  </div>
+
+  @if (error() && !showCreate()) {
+    <div class="error">{{ error() }}</div>
+  }
+  @if (notice()) {
+    <div class="success"><svg lucideCircleCheck></svg>{{ notice() }}</div>
+  }
+
+  @if (loading()) {
+    <div class="card"><app-skeleton-rows [count]="5" /></div>
+  } @else {
+    <div class="card card--flush">
+      <div class="inline-head" style="padding: 1rem 1.1rem 0;">
+        <h2>Whitelisted IPs</h2>
+        <span class="count">{{ pluralize(ips().length, 'entry', 'entries') }}</span>
+      </div>
+
+      @if (ips().length === 0) {
+        <app-empty-state
+          title="No IPs whitelisted yet"
+          hint="From a computer on your office network, click 'Add this network' above — otherwise no one outside Admin/Client will be able to sign in."
+        >
+          <svg lucideShield></svg>
+        </app-empty-state>
+      } @else {
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>IP Address</th>
+                <th class="hide-sm">Label</th>
+                <th class="right hide-sm">Added</th>
+                <th class="right">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (ip of ips(); track ip.id) {
+                <tr>
+                  <td><span class="cell-main">{{ ip.ipAddress }}</span></td>
+                  <td class="hide-sm">{{ ip.label || '—' }}</td>
+                  <td class="right hide-sm">{{ formatDate(ip.createdAt) }}</td>
+                  <td class="right">
+                    <button
+                      type="button"
+                      class="btn btn--sm btn--ghost"
+                      [disabled]="deletingId() === ip.id"
+                      (click)="deleteIp(ip)"
+                    >
+                      @if (deletingId() === ip.id) {
+                        <span class="spinner"></span>
+                      } @else {
+                        <svg lucideTrash2></svg>
+                      }
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  }
+</div>
+
+@if (showCreate()) {
+  <app-modal title="Whitelist an IP" (close)="showCreate.set(false)">
+    @if (error()) {
+      <div class="error">{{ error() }}</div>
+    }
+    @if (detectedIp()) {
+      <p class="sub">
+        Detected from this connection: <strong>{{ detectedIp() }}</strong>
+        @if (detectedIp() !== ipAddress) {
+          — widened below to a stable range, since this type of address rotates over time.
+        }
+      </p>
+    }
+
+    <div class="form-grid">
+      <label class="full">
+        IP Address
+        <input
+          type="text"
+          [(ngModel)]="ipAddress"
+          name="ipAddress"
+          placeholder="e.g. 203.0.113.42 or 2407:d000:2b:6a93::/64"
+        />
+      </label>
+      <label class="full">
+        Label (optional)
+        <input type="text" [(ngModel)]="label" name="label" placeholder="e.g. Office - Karachi" />
+      </label>
+    </div>
+
+    <div footer>
+      <button type="button" class="btn" [disabled]="!canSubmitCreate() || creating()" (click)="createIp()">
+        @if (creating()) {
+          <span class="spinner"></span> Adding…
+        } @else {
+          <svg lucidePlus></svg> Whitelist
+        }
+      </button>
+    </div>
+  </app-modal>
+}

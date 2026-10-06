@@ -5,6 +5,7 @@ import { io, Socket } from 'socket.io-client';
 import { API_BASE_URL } from '../config';
 import {
   CHAT_ROOMS_BY_ROLE,
+  ChatAttachment,
   ChatMessage,
   ChatRoomKey,
   ChatRoomSummary,
@@ -18,7 +19,8 @@ interface ApiSuccess<T> {
 }
 
 const BASE = `${API_BASE_URL}/chat`;
-/** Socket connects to the server origin, not the /api path. */
+/** The socket connects to the server origin, not the /api path — also used to resolve an
+ * attachment's server-relative `url` (which already starts with /api/chat/...). */
 const SOCKET_URL = API_BASE_URL.replace(/\/api\/?$/, '');
 
 /** How long a "typing" flag survives without a refresh, in case the stop event is lost. */
@@ -266,6 +268,30 @@ export class ChatService {
     // The socket broadcast usually beats this; upsert-by-id makes whichever arrives second a no-op.
     this.upsert(res.data.message);
     this.notifyTyping(false);
+  }
+
+  /** Uploads a file (any type — no restriction) as its own message, with an optional caption.
+   * Angular sets the multipart boundary itself as long as nothing here sets Content-Type. */
+  async sendFile(file: File, caption?: string): Promise<void> {
+    const room = this._activeRoom();
+    if (!room) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+    if (caption?.trim()) formData.append('body', caption.trim());
+
+    const res = await firstValueFrom(
+      this.http.post<ApiSuccess<{ message: ChatMessage }>>(`${BASE}/${room}/messages/file`, formData)
+    );
+    this.upsert(res.data.message);
+    this.notifyTyping(false);
+  }
+
+  /** Fetches an attachment's bytes through the authenticated download route (never a bare
+   * <img>/<a> src, which couldn't carry the Bearer token) — used for both "Save" and the
+   * inline image preview. Caller owns the resulting object URL and must revoke it. */
+  async fetchAttachmentBlob(attachment: ChatAttachment): Promise<Blob> {
+    return firstValueFrom(this.http.get(`${SOCKET_URL}${attachment.url}`, { responseType: 'blob' }));
   }
 
   async edit(id: string, body: string): Promise<void> {

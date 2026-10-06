@@ -2,7 +2,7 @@
 // Runtime type/shape checks matter here (request bodies are `unknown`), not full
 // business-rule validation — see REQUIREMENTS.md for what's still being defined.
 
-type FieldType = 'string' | 'int' | 'boolean' | 'date' | 'ssn' | 'routing';
+type FieldType = 'string' | 'int' | 'boolean' | 'date' | 'ssn' | 'routing' | 'accountNumber' | 'cardNumber' | 'cardExpiry';
 
 interface FieldSpec {
   type: FieldType;
@@ -11,12 +11,23 @@ interface FieldSpec {
 
 const SSN_PATTERN = /^\d{3}-?\d{2}-?\d{4}$/;
 const ROUTING_PATTERN = /^\d{9}$/;
+const ACCOUNT_NUMBER_PATTERN = /^\d{3,17}$/;
+const CARD_NUMBER_PATTERN = /^\d{13,19}$/;
+const CARD_EXPIRY_PATTERN = /^(0[1-9]|1[0-2])\/\d{2}$/;
 
 export const DRAFT_REASON_VALUES = [
-  'MISSING_INFO',
-  'CLIENT_NOT_REACHABLE',
-  'NEEDS_FOLLOW_UP',
-  'PENDING_DOCUMENTATION',
+  'LOST_ON_SOCIAL',
+  'LOST_ON_ACCOUNT',
+  'LOST_ON_PRICES',
+  'DEMENTIA_ALZHEIMERS',
+  'NOT_A_DM',
+  'DNC',
+  'BAD_STATE',
+  'CALLBACK',
+  'HUNGUP',
+  'OVER_AGE',
+  'CLOSED_DEAD_DEAL',
+  'NOT_IN_SERVICE',
   'OTHER',
 ] as const;
 
@@ -69,17 +80,24 @@ const FIELD_SCHEMA: Record<string, FieldSpec> = {
   initialDraftDate: { type: 'date' },
   futureDraftDate: { type: 'date' },
   payer: { type: 'string', enumValues: ['SELF', 'SOMEONE_ELSE'] },
+  paymentMethod: { type: 'string', enumValues: ['BANK_ACCOUNT', 'CARD'] },
   bankName: { type: 'string' },
   accountTitle: { type: 'string' },
   payerSocial: { type: 'ssn' },
   accountType: { type: 'string', enumValues: ['CHECKING', 'SAVINGS'] },
+  accountOwnership: { type: 'string', enumValues: ['SINGLE', 'JOINT'] },
+  accountOpeningState: { type: 'string' },
   routingNumber: { type: 'routing' },
-  accountNumber: { type: 'string' },
+  accountNumber: { type: 'accountNumber' },
+  cardType: { type: 'string', enumValues: ['CREDIT', 'DEBIT', 'DIRECT_EXPRESS'] },
+  cardNumber: { type: 'cardNumber' },
+  cardExpiry: { type: 'cardExpiry' },
 
   closerNotes: { type: 'string' },
 
   // Draft-only — why the closer parked the lead. Not part of any other allowlist below.
   draftReason: { type: 'string', enumValues: DRAFT_REASON_VALUES },
+  draftReasonNote: { type: 'string' },
 
   // CPL intake only
   decisionMaker: { type: 'boolean' },
@@ -101,8 +119,9 @@ export const CLOSER_ONLY_FIELDS = [
   'beneficiaryRelation', 'beneficiaryName', 'beneficiaryDob',
   'medications',
   'carrierName', 'planType', 'coverageAmount', 'monthlyPremiums',
-  'initialDraftDate', 'futureDraftDate', 'payer',
-  'bankName', 'accountTitle', 'payerSocial', 'accountType', 'routingNumber', 'accountNumber',
+  'initialDraftDate', 'futureDraftDate', 'payer', 'paymentMethod',
+  'bankName', 'accountTitle', 'payerSocial', 'accountType', 'accountOwnership', 'accountOpeningState',
+  'routingNumber', 'accountNumber', 'cardType', 'cardNumber', 'cardExpiry',
   'closerNotes',
 ] as const;
 
@@ -114,7 +133,12 @@ export const CLOSER_ENRICHMENT_FIELDS = [...SHARED_FIELDS, ...CLOSER_ONLY_FIELDS
 export const FULL_LEAD_FIELDS = [...SHARED_FIELDS, ...JUNIOR_ONLY_FIELDS, ...CLOSER_ONLY_FIELDS] as const;
 export const ADMIN_EDIT_FIELDS = FULL_LEAD_FIELDS;
 // Saving/updating a draft accepts everything enrichment does, plus the reason.
-export const DRAFT_FIELDS = [...CLOSER_ENRICHMENT_FIELDS, 'draftReason'] as const;
+export const DRAFT_FIELDS = [...CLOSER_ENRICHMENT_FIELDS, 'draftReason', 'draftReasonNote'] as const;
+// Draft variant of FULL_LEAD_FIELDS — used anywhere a lead is built/resumed from the full
+// junior+closer field set, not just the closer-only fields: Retention's edit form (any
+// RETENTION lead, see enrichAndSubmitRetentionLead), and a self-sourced Closer draft (no
+// Junior Closer involved, see saveLeadAsDraft's juniorCloserId branch).
+export const FULL_LEAD_DRAFT_FIELDS = [...FULL_LEAD_FIELDS, 'draftReason', 'draftReasonNote'] as const;
 
 // CPL's own, deliberately shorter intake — no enrichment step exists for CPL, so this
 // is the entire field set a CPL lead ever carries (see PENDING_CHANGES.md Module M3).
@@ -129,8 +153,9 @@ export const CPL_INTAKE_FIELDS = [
 // CPA), nothing RETENTION-specific needed.
 export const RETENTION_INTAKE_FIELDS = [
   'customerName', 'phone', 'mailingAddress', 'state', 'dob', 'ssn', 'carrierName',
-  'planType', 'coverageAmount', 'monthlyPremiums', 'beneficiaryName', 'bankName',
-  'accountType', 'routingNumber', 'accountNumber',
+  'planType', 'coverageAmount', 'monthlyPremiums', 'beneficiaryName',
+  'paymentMethod', 'bankName', 'accountType', 'accountOwnership', 'accountOpeningState',
+  'routingNumber', 'accountNumber', 'cardType', 'cardNumber', 'cardExpiry',
 ] as const;
 
 export type SanitizedLeadFields = Record<string, string | number | boolean | Date>;
@@ -184,6 +209,21 @@ export function sanitizeLeadFields(
       }
       case 'routing': {
         if (typeof raw !== 'string' || !ROUTING_PATTERN.test(raw)) return { error: `Invalid ${key} — must be exactly 9 digits` };
+        data[key] = raw;
+        break;
+      }
+      case 'accountNumber': {
+        if (typeof raw !== 'string' || !ACCOUNT_NUMBER_PATTERN.test(raw)) return { error: `Invalid ${key} — must be 3 to 17 digits` };
+        data[key] = raw;
+        break;
+      }
+      case 'cardNumber': {
+        if (typeof raw !== 'string' || !CARD_NUMBER_PATTERN.test(raw)) return { error: `Invalid ${key} — must be 13 to 19 digits` };
+        data[key] = raw;
+        break;
+      }
+      case 'cardExpiry': {
+        if (typeof raw !== 'string' || !CARD_EXPIRY_PATTERN.test(raw)) return { error: `Invalid ${key} — must be MM/YY` };
         data[key] = raw;
         break;
       }

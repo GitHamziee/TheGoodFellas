@@ -53,10 +53,13 @@ export interface DraftRow {
   id: string;
   customerName: string;
   draftReason: DraftReason | null;
+  draftReasonNote: string | null;
   createdAt: string;
   updatedAt: string;
   ageDays: number;
   closer: { id: string; name: string };
+  /** Null when the closer built the lead from scratch (self- or AI-sourced, no junior closer). */
+  juniorCloser: { id: string; name: string } | null;
 }
 
 export interface DraftsAnalytics {

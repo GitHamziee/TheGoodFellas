@@ -67,16 +67,8 @@
 </div>
 
 @if (selected(); as row) {
-  <app-modal title="Review lead" [subtitle]="row.customerName" [wide]="lane() === 'CLOSER'" (close)="selected.set(null)">
-    @if (lane() === 'CLOSER') {
-      <app-lead-detail [lead]="$any(row)" />
-    } @else {
-      <div class="detail-grid">
-        @for (r of juniorDetailRows(); track r.k) {
-          <app-detail [label]="r.k" [value]="r.v" />
-        }
-      </div>
-    }
+  <app-modal title="Review lead" [subtitle]="row.customerName" [wide]="true" (close)="selected.set(null)">
+    <app-lead-detail [lead]="$any(row)" />
 
     <div class="pick-list qa-outcome">
       <button type="button" class="pick-row" [class.chosen]="outcome() === 'PASS'" (click)="outcome.set('PASS')">

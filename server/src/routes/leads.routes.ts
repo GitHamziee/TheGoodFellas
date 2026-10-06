@@ -149,10 +149,21 @@ router.post(
   })
 );
 
+// Same as above, but parked as a draft — for a call the closer hasn't finished capturing.
+router.post(
+  '/closer/draft',
+  requireRole('CLOSER'),
+  asyncHandler(async (req, res) => {
+    const result = await leadService.createDraftByCloser(req.user!.id, req.body ?? {});
+    if ('error' in result) return apiError(res, result.error, result.status);
+    return apiSuccess(res, result.data, 'Lead saved as a draft', 201);
+  })
+);
+
 // ─── Admin ──────────────────────────────────────────────────────
 router.get(
   '/queue',
-  requireRole('ADMIN'),
+  requireRole('ADMIN', 'MANAGER'),
   asyncHandler(async (_req, res) => {
     const leads = await leadService.listQueueForAdmin();
     return apiSuccess(res, { leads });
@@ -161,7 +172,7 @@ router.get(
 
 router.get(
   '/all',
-  requireRole('ADMIN'),
+  requireRole('ADMIN', 'MANAGER'),
   asyncHandler(async (_req, res) => {
     const leads = await leadService.listAllLeadsForAdmin();
     return apiSuccess(res, { leads });
@@ -170,7 +181,7 @@ router.get(
 
 router.get(
   '/charge-backs',
-  requireRole('ADMIN'),
+  requireRole('ADMIN', 'MANAGER'),
   asyncHandler(async (_req, res) => {
     const leads = await leadService.listChargeBacksForAdmin();
     return apiSuccess(res, { leads });
@@ -179,7 +190,7 @@ router.get(
 
 router.get(
   '/cpl',
-  requireRole('ADMIN'),
+  requireRole('ADMIN', 'MANAGER'),
   asyncHandler(async (_req, res) => {
     const leads = await leadService.listCplLeadsForAdmin();
     return apiSuccess(res, { leads });
@@ -189,7 +200,7 @@ router.get(
 // Distinct path from the Closer-only '/drafts' above — same router, different role.
 router.get(
   '/admin/drafts',
-  requireRole('ADMIN'),
+  requireRole('ADMIN', 'MANAGER'),
   asyncHandler(async (_req, res) => {
     const leads = await leadService.listDraftsForAdmin();
     return apiSuccess(res, { leads });
@@ -198,7 +209,7 @@ router.get(
 
 router.patch(
   '/:id/assign',
-  requireRole('ADMIN'),
+  requireRole('ADMIN', 'MANAGER'),
   asyncHandler(async (req, res) => {
     const { clientId } = req.body ?? {};
     if (!clientId) return apiError(res, 'clientId is required', 400);
@@ -211,7 +222,7 @@ router.patch(
 
 router.patch(
   '/:id/assign-external',
-  requireRole('ADMIN'),
+  requireRole('ADMIN', 'MANAGER'),
   asyncHandler(async (req, res) => {
     const { externalClientId } = req.body ?? {};
     if (!externalClientId) return apiError(res, 'externalClientId is required', 400);
@@ -224,11 +235,11 @@ router.patch(
 
 router.patch(
   '/:id/return',
-  requireRole('ADMIN'),
+  requireRole('ADMIN', 'MANAGER'),
   asyncHandler(async (req, res) => {
     const { target, reason } = req.body ?? {};
-    if (target !== 'JUNIOR_CLOSER' && target !== 'CLOSER') {
-      return apiError(res, 'target must be JUNIOR_CLOSER or CLOSER', 400);
+    if (target !== 'JUNIOR_CLOSER' && target !== 'CLOSER' && target !== 'RETENTION') {
+      return apiError(res, 'target must be JUNIOR_CLOSER, CLOSER, or RETENTION', 400);
     }
     const result = await leadService.returnLeadForEdit(req.params.id, target, reason);
     if ('error' in result) return apiError(res, result.error, result.status);
@@ -237,8 +248,18 @@ router.patch(
 );
 
 router.patch(
+  '/:id/approve',
+  requireRole('ADMIN', 'MANAGER'),
+  asyncHandler(async (req, res) => {
+    const result = await leadService.approveLeadAsAdmin(req.params.id);
+    if ('error' in result) return apiError(res, result.error, result.status);
+    return apiSuccess(res, result.data, 'Lead approved');
+  })
+);
+
+router.patch(
   '/batch-payment',
-  requireRole('ADMIN'),
+  requireRole('ADMIN', 'MANAGER'),
   asyncHandler(async (req, res) => {
     const { leadIds, pkrAmount, note } = req.body ?? {};
     const result = await leadService.batchMarkPaid(leadIds, pkrAmount, note);
@@ -249,7 +270,7 @@ router.patch(
 
 router.patch(
   '/:id/charge-back',
-  requireRole('ADMIN'),
+  requireRole('ADMIN', 'MANAGER'),
   asyncHandler(async (req, res) => {
     const { pkrAmount, reason } = req.body ?? {};
     const result = await leadService.markLeadChargedBack(req.params.id, pkrAmount, reason);
@@ -260,7 +281,7 @@ router.patch(
 
 router.patch(
   '/:id/payment-status',
-  requireRole('ADMIN'),
+  requireRole('ADMIN', 'MANAGER'),
   asyncHandler(async (req, res) => {
     const { paymentStatus } = req.body ?? {};
     // Marking a lead PAID must go through /batch-payment so the PKR amount received is
@@ -276,7 +297,7 @@ router.patch(
 
 router.patch(
   '/:id',
-  requireRole('ADMIN'),
+  requireRole('ADMIN', 'MANAGER'),
   asyncHandler(async (req, res) => {
     const result = await leadService.editLead(req.params.id, req.body ?? {});
     if ('error' in result) return apiError(res, result.error, result.status);
@@ -287,16 +308,25 @@ router.patch(
 // ─── Retention (admin-facing) ────────────────────────────────────
 router.get(
   '/retention/unassigned',
-  requireRole('ADMIN'),
+  requireRole('ADMIN', 'MANAGER'),
   asyncHandler(async (_req, res) => {
     const leads = await leadService.listUnassignedRetentionForAdmin();
     return apiSuccess(res, { leads });
   })
 );
 
+router.get(
+  '/retention/all',
+  requireRole('ADMIN', 'MANAGER'),
+  asyncHandler(async (_req, res) => {
+    const leads = await leadService.listRetentionAllForAdmin();
+    return apiSuccess(res, { leads });
+  })
+);
+
 router.patch(
   '/retention/:id/assign',
-  requireRole('ADMIN'),
+  requireRole('ADMIN', 'MANAGER'),
   asyncHandler(async (req, res) => {
     const { retentionId } = req.body ?? {};
     if (!retentionId) return apiError(res, 'retentionId is required', 400);
@@ -308,6 +338,29 @@ router.patch(
 );
 
 // ─── Retention (retention-facing) ────────────────────────────────
+// Retention builds a lead from scratch — same pattern as Closer's '/closer' create route.
+router.post(
+  '/retention',
+  requireRole('RETENTION'),
+  asyncHandler(async (req, res) => {
+    const result = await leadService.createLeadByRetention(req.user!.id, req.body ?? {});
+    if ('error' in result) return apiError(res, result.error, result.status);
+    return apiSuccess(res, result.data, 'Lead submitted', 201);
+  })
+);
+
+// Same as above, but parked as a draft — for a call the retention person hasn't finished
+// capturing yet.
+router.post(
+  '/retention/draft',
+  requireRole('RETENTION'),
+  asyncHandler(async (req, res) => {
+    const result = await leadService.createDraftByRetention(req.user!.id, req.body ?? {});
+    if ('error' in result) return apiError(res, result.error, result.status);
+    return apiSuccess(res, result.data, 'Lead saved as a draft', 201);
+  })
+);
+
 router.get(
   '/retention/queue',
   requireRole('RETENTION'),
@@ -324,6 +377,16 @@ router.patch(
     const result = await leadService.enrichAndSubmitRetentionLead(req.params.id, req.body ?? {});
     if ('error' in result) return apiError(res, result.error, result.status);
     return apiSuccess(res, result.data, 'Lead sent to admin');
+  })
+);
+
+router.patch(
+  '/retention/:id/draft',
+  requireRole('RETENTION'),
+  asyncHandler(async (req, res) => {
+    const result = await leadService.saveRetentionLeadAsDraft(req.params.id, req.body ?? {});
+    if ('error' in result) return apiError(res, result.error, result.status);
+    return apiSuccess(res, result.data, 'Lead saved as a draft');
   })
 );
 

@@ -11,6 +11,8 @@ export interface Requester {
 
 /** Max characters in one message — long enough for a paragraph, short enough to bound the row. */
 export const MAX_BODY_LENGTH = 4000;
+/** Generous for docs/images, bounds disk usage — enforced again at the multer layer in the route. */
+export const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
 const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 100;
 
@@ -27,14 +29,40 @@ type MessageRow = {
   editedAt: Date | null;
   deletedAt: Date | null;
   createdAt: Date;
+  attachmentName: string | null;
+  attachmentType: string | null;
+  attachmentSize: number | null;
   sender: { id: string; name: string; role: Role };
 };
 
+/** Everything the multer middleware hands the service about an already-saved upload. */
+export interface UploadedFile {
+  originalName: string;
+  mimeType: string;
+  size: number;
+  /** Filename on disk under server/uploads/chat/ — never sent to the client. */
+  diskName: string;
+}
+
 /**
  * Wire shape for one message. A soft-deleted message keeps its slot in the timeline but
- * its body never leaves the server — the client gets `deleted: true` and renders a tombstone.
+ * its body — and its attachment, the same way — never leaves the server; the client gets
+ * `deleted: true` and renders a tombstone instead.
  */
 function publicMessage(m: MessageRow) {
+  const attachment =
+    !m.deletedAt && m.attachmentName
+      ? {
+          name: m.attachmentName,
+          type: m.attachmentType,
+          size: m.attachmentSize,
+          // Proxied through the authenticated download route below rather than a direct
+          // disk/static URL, so room membership still gates attachments the same way it
+          // gates message text.
+          url: `/api/chat/attachments/${m.id}`,
+        }
+      : null;
+
   return {
     id: m.id,
     room: m.room,
@@ -43,6 +71,7 @@ function publicMessage(m: MessageRow) {
     edited: m.editedAt !== null,
     createdAt: m.createdAt,
     sender: m.sender,
+    attachment,
   };
 }
 
@@ -159,6 +188,70 @@ export async function sendMessage(
   await touchRead(room, requester.id, created.createdAt);
 
   return { data: { message: publicMessage(created) } };
+}
+
+/**
+ * Sends a file/doc as its own message — the caption is optional, unlike sendMessage's body,
+ * since "just a file, no comment" is the common case. The route has already saved the file
+ * to disk (via multer) by the time this runs; this only ever touches the DB row.
+ */
+export async function sendFileMessage(
+  room: ChatRoom,
+  requester: Requester,
+  file: UploadedFile,
+  caption: unknown
+): Promise<ServiceResult<{ message: PublicMessage }>> {
+  if (!canAccessRoom(requester.role, room)) {
+    return { error: "You do not have access to this channel", status: 403 };
+  }
+
+  const trimmedCaption = typeof caption === "string" ? caption.trim() : "";
+  if (trimmedCaption.length > MAX_BODY_LENGTH) {
+    return { error: `Message cannot exceed ${MAX_BODY_LENGTH} characters`, status: 400 };
+  }
+
+  const created = await prisma.chatMessage.create({
+    data: {
+      room,
+      senderId: requester.id,
+      body: trimmedCaption,
+      attachmentName: file.originalName,
+      attachmentType: file.mimeType,
+      attachmentSize: file.size,
+      attachmentPath: file.diskName,
+    },
+    include: MESSAGE_INCLUDE,
+  });
+
+  await touchRead(room, requester.id, created.createdAt);
+
+  return { data: { message: publicMessage(created) } };
+}
+
+/**
+ * Resolves an attachment download — the same room-membership + not-deleted check that
+ * gates message text gates the file behind it, since the file never leaves the server
+ * except through this route.
+ */
+export async function getAttachment(
+  messageId: string,
+  requester: Requester
+): Promise<ServiceResult<{ diskName: string; originalName: string; mimeType: string | null }>> {
+  const message = await prisma.chatMessage.findUnique({ where: { id: messageId } });
+  if (!message || message.deletedAt || !message.attachmentPath || !message.attachmentName) {
+    return { error: "Attachment not found", status: 404 };
+  }
+  if (!canAccessRoom(requester.role, message.room)) {
+    return { error: "You do not have access to this channel", status: 403 };
+  }
+
+  return {
+    data: {
+      diskName: message.attachmentPath,
+      originalName: message.attachmentName,
+      mimeType: message.attachmentType,
+    },
+  };
 }
 
 export async function editMessage(

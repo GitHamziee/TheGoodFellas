@@ -74,7 +74,7 @@
 </div>
 
 @if (selected(); as r) {
-  <app-modal title="Review details" [subtitle]="r.lead.customerName" [wide]="lane() === 'CLOSER'" (close)="selected.set(null)">
+  <app-modal title="Review details" [subtitle]="r.lead.customerName" [wide]="true" (close)="selected.set(null)">
     <div class="detail-grid">
       <app-detail label="Outcome" [value]="outcomeText(r.outcome)" />
       <app-detail label="Reviewed" [value]="formatDateTime(r.createdAt)" />
@@ -85,14 +85,6 @@
 
     <hr />
 
-    @if (lane() === 'CLOSER') {
-      <app-lead-detail [lead]="$any(r.lead)" />
-    } @else {
-      <div class="detail-grid">
-        @for (row of juniorDetailRows(); track row.k) {
-          <app-detail [label]="row.k" [value]="row.v" />
-        }
-      </div>
-    }
+    <app-lead-detail [lead]="$any(r.lead)" />
   </app-modal>
 }

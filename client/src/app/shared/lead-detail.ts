@@ -201,17 +201,22 @@ export class LeadDetail {
 
   readonly hasSensitive = computed(() => {
     const l = this.lead();
-    return !!(l.ssn || l.routingNumber || l.accountNumber || l.payerSocial);
+    return !!(l.ssn || l.routingNumber || l.accountNumber || l.payerSocial || l.cardNumber);
   });
 
   readonly sections = computed(() => {
     const l = this.lead();
     const show = this.unmasked() || this.revealed();
+    /** Admin/Retention (unmasked) audit the full record, so every field is shown even
+     * when blank — a missing row there would be indistinguishable from "hidden by
+     * masking." Every other, more limited view still drops empty rows so a masked or
+     * partially-filled record doesn't render as a wall of dashes. */
+    const showEmpty = this.unmasked();
     const keep = (rows: (Row | null)[]): Row[] => rows.filter((r): r is Row => r !== null);
-    /** Emits a row only when the lead actually carries the field. */
     const row = (k: string, v: unknown, formatted?: string, sensitive = false): Row | null => {
-      if (v === null || v === undefined || v === '') return null;
-      return { k, v: formatted ?? String(v), sensitive };
+      const isEmpty = v === null || v === undefined || v === '';
+      if (isEmpty && !showEmpty) return null;
+      return { k, v: formatted ?? (isEmpty ? '—' : String(v)), sensitive };
     };
 
     return [
@@ -284,14 +289,20 @@ export class LeadDetail {
         icon: 'billing',
         rows: keep([
           row('Payer', l.payer, humanizeEnum(l.payer)),
+          row('Payment method', l.paymentMethod, humanizeEnum(l.paymentMethod)),
           row('Initial draft date', l.initialDraftDate, formatDate(l.initialDraftDate)),
           row('Future draft date', l.futureDraftDate, formatDate(l.futureDraftDate)),
           row('Bank name', l.bankName),
           row('Account title', l.accountTitle),
           row('Account type', l.accountType, humanizeEnum(l.accountType)),
+          row('Account ownership', l.accountOwnership, humanizeEnum(l.accountOwnership)),
+          row('Account opening state', l.accountOpeningState),
           row('Routing number', l.routingNumber, show ? l.routingNumber! : maskAccount(l.routingNumber), true),
           row('Account number', l.accountNumber, show ? l.accountNumber! : maskAccount(l.accountNumber), true),
           row("Payer's SSN", l.payerSocial, show ? l.payerSocial! : maskSsn(l.payerSocial), true),
+          row('Card type', l.cardType, humanizeEnum(l.cardType)),
+          row('Card number', l.cardNumber, show ? l.cardNumber! : maskAccount(l.cardNumber), true),
+          row('Card expiry', l.cardExpiry),
         ]),
       },
       {

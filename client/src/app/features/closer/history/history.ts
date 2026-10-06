@@ -77,8 +77,9 @@ export class CloserHistory implements OnInit {
       customerName: (l) => l.customerName,
       status: (l) => l.status,
       createdAt: (l) => new Date(l.createdAt).getTime(),
+      updatedAt: (l) => new Date(l.updatedAt ?? l.createdAt).getTime(),
     },
-    initialSort: { key: 'createdAt', dir: 'desc' },
+    initialSort: { key: 'updatedAt', dir: 'desc' },
     pageSize: 12,
   });
 

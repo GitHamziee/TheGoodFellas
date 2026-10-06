@@ -368,6 +368,15 @@ against the code on 2026-08-14, not dated at build time)
 
 _(move a one-line note here and strike the module heading above when a module ships)_
 
+- **Retention gets State Sheet access** (2026-09-02): confirmed with the user this meant
+  specifically the State Sheet reference page (which clients/carriers cover which states),
+  not Closer's whole nav — Closer's other pages (New Lead, Inbox, Drafts, Sent Back to Me)
+  are tied to the CPA pipeline and don't map onto Retention's shared-queue model (Retention
+  drafts already resurface in the shared queue rather than needing a separate page).
+  `GET /api/users/state-sheet` now also accepts `RETENTION`; new `/retention/state-sheet`
+  route reuses the existing shared `StateSheet` component; nav item added to `RETENTION` in
+  `nav-config.ts`.
+
 - **Doc audit against the code** (2026-08-14): the user pasted their own master
   requirements checklist and asked this doc to be reconciled against it. Several items
   turned out to be already built but never marked done here — this doc had drifted from

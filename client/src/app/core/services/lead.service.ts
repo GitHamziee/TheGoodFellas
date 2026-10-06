@@ -56,14 +56,22 @@ export type CloserLeadInput = Partial<Pick<Lead, (typeof SHARED_KEYS)[number]>> 
       | 'initialDraftDate'
       | 'futureDraftDate'
       | 'payer'
+      | 'paymentMethod'
       | 'bankName'
       | 'accountTitle'
       | 'payerSocial'
       | 'accountType'
+      | 'accountOwnership'
+      | 'accountOpeningState'
       | 'routingNumber'
       | 'accountNumber'
+      | 'cardType'
+      | 'cardNumber'
+      | 'cardExpiry'
       | 'closerNotes'
       | 'draftReason'
+      | 'draftReasonNote'
+      | 'suggestedClientId'
     >
   >;
 
@@ -82,8 +90,9 @@ export type RetentionSubmitInput = CloserCreateLeadInput;
 
 const RETENTION_INTAKE_KEYS = [
   'customerName', 'phone', 'mailingAddress', 'state', 'dob', 'ssn', 'carrierName',
-  'planType', 'coverageAmount', 'monthlyPremiums', 'beneficiaryName', 'bankName',
-  'accountType', 'routingNumber', 'accountNumber',
+  'planType', 'coverageAmount', 'monthlyPremiums', 'beneficiaryName',
+  'paymentMethod', 'bankName', 'accountType', 'accountOwnership', 'accountOpeningState',
+  'routingNumber', 'accountNumber', 'cardType', 'cardNumber', 'cardExpiry',
 ] as const;
 
 /** What the public retention intake form (no login) submits — whoever just worked an
@@ -180,6 +189,13 @@ export class LeadService {
     return res.data.lead;
   }
 
+  /** Same as createLeadAsCloser, but parks it as a draft — draftReason is required.
+   *  Resumable via the normal enrich-lead page, same as any other closer draft. */
+  async createLeadAsCloserDraft(input: CloserCreateLeadInput): Promise<Lead> {
+    const res = await firstValueFrom(this.http.post<ApiSuccess<{ lead: Lead }>>(`${BASE}/closer/draft`, input));
+    return res.data.lead;
+  }
+
   // ─── Admin ──────────────────────────────────────────────────
   async queue(): Promise<Lead[]> {
     const res = await firstValueFrom(this.http.get<ApiSuccess<{ leads: Lead[] }>>(`${BASE}/queue`));
@@ -235,10 +251,17 @@ export class LeadService {
   }
 
   /** Sends a queued lead back to whichever role entered the bad data. */
-  async returnLead(id: string, target: 'JUNIOR_CLOSER' | 'CLOSER', reason: string): Promise<Lead> {
+  async returnLead(id: string, target: 'JUNIOR_CLOSER' | 'CLOSER' | 'RETENTION', reason: string): Promise<Lead> {
     const res = await firstValueFrom(
       this.http.patch<ApiSuccess<{ lead: Lead }>>(`${BASE}/${id}/return`, { target, reason })
     );
+    return res.data.lead;
+  }
+
+  /** Admin override of the client's own accept step — records a decision made over the
+   *  phone instead of waiting for the client to log in and accept it themselves. */
+  async approveLead(id: string): Promise<Lead> {
+    const res = await firstValueFrom(this.http.patch<ApiSuccess<{ lead: Lead }>>(`${BASE}/${id}/approve`, {}));
     return res.data.lead;
   }
 
@@ -261,8 +284,8 @@ export class LeadService {
 
   // ─── Client ─────────────────────────────────────────────────
   /** "New Leads" page — ASSIGNED, masked preview until accepted. */
-  async assignedPreviews(): Promise<LeadPreview[]> {
-    const res = await firstValueFrom(this.http.get<ApiSuccess<{ leads: LeadPreview[] }>>(`${BASE}/assigned`));
+  async assignedPreviews(): Promise<Lead[]> {
+    const res = await firstValueFrom(this.http.get<ApiSuccess<{ leads: Lead[] }>>(`${BASE}/assigned`));
     return res.data.leads;
   }
 
@@ -314,7 +337,30 @@ export class LeadService {
     return res.data.lead;
   }
 
+  /** Every RETENTION lead, any status — the dedicated "Retention Leads" reporting page,
+   *  same pattern as cplLeads() below. retentionUnassigned() above is the intake triage
+   *  inbox; this is the full pipeline view. */
+  async retentionAllLeads(): Promise<Lead[]> {
+    const res = await firstValueFrom(this.http.get<ApiSuccess<{ leads: Lead[] }>>(`${BASE}/retention/all`));
+    return res.data.leads;
+  }
+
   // ─── Retention ────────────────────────────────────────────────
+  /** Retention builds a lead from scratch — self-/AI-sourced calls worked directly by a
+   *  Retention person, no public intake form involved. Lands straight in the admin queue
+   *  as SUBMITTED, same as createLeadAsCloser. */
+  async createLeadAsRetention(input: RetentionSubmitInput): Promise<Lead> {
+    const res = await firstValueFrom(this.http.post<ApiSuccess<{ lead: Lead }>>(`${BASE}/retention`, input));
+    return res.data.lead;
+  }
+
+  /** Same as createLeadAsRetention, but parks it as a draft — draftReason is required.
+   *  Resumable via the normal shared queue + lead-edit page, same as any other retention draft. */
+  async createLeadAsRetentionDraft(input: RetentionSubmitInput): Promise<Lead> {
+    const res = await firstValueFrom(this.http.post<ApiSuccess<{ lead: Lead }>>(`${BASE}/retention/draft`, input));
+    return res.data.lead;
+  }
+
   /** The whole team's shared working queue, full detail — not scoped to the caller. */
   async retentionQueue(): Promise<Lead[]> {
     const res = await firstValueFrom(this.http.get<ApiSuccess<{ leads: Lead[] }>>(`${BASE}/retention/queue`));
@@ -325,6 +371,15 @@ export class LeadService {
   async retentionSubmit(id: string, input: RetentionSubmitInput): Promise<Lead> {
     const res = await firstValueFrom(
       this.http.patch<ApiSuccess<{ lead: Lead }>>(`${BASE}/retention/${id}/submit`, input)
+    );
+    return res.data.lead;
+  }
+
+  /** Parks a retention lead as a draft instead of submitting it — draftReason required,
+   *  same as the Closer's saveDraft. Reappears in the shared queue, resumable by anyone. */
+  async retentionSaveDraft(id: string, input: RetentionSubmitInput): Promise<Lead> {
+    const res = await firstValueFrom(
+      this.http.patch<ApiSuccess<{ lead: Lead }>>(`${BASE}/retention/${id}/draft`, input)
     );
     return res.data.lead;
   }

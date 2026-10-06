@@ -147,7 +147,7 @@
         @if (leadType() === 'CPA') {
           <label>
             Date of birth
-            <input type="date" name="dob" [(ngModel)]="form.dob" />
+            <input type="date" name="dob" [min]="minDob" [max]="todayIso" [ngModel]="form.dob" (ngModelChange)="onDobChange($event)" />
           </label>
 
           <label>
@@ -177,7 +177,7 @@
         } @else {
           <label>
             Date of birth
-            <input type="date" name="dob" [(ngModel)]="form.dob" />
+            <input type="date" name="dob" [min]="minDob" [max]="todayIso" [(ngModel)]="form.dob" />
           </label>
 
           <label>

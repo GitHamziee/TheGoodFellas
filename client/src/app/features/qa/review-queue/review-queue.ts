@@ -7,7 +7,7 @@ import { createListView } from '../../../core/list-view';
 import { formatPhone, timeAgo } from '../../../core/format-utils';
 import { Modal } from '../../../shared/ui/modal';
 import { LeadDetail } from '../../../shared/lead-detail';
-import { Detail, EmptyState, Pagination, SearchBox, SkeletonRows, StatTile, StatusBadge } from '../../../shared/ui/ui';
+import { EmptyState, Pagination, SearchBox, SkeletonRows, StatTile, StatusBadge } from '../../../shared/ui/ui';
 
 type QaRow = QaJuniorLeadRow | QaCloserLeadRow;
 
@@ -21,7 +21,6 @@ type QaRow = QaJuniorLeadRow | QaCloserLeadRow;
   imports: [
     Modal,
     LeadDetail,
-    Detail,
     StatTile,
     SearchBox,
     Pagination,
@@ -66,32 +65,6 @@ export class QaReviewQueue implements OnInit {
     },
     initialSort: { key: 'createdAt', dir: 'desc' },
     pageSize: 10,
-  });
-
-  /** Read-only intake fields for the QA_JUNIOR_CLOSER modal — QA_CLOSER instead reuses
-   *  <app-lead-detail> directly, since its row is already a full Lead. */
-  readonly juniorDetailRows = computed(() => {
-    const l = this.selected();
-    if (!l || this.lane() !== 'JUNIOR_CLOSER') return [];
-    const j = l as QaJuniorLeadRow;
-    const row = (k: string, v: unknown, formatted?: string) =>
-      v === null || v === undefined || v === '' ? null : { k, v: formatted ?? String(v) };
-    return [
-      row('Phone', j.phone, formatPhone(j.phone)),
-      row('State', j.state),
-      row('Zipcode', j.zipcode),
-      row('Marital status', j.maritalStatus),
-      row('Gender', j.gender),
-      row('Date of birth', j.dob),
-      row('Age', j.age),
-      row('Smoker', j.smoker, j.smoker === null || j.smoker === undefined ? undefined : j.smoker ? 'Yes' : 'No'),
-      row('Health conditions', j.healthConditions),
-      row('Need', j.need),
-      row('Income source', j.incomeSource),
-      row('Annual income', j.annualIncome),
-      row('Junior closer notes', j.juniorNotes),
-      row('D-code', j.dCode),
-    ].filter((r): r is { k: string; v: string } => r !== null);
   });
 
   async ngOnInit(): Promise<void> {

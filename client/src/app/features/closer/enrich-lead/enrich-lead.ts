@@ -11,26 +11,48 @@ import {
   LucideShieldCheck,
   LucideUser,
   LucideUsers,
+  LucideWallet,
 } from '@lucide/angular';
-import { CloserLeadInput, LeadService } from '../../../core/services/lead.service';
+import { CloserCreateLeadInput, LeadService } from '../../../core/services/lead.service';
+import { UserService } from '../../../core/services/user.service';
 import { Lead } from '../../../core/models/lead.model';
 import {
+  ACCOUNT_OWNERSHIP_OPTIONS,
   ACCOUNT_TYPE_OPTIONS,
+  CARD_TYPE_OPTIONS,
   DRAFT_REASON_OPTIONS,
   GENDER_OPTIONS,
+  INCOME_SOURCE_OPTIONS,
   MARITAL_STATUS_OPTIONS,
+  NEED_OPTIONS,
   PAYER_OPTIONS,
+  PAYMENT_METHOD_OPTIONS,
   PLAN_TYPE_OPTIONS,
+  RETIRED_INCOME_OPTIONS,
   SMOKER_OPTIONS,
 } from '../../../core/lead-options';
-import { humanizeEnum, pluralize, toDateInput } from '../../../core/format-utils';
+import {
+  calculateAge,
+  formatCardExpiry,
+  humanizeEnum,
+  pluralize,
+  sanitizeDigits,
+  toDateInput,
+  todayDateInput,
+} from '../../../core/format-utils';
 import { SkeletonRows } from '../../../shared/ui/ui';
 import { Modal } from '../../../shared/ui/modal';
 import { Select } from '../../../shared/ui/select';
 import { NoCopy } from '../../../shared/no-copy.directive';
 
+interface LookupUser {
+  id: string;
+  name: string;
+  email: string;
+}
+
 /** Fields the closer is expected to fill, grouped for the completeness meter. */
-const TRACKED: (keyof CloserLeadInput)[] = [
+const TRACKED: (keyof CloserCreateLeadInput)[] = [
   'mailingAddress',
   'email',
   'ssn',
@@ -47,10 +69,16 @@ const TRACKED: (keyof CloserLeadInput)[] = [
   'monthlyPremiums',
   'initialDraftDate',
   'payer',
+  'paymentMethod',
   'accountTitle',
   'accountType',
+  'accountOwnership',
+  'accountOpeningState',
   'routingNumber',
   'accountNumber',
+  'cardType',
+  'cardNumber',
+  'cardExpiry',
 ];
 
 @Component({
@@ -68,6 +96,7 @@ const TRACKED: (keyof CloserLeadInput)[] = [
     LucideHeartPulse,
     LucideShieldCheck,
     LucideBanknote,
+    LucideWallet,
     LucideNotebookPen,
     LucideCircleAlert,
     LucideArrowLeft,
@@ -78,6 +107,7 @@ export class EnrichLead implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly leadService = inject(LeadService);
+  private readonly userService = inject(UserService);
 
   readonly leadId = this.route.snapshot.paramMap.get('id')!;
   readonly loading = signal(true);
@@ -98,6 +128,12 @@ export class EnrichLead implements OnInit {
   readonly isCorrection = computed(() => this.lead()?.status === 'RETURNED_TO_CLOSER');
   readonly isDraft = computed(() => this.lead()?.status === 'DRAFT');
   readonly returnReason = computed(() => this.lead()?.returnReason ?? null);
+  /** No Junior Closer involved (self-/AI-sourced, see createLeadByCloser) — the form needs
+   * its own Need & income section since there's no upstream intake to have captured it. */
+  readonly isSelfSourced = computed(() => !!this.lead() && !this.lead()?.juniorCloser);
+
+  readonly clients = signal<LookupUser[]>([]);
+  readonly clientOptions = computed(() => this.clients().map((c) => ({ value: c.id, label: c.name })));
 
   readonly accountTypeOptions = ACCOUNT_TYPE_OPTIONS;
   readonly payerOptions = PAYER_OPTIONS;
@@ -106,12 +142,29 @@ export class EnrichLead implements OnInit {
   readonly maritalStatusOptions = MARITAL_STATUS_OPTIONS;
   readonly genderOptions = GENDER_OPTIONS;
   readonly smokerOptions = SMOKER_OPTIONS;
+  readonly needOptions = NEED_OPTIONS;
+  readonly incomeSourceOptions = INCOME_SOURCE_OPTIONS;
+  readonly retiredIncomeOptions = RETIRED_INCOME_OPTIONS;
+  readonly paymentMethodOptions = PAYMENT_METHOD_OPTIONS;
+  readonly cardTypeOptions = CARD_TYPE_OPTIONS;
+  readonly accountOwnershipOptions = ACCOUNT_OWNERSHIP_OPTIONS;
   readonly humanizeEnum = humanizeEnum;
   readonly pluralize = pluralize;
+  /** Bounds for date-of-birth inputs — a plain `<input type="date">` has no digit limit
+   * on the year segment otherwise, so nothing stops typing a year like "221465". */
+  readonly minDob = '1900-01-01';
+  readonly todayIso = todayDateInput();
 
-  form: CloserLeadInput = {};
+  form: CloserCreateLeadInput = {};
   /** Bumped on every field change so the completeness meter recomputes. */
   readonly revision = signal(0);
+
+  /** Routing numbers are optional, but once started they must be exactly 9 digits. */
+  readonly routingInvalid = computed(() => {
+    this.revision();
+    const r = this.form.routingNumber;
+    return !!r && r.length !== 9;
+  });
 
   readonly missing = computed(() => {
     this.revision();
@@ -120,6 +173,7 @@ export class EnrichLead implements OnInit {
     if (!f.customerName?.trim()) missing.push("Customer's name");
     if (!f.phone?.trim()) missing.push('Phone');
     if (!f.state?.trim()) missing.push('State');
+    if (this.routingInvalid()) missing.push('Routing number (must be exactly 9 digits)');
     return missing;
   });
 
@@ -144,6 +198,12 @@ export class EnrichLead implements OnInit {
 
   async ngOnInit(): Promise<void> {
     try {
+      this.clients.set(await this.userService.listClients());
+    } catch {
+      // Non-fatal — the client picker is optional, the rest of the form still works.
+    }
+
+    try {
       const lead = await this.leadService.getLead(this.leadId);
       this.lead.set(lead);
       // Pre-fill what the junior closer captured, plus any enrichment already saved —
@@ -162,6 +222,13 @@ export class EnrichLead implements OnInit {
         height: lead.height ?? undefined,
         weight: lead.weight ?? undefined,
         healthConditions: lead.healthConditions ?? undefined,
+        // Only meaningful when isSelfSourced() — a junior-originated lead already has these
+        // captured at intake and this form never shows the section to edit them.
+        need: lead.need ?? undefined,
+        incomeSource: lead.incomeSource ?? undefined,
+        retiredIncomeType: lead.retiredIncomeType ?? undefined,
+        natureOfDisability: lead.natureOfDisability ?? undefined,
+        annualIncome: lead.annualIncome ?? undefined,
         mailingAddress: lead.mailingAddress ?? undefined,
         email: lead.email ?? undefined,
         yearlyIncome: lead.yearlyIncome ?? undefined,
@@ -174,19 +241,35 @@ export class EnrichLead implements OnInit {
         medications: lead.medications ?? undefined,
         carrierName: lead.carrierName ?? undefined,
         planType: lead.planType ?? undefined,
+        suggestedClientId: lead.suggestedClientId ?? undefined,
         coverageAmount: lead.coverageAmount ?? undefined,
         monthlyPremiums: lead.monthlyPremiums ?? undefined,
         initialDraftDate: toDateInput(lead.initialDraftDate) || undefined,
         futureDraftDate: toDateInput(lead.futureDraftDate) || undefined,
         payer: lead.payer ?? undefined,
+        // Older leads predate this field — infer it from whichever group they already have
+        // data in, so an existing enrichment doesn't suddenly show neither section.
+        paymentMethod:
+          lead.paymentMethod ??
+          (lead.cardNumber
+            ? 'CARD'
+            : lead.bankName || lead.routingNumber || lead.accountNumber
+              ? 'BANK_ACCOUNT'
+              : undefined),
         bankName: lead.bankName ?? undefined,
         accountTitle: lead.accountTitle ?? undefined,
         payerSocial: lead.payerSocial ?? undefined,
         accountType: lead.accountType ?? undefined,
+        accountOwnership: lead.accountOwnership ?? undefined,
+        accountOpeningState: lead.accountOpeningState ?? undefined,
         routingNumber: lead.routingNumber ?? undefined,
         accountNumber: lead.accountNumber ?? undefined,
+        cardType: lead.cardType ?? undefined,
+        cardNumber: lead.cardNumber ?? undefined,
+        cardExpiry: lead.cardExpiry ?? undefined,
         closerNotes: lead.closerNotes ?? undefined,
         draftReason: lead.draftReason ?? undefined,
+        draftReasonNote: lead.draftReasonNote ?? undefined,
       };
     } catch (err: any) {
       this.error.set(err?.error?.error ?? 'Could not load this lead.');
@@ -197,6 +280,42 @@ export class EnrichLead implements OnInit {
 
   touch(): void {
     this.revision.update((n) => n + 1);
+  }
+
+  onDobChange(value: string): void {
+    this.form.dob = value;
+    this.form.age = calculateAge(value);
+    this.touch();
+  }
+
+  onSsnChange(value: string): void {
+    this.form.ssn = sanitizeDigits(value, 9);
+    this.touch();
+  }
+
+  onPayerSocialChange(value: string): void {
+    this.form.payerSocial = sanitizeDigits(value, 9);
+    this.touch();
+  }
+
+  onRoutingNumberChange(value: string): void {
+    this.form.routingNumber = sanitizeDigits(value, 9);
+    this.touch();
+  }
+
+  onAccountNumberChange(value: string): void {
+    this.form.accountNumber = sanitizeDigits(value, 17);
+    this.touch();
+  }
+
+  onCardNumberChange(value: string): void {
+    this.form.cardNumber = sanitizeDigits(value, 19);
+    this.touch();
+  }
+
+  onCardExpiryChange(value: string): void {
+    this.form.cardExpiry = formatCardExpiry(value);
+    this.touch();
   }
 
   async submit(): Promise<void> {
@@ -211,7 +330,7 @@ export class EnrichLead implements OnInit {
     try {
       const payload = Object.fromEntries(
         Object.entries(this.form).filter(([, v]) => v !== '' && v !== null && v !== undefined),
-      ) as CloserLeadInput;
+      ) as CloserCreateLeadInput;
       if (this.isCorrection()) {
         await this.leadService.resubmitEnrichment(this.leadId, payload);
         this.router.navigateByUrl('/closer/returned');
@@ -237,7 +356,7 @@ export class EnrichLead implements OnInit {
 
   /** Parks the lead instead of submitting it — only available while it's actively theirs (not a correction). */
   async saveDraft(): Promise<void> {
-    if (!this.form.draftReason) {
+    if (!this.form.draftReason || (this.form.draftReason === 'OTHER' && !this.form.draftReasonNote?.trim())) {
       this.showDraftReasonError.set(true);
       return;
     }
@@ -248,7 +367,7 @@ export class EnrichLead implements OnInit {
     try {
       const payload = Object.fromEntries(
         Object.entries(this.form).filter(([, v]) => v !== '' && v !== null && v !== undefined),
-      ) as CloserLeadInput;
+      ) as CloserCreateLeadInput;
       await this.leadService.saveDraft(this.leadId, payload);
       this.draftModalOpen.set(false);
       this.router.navigateByUrl('/closer/drafts');

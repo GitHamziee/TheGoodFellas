@@ -7,7 +7,7 @@ import { AuthService } from '../../../core/services/auth.service';
 import { Lead } from '../../../core/models/lead.model';
 import { createListView } from '../../../core/list-view';
 import { formatPhone, getAvatarTone, getInitials, timeAgo } from '../../../core/format-utils';
-import { EmptyState, Pagination, SearchBox, SkeletonRows, StatTile } from '../../../shared/ui/ui';
+import { EmptyState, Pagination, SearchBox, SkeletonRows, StatTile, StatusBadge } from '../../../shared/ui/ui';
 import { Select } from '../../../shared/ui/select';
 
 /**
@@ -28,6 +28,7 @@ import { Select } from '../../../shared/ui/select';
     Pagination,
     EmptyState,
     SkeletonRows,
+    StatusBadge,
     LucideSend,
     LucideClock,
     LucideSquarePen,
@@ -81,8 +82,9 @@ export class RetentionQueue implements OnInit {
     sorters: {
       customerName: (l) => l.customerName,
       createdAt: (l) => new Date(l.createdAt).getTime(),
+      updatedAt: (l) => new Date(l.updatedAt ?? l.createdAt).getTime(),
     },
-    initialSort: { key: 'createdAt', dir: 'desc' },
+    initialSort: { key: 'updatedAt', dir: 'desc' },
     pageSize: 12,
   });
 

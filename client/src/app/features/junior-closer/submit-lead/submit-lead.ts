@@ -23,7 +23,7 @@ import {
   RETIRED_INCOME_OPTIONS,
   SMOKER_OPTIONS,
 } from '../../../core/lead-options';
-import { getAvatarTone, getInitials, toDateInput } from '../../../core/format-utils';
+import { calculateAge, getAvatarTone, getInitials, toDateInput, todayDateInput } from '../../../core/format-utils';
 import { Select } from '../../../shared/ui/select';
 import { NoCopy } from '../../../shared/no-copy.directive';
 
@@ -113,6 +113,10 @@ export class SubmitLead implements OnInit {
 
   readonly getInitials = getInitials;
   readonly getAvatarTone = getAvatarTone;
+  /** Bounds for date-of-birth inputs — a plain `<input type="date">` has no digit limit
+   * on the year segment otherwise, so nothing stops typing a year like "221465". */
+  readonly minDob = '1900-01-01';
+  readonly todayIso = todayDateInput();
 
   /** Fixed to whatever the lead already is in correction mode — reassigning type isn't
    * on the table when you're just fixing what's already there. */
@@ -192,6 +196,12 @@ export class SubmitLead implements OnInit {
   /** Signals feed off `form`, which template-driven bindings mutate in place. */
   touch(): void {
     if (this.showErrors()) this.showErrors.set(true);
+  }
+
+  onDobChange(value: string): void {
+    this.form.dob = value;
+    this.form.age = calculateAge(value);
+    this.touch();
   }
 
   async submit(): Promise<void> {

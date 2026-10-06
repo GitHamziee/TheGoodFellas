@@ -10,8 +10,16 @@ import chatRoutes from "./routes/chat.routes";
 import externalClientRoutes from "./routes/external-clients.routes";
 import expenseRoutes from "./routes/expenses.routes";
 import callReviewRoutes from "./routes/call-reviews.routes";
+import ipWhitelistRoutes from "./routes/ip-whitelist.routes";
 
 const app = express();
+
+// See the comment on env.trustProxy — unset by default, so req.ip is the raw socket address
+// and X-Forwarded-For is ignored. Only meaningful once a real reverse proxy sits in front.
+if (env.trustProxy) {
+  const numeric = Number(env.trustProxy);
+  app.set("trust proxy", env.trustProxy === "true" ? true : env.trustProxy === "false" ? false : Number.isNaN(numeric) ? env.trustProxy : numeric);
+}
 
 app.use(cors({ origin: env.clientOrigin, credentials: true }));
 app.use(express.json());
@@ -26,6 +34,7 @@ app.use("/api/chat", chatRoutes);
 app.use("/api/external-clients", externalClientRoutes);
 app.use("/api/expenses", expenseRoutes);
 app.use("/api/call-reviews", callReviewRoutes);
+app.use("/api/admin/whitelisted-ips", ipWhitelistRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({ error: "Not found" });

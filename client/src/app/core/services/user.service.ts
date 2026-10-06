@@ -44,7 +44,7 @@ export class UserService {
     return res.data.retention;
   }
 
-  /** For the State Sheet — visible to Closer/Team Lead/Admin, narrower than listUsers(). */
+  /** For the State Sheet — visible to Closer/Team Lead/Retention/Admin, narrower than listUsers(). */
   async getStateSheet(): Promise<ClientCoverage[]> {
     const res = await firstValueFrom(
       this.http.get<ApiSuccess<{ clients: ClientCoverage[] }>>(`${BASE}/state-sheet`),

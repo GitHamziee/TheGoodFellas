@@ -142,6 +142,11 @@ export const routes: Routes = [
         loadComponent: () => import('./features/admin/retention/retention').then((m) => m.AdminRetention),
       },
       {
+        path: 'retention-leads',
+        loadComponent: () =>
+          import('./features/admin/retention-leads/retention-leads').then((m) => m.AdminRetentionLeads),
+      },
+      {
         path: 'cpl-leads',
         loadComponent: () => import('./features/admin/cpl-leads/cpl-leads').then((m) => m.AdminCplLeads),
       },
@@ -169,6 +174,10 @@ export const routes: Routes = [
       {
         path: 'expenses',
         loadComponent: () => import('./features/admin/expenses/expenses').then((m) => m.AdminExpenses),
+      },
+      {
+        path: 'ip-whitelist',
+        loadComponent: () => import('./features/admin/ip-whitelist/ip-whitelist').then((m) => m.AdminIpWhitelist),
       },
       {
         path: 'analytics/junior-closers',
@@ -231,45 +240,46 @@ export const routes: Routes = [
     ],
   },
 
+  // Reuses the same admin-page components as /admin above, minus Clients, Team, External
+  // Clients, and Expenses — see nav-config.ts's MANAGER entry for the exact list this mirrors.
   {
-    path: 'client',
-    canMatch: [authGuard, roleGuard('CLIENT')],
+    path: 'manager',
+    canMatch: [authGuard, roleGuard('MANAGER')],
     loadComponent: () => import('./layout/portal-shell/portal-shell').then((m) => m.PortalShell),
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
       {
         path: 'dashboard',
-        loadComponent: () => import('./features/client/dashboard/dashboard').then((m) => m.ClientDashboard),
+        loadComponent: () => import('./features/admin/dashboard/dashboard').then((m) => m.AdminDashboard),
       },
       {
-        path: 'new-leads',
-        loadComponent: () => import('./features/client/assigned-leads/assigned-leads').then((m) => m.AssignedLeads),
+        path: 'queue',
+        loadComponent: () => import('./features/admin/queue/queue').then((m) => m.AdminQueue),
       },
       {
-        path: 'lead-history',
-        loadComponent: () => import('./features/client/lead-history/lead-history').then((m) => m.ClientLeadHistory),
+        path: 'leads',
+        loadComponent: () => import('./features/admin/leads/leads').then((m) => m.AdminLeads),
       },
       {
-        path: 'settings',
-        loadComponent: () => import('./features/settings/settings').then((m) => m.Settings),
-      },
-    ],
-  },
-
-  {
-    path: 'team-lead',
-    canMatch: [authGuard, roleGuard('TEAM_LEAD')],
-    loadComponent: () => import('./layout/portal-shell/portal-shell').then((m) => m.PortalShell),
-    children: [
-      { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
-      {
-        path: 'dashboard',
-        loadComponent: () => import('./features/team-lead/dashboard/dashboard').then((m) => m.TeamLeadDashboard),
+        path: 'charge-backs',
+        loadComponent: () => import('./features/admin/charge-backs/charge-backs').then((m) => m.AdminChargeBacks),
       },
       {
-        path: 'submitted-leads',
+        path: 'retention',
+        loadComponent: () => import('./features/admin/retention/retention').then((m) => m.AdminRetention),
+      },
+      {
+        path: 'retention-leads',
         loadComponent: () =>
-          import('./features/team-lead/submitted-leads/submitted-leads').then((m) => m.TeamLeadSubmittedLeads),
+          import('./features/admin/retention-leads/retention-leads').then((m) => m.AdminRetentionLeads),
+      },
+      {
+        path: 'cpl-leads',
+        loadComponent: () => import('./features/admin/cpl-leads/cpl-leads').then((m) => m.AdminCplLeads),
+      },
+      {
+        path: 'drafts',
+        loadComponent: () => import('./features/admin/drafts/drafts').then((m) => m.AdminDrafts),
       },
       {
         path: 'state-sheet',
@@ -282,6 +292,28 @@ export const routes: Routes = [
       {
         path: 'analytics/closers',
         loadComponent: () => import('./features/admin/analytics-closer/analytics-closer').then((m) => m.AnalyticsCloser),
+      },
+      {
+        path: 'analytics/retention',
+        loadComponent: () =>
+          import('./features/admin/analytics-retention/analytics-retention').then((m) => m.AnalyticsRetention),
+      },
+      {
+        path: 'analytics/clients',
+        loadComponent: () => import('./features/admin/analytics-client/analytics-client').then((m) => m.AnalyticsClient),
+      },
+      {
+        path: 'analytics/overall',
+        loadComponent: () => import('./features/admin/analytics-overall/analytics-overall').then((m) => m.AnalyticsOverall),
+      },
+      {
+        path: 'analytics/drafts',
+        loadComponent: () => import('./features/admin/analytics-drafts/analytics-drafts').then((m) => m.AnalyticsDrafts),
+      },
+      {
+        path: 'analytics/charge-backs',
+        loadComponent: () =>
+          import('./features/admin/analytics-charge-backs/analytics-charge-backs').then((m) => m.AnalyticsChargeBacks),
       },
       {
         path: 'qa-reports/transfer-junior-closers',
@@ -307,8 +339,83 @@ export const routes: Routes = [
         path: 'chat',
         loadComponent: () => import('./features/chat/chat').then((m) => m.Chat),
       },
+      {
+        path: 'settings',
+        loadComponent: () => import('./features/settings/settings').then((m) => m.Settings),
+      },
+      // Excluded from this role — redirect stray bookmarks/links rather than 404ing.
+      { path: 'clients', redirectTo: 'dashboard' },
+      { path: 'team', redirectTo: 'dashboard' },
+      { path: 'external-clients', redirectTo: 'dashboard' },
+      { path: 'expenses', redirectTo: 'dashboard' },
+      { path: 'ip-whitelist', redirectTo: 'dashboard' },
+    ],
+  },
+
+  {
+    path: 'client',
+    canMatch: [authGuard, roleGuard('CLIENT')],
+    loadComponent: () => import('./layout/portal-shell/portal-shell').then((m) => m.PortalShell),
+    children: [
+      { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
+      {
+        path: 'dashboard',
+        loadComponent: () => import('./features/client/dashboard/dashboard').then((m) => m.ClientDashboard),
+      },
+      {
+        path: 'new-leads',
+        loadComponent: () => import('./features/client/assigned-leads/assigned-leads').then((m) => m.AssignedLeads),
+      },
+      {
+        path: 'lead-history',
+        loadComponent: () => import('./features/client/lead-history/lead-history').then((m) => m.ClientLeadHistory),
+      },
       // Settings removed from this portal's nav — redirect stray bookmarks/links rather
       // than letting them 404 all the way out to the public marketing site.
+      { path: 'settings', redirectTo: 'dashboard' },
+    ],
+  },
+
+  {
+    path: 'team-lead',
+    canMatch: [authGuard, roleGuard('TEAM_LEAD')],
+    loadComponent: () => import('./layout/portal-shell/portal-shell').then((m) => m.PortalShell),
+    children: [
+      { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
+      {
+        path: 'dashboard',
+        loadComponent: () => import('./features/team-lead/dashboard/dashboard').then((m) => m.TeamLeadDashboard),
+      },
+      {
+        path: 'submitted-leads',
+        loadComponent: () =>
+          import('./features/team-lead/submitted-leads/submitted-leads').then((m) => m.TeamLeadSubmittedLeads),
+      },
+      {
+        path: 'analytics/junior-closers',
+        loadComponent: () => import('./features/admin/analytics-junior/analytics-junior').then((m) => m.AnalyticsJunior),
+      },
+      {
+        path: 'qa-reports/transfer-junior-closers',
+        loadComponent: () =>
+          import('./features/qa-reports/transfer-junior/transfer-junior').then((m) => m.QaTransferJunior),
+      },
+      {
+        path: 'qa-reports/live-call-junior-closers',
+        loadComponent: () =>
+          import('./features/qa-reports/live-call-junior/live-call-junior').then((m) => m.QaLiveCallJunior),
+      },
+      {
+        path: 'chat',
+        loadComponent: () => import('./features/chat/chat').then((m) => m.Chat),
+      },
+      // Removed from this portal's nav — Closer oversight (State Sheet, Closer analytics/QA)
+      // and Settings — redirect stray bookmarks/links rather than letting them 404 all the
+      // way out to the public marketing site.
+      { path: 'state-sheet', redirectTo: 'dashboard' },
+      { path: 'analytics/closers', redirectTo: 'dashboard' },
+      { path: 'qa-reports/transfer-closers', redirectTo: 'dashboard' },
+      { path: 'qa-reports/live-call-closers', redirectTo: 'dashboard' },
       { path: 'settings', redirectTo: 'dashboard' },
     ],
   },
@@ -331,10 +438,9 @@ export const routes: Routes = [
         path: 'write-review',
         loadComponent: () => import('./features/qa/write-review/write-review').then((m) => m.QaWriteReview),
       },
-      {
-        path: 'settings',
-        loadComponent: () => import('./features/settings/settings').then((m) => m.Settings),
-      },
+      // Settings removed from this portal's nav — redirect stray bookmarks/links rather
+      // than letting them 404 all the way out to the public marketing site.
+      { path: 'settings', redirectTo: 'review-queue' },
     ],
   },
 
@@ -356,10 +462,9 @@ export const routes: Routes = [
         path: 'write-review',
         loadComponent: () => import('./features/qa/write-review/write-review').then((m) => m.QaWriteReview),
       },
-      {
-        path: 'settings',
-        loadComponent: () => import('./features/settings/settings').then((m) => m.Settings),
-      },
+      // Settings removed from this portal's nav — redirect stray bookmarks/links rather
+      // than letting them 404 all the way out to the public marketing site.
+      { path: 'settings', redirectTo: 'review-queue' },
     ],
   },
 
@@ -374,6 +479,10 @@ export const routes: Routes = [
         loadComponent: () => import('./features/retention/dashboard/dashboard').then((m) => m.RetentionDashboard),
       },
       {
+        path: 'new-lead',
+        loadComponent: () => import('./features/retention/new-lead/new-lead').then((m) => m.RetentionNewLead),
+      },
+      {
         path: 'queue',
         loadComponent: () => import('./features/retention/queue/queue').then((m) => m.RetentionQueue),
       },
@@ -384,6 +493,10 @@ export const routes: Routes = [
       {
         path: 'history',
         loadComponent: () => import('./features/retention/history/history').then((m) => m.RetentionHistory),
+      },
+      {
+        path: 'state-sheet',
+        loadComponent: () => import('./features/admin/state-sheet/state-sheet').then((m) => m.StateSheet),
       },
       {
         path: 'chat',

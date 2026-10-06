@@ -4,8 +4,10 @@ import {
   LucideArrowRight,
   LucideCircleCheck,
   LucideCircleX,
+  LucideHeadset,
   LucideInbox,
   LucideLayers,
+  LucideTag,
   LucideTrendingUp,
   LucideTriangleAlert,
   LucideUserCheck,
@@ -38,8 +40,10 @@ const FLOW: { status: LeadStatus; label: string; owner: string; mine: boolean }[
     LucideArrowRight,
     LucideCircleCheck,
     LucideCircleX,
+    LucideHeadset,
     LucideInbox,
     LucideLayers,
+    LucideTag,
     LucideTrendingUp,
     LucideTriangleAlert,
     LucideUserCheck,
@@ -92,6 +96,17 @@ export class AdminDashboard implements OnInit {
   });
 
   readonly rejectedCount = computed(() => this.leads().filter((l) => l.status === 'REJECTED').length);
+
+  /** How many leads came in through each pipeline — CPA, CPL, and Retention each have
+   *  their own dedicated admin page, so this is the at-a-glance split between them. */
+  readonly bySource = computed(() => {
+    const rows = this.leads();
+    return {
+      cpa: rows.filter((l) => l.leadType === 'CPA').length,
+      cpl: rows.filter((l) => l.leadType === 'CPL').length,
+      retention: rows.filter((l) => l.leadType === 'RETENTION').length,
+    };
+  });
 
   /**
    * How the pipeline is converting, in leads. Deliberately count-based: a lead's

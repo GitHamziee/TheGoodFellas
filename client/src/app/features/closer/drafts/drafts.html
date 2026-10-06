@@ -66,7 +66,7 @@
                 </td>
                 <td class="hide-sm">
                   @if (lead.draftReason) {
-                    <span class="chip">{{ humanizeEnum(lead.draftReason) }}</span>
+                    <span class="chip">{{ lead.draftReason === 'OTHER' && lead.draftReasonNote ? lead.draftReasonNote : draftReasonLabel[lead.draftReason] }}</span>
                   } @else {
                     <span class="empty">—</span>
                   }
@@ -123,7 +123,7 @@
     @if (lead.draftReason) {
       <div class="locked" style="border-style: solid;">
         <svg lucideNotebookPen></svg>
-        <span><strong>Draft reason:</strong> {{ humanizeEnum(lead.draftReason) }}</span>
+        <span><strong>Draft reason:</strong> {{ lead.draftReason === 'OTHER' && lead.draftReasonNote ? lead.draftReasonNote : draftReasonLabel[lead.draftReason] }}</span>
       </div>
     }
 

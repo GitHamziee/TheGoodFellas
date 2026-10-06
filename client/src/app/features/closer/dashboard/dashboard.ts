@@ -1,6 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
+  LucideBanknoteArrowUp,
   LucideCircleCheck,
   LucideClock,
   LucideHourglass,
@@ -32,6 +33,7 @@ const STALE_AFTER_DAYS = 3;
     LucideCircleCheck,
     LucideTarget,
     LucideHourglass,
+    LucideBanknoteArrowUp,
   ],
   templateUrl: './dashboard.html',
 })
@@ -62,13 +64,16 @@ export class CloserDashboard implements OnInit {
       thisMonth: past.filter((l) => isThisMonth(l.createdAt)).length,
       accepted,
       acceptRate: decided ? Math.round((accepted / decided) * 100) : null,
+      // A sale a client accepted and paid for, then clawed back later — still theirs in
+      // history (closerId never changes), just flagged separately from the accept/reject split.
+      chargedBack: past.filter((l) => l.status === 'CHARGED_BACK').length,
     };
   });
 
-  /** Oldest first — those are the ones at risk of going stale. */
+  /** Newest first. */
   readonly upNext = computed(() =>
     [...this.inbox()]
-      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, 5),
   );
 

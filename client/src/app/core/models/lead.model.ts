@@ -6,9 +6,11 @@ export type LeadStatus =
   | 'ASSIGNED'
   | 'ACCEPTED'
   | 'REJECTED'
-  // Admin sent it back to the role that entered the bad data; both resubmit to SUBMITTED.
+  // Admin sent it back to the role that entered the bad data; all three resubmit to SUBMITTED.
   | 'RETURNED_TO_JUNIOR'
   | 'RETURNED_TO_CLOSER'
+  // A RETENTION lead's only valid return target — it never has a junior closer or closer.
+  | 'RETURNED_TO_RETENTION'
   // Handed to a non-login ExternalClient — terminal, no accept/reject step.
   | 'ASSIGNED_EXTERNAL'
   // Closer parked a half-baked enrichment instead of submitting; resumable by them only.
@@ -17,10 +19,18 @@ export type LeadStatus =
   | 'CHARGED_BACK';
 export type PaymentStatus = 'UNPAID' | 'PAID';
 export type DraftReason =
-  | 'MISSING_INFO'
-  | 'CLIENT_NOT_REACHABLE'
-  | 'NEEDS_FOLLOW_UP'
-  | 'PENDING_DOCUMENTATION'
+  | 'LOST_ON_SOCIAL'
+  | 'LOST_ON_ACCOUNT'
+  | 'LOST_ON_PRICES'
+  | 'DEMENTIA_ALZHEIMERS'
+  | 'NOT_A_DM'
+  | 'DNC'
+  | 'BAD_STATE'
+  | 'CALLBACK'
+  | 'HUNGUP'
+  | 'OVER_AGE'
+  | 'CLOSED_DEAD_DEAL'
+  | 'NOT_IN_SERVICE'
   | 'OTHER';
 export type LeadNeed = 'BURIAL' | 'CREMATION' | 'LEAVE_MONEY';
 /** CPA = today's full pipeline. CPL skips the Closer step entirely — see the Lead interface.
@@ -34,6 +44,9 @@ export type RetiredIncomeType = 'SSI' | 'SSDI';
 export type AccountType = 'CHECKING' | 'SAVINGS';
 export type PayerType = 'SELF' | 'SOMEONE_ELSE';
 export type PlanType = 'LEVEL' | 'GRADED' | 'MODIFIED' | 'GI';
+export type PaymentMethod = 'BANK_ACCOUNT' | 'CARD';
+export type CardType = 'CREDIT' | 'DEBIT' | 'DIRECT_EXPRESS';
+export type AccountOwnership = 'SINGLE' | 'JOINT';
 
 export interface LeadParty {
   id: string;
@@ -63,6 +76,9 @@ export interface Lead {
   externalClientId: string | null;
   /** Set only for RETENTION leads — who Admin handed a form-submitted lead to. */
   retentionId: string | null;
+  /** Non-binding hint from whoever built/enriched the lead — "I think this fits Client X".
+   * Admin still explicitly assigns; this is just a heads-up shown in the queue. */
+  suggestedClientId?: string | null;
 
   /** CPA = today's pipeline. A CPL lead never leaves this shorter field set. */
   leadType: LeadType;
@@ -113,16 +129,24 @@ export interface Lead {
   initialDraftDate?: string | null;
   futureDraftDate?: string | null;
   payer?: PayerType | null;
+  paymentMethod?: PaymentMethod | null;
   bankName?: string | null;
   accountTitle?: string | null;
   payerSocial?: string | null;
   accountType?: AccountType | null;
+  accountOwnership?: AccountOwnership | null;
+  accountOpeningState?: string | null;
   routingNumber?: string | null;
   accountNumber?: string | null;
+  cardType?: CardType | null;
+  cardNumber?: string | null;
+  cardExpiry?: string | null;
   closerNotes?: string | null;
 
   /** Set while status is DRAFT; cleared on final submit. */
   draftReason?: DraftReason | null;
+  /** Typed reason, only present when draftReason is 'OTHER'. */
+  draftReasonNote?: string | null;
 
   // admin
   rejectionReason?: string | null;
@@ -145,6 +169,8 @@ export interface Lead {
   externalClient: Pick<ExternalClient, 'id' | 'name' | 'company' | 'email' | 'phone'> | null;
   /** Set only for RETENTION leads — who Admin handed a form-submitted lead to. */
   retention: LeadParty | null;
+  /** Non-binding "suggested for this client" hint — see suggestedClientId above. */
+  suggestedClient?: LeadParty | null;
   /** Full chargeback history, newest first. Empty unless the lead has ever been charged back. */
   chargeBacks: ChargeBack[];
 }
@@ -157,6 +183,7 @@ export interface LeadHistoryRow {
   customerName: string;
   status: LeadStatus;
   createdAt: string;
+  updatedAt: string;
   leadType?: LeadType;
   closer?: LeadParty;
   client?: LeadParty | null;
@@ -173,6 +200,7 @@ export type LeadIntakeEdit = Pick<
   | 'id'
   | 'status'
   | 'createdAt'
+  | 'updatedAt'
   | 'returnReason'
   | 'leadType'
   | 'customerName'
@@ -209,6 +237,7 @@ export interface TeamLeadLeadRow {
   customerName: string;
   status: LeadStatus;
   createdAt: string;
+  updatedAt: string;
   leadType?: LeadType;
   dCode?: DCode | null;
   juniorCloser?: LeadParty;
@@ -225,6 +254,7 @@ export interface LeadPreview {
   maritalStatus?: string | null;
   status: LeadStatus;
   createdAt: string;
+  updatedAt: string;
   /** Null for a CPL lead — CPL skips the Closer step entirely, forever. */
   closer?: LeadParty | null;
 }
@@ -241,6 +271,7 @@ export interface LeadInboxPreview {
   need?: LeadNeed | null;
   status: LeadStatus;
   createdAt: string;
+  updatedAt: string;
   leadType?: LeadType;
   juniorCloser: LeadParty;
 }

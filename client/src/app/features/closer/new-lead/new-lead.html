@@ -77,7 +77,7 @@
         </label>
         <label>
           Date of birth
-          <input type="date" name="dob" [(ngModel)]="form.dob" />
+          <input type="date" name="dob" [min]="minDob" [max]="todayIso" [ngModel]="form.dob" (ngModelChange)="onDobChange($event)" />
         </label>
         <label>
           Age
@@ -85,8 +85,9 @@
         </label>
         <label>
           Social Security Number
-          <input type="text" name="ssn" placeholder="123-00-1234" [(ngModel)]="form.ssn" />
-          <span class="hint">9 digits — stored in the format 123-00-1234.</span>
+          <input type="text" name="ssn" inputmode="numeric" maxlength="9" placeholder="123456789"
+            [ngModel]="form.ssn" (ngModelChange)="onSsnChange($event)" />
+          <span class="hint">Exactly 9 digits.</span>
         </label>
         <label>
           DL / State ID #
@@ -179,7 +180,7 @@
         </label>
         <label>
           Beneficiary date of birth
-          <input type="date" name="beneficiaryDob" [(ngModel)]="form.beneficiaryDob" />
+          <input type="date" name="beneficiaryDob" [min]="minDob" [max]="todayIso" [(ngModel)]="form.beneficiaryDob" />
         </label>
       </div>
     </div>
@@ -196,6 +197,11 @@
           Plan type
           <app-select [options]="planTypeOptions" [ngModel]="form.planType" name="planType"
             (ngModelChange)="form.planType = $event; touch()" placeholder="Select a plan type…" />
+        </label>
+        <label>
+          Suggested client <span class="hint">Optional — helps admin decide who to assign this to</span>
+          <app-select [options]="clientOptions()" [ngModel]="form.suggestedClientId" name="suggestedClientId"
+            (ngModelChange)="form.suggestedClientId = $event; touch()" placeholder="No suggestion…" />
         </label>
         <label>
           Coverage amount <span class="hint">Whole dollars</span>
@@ -218,20 +224,25 @@
       <div class="form-grid">
         <label>
           Initial draft date
-          <input type="date" name="initialDraftDate" [(ngModel)]="form.initialDraftDate" />
+          <input type="date" name="initialDraftDate" min="2000-01-01" max="2100-12-31" [(ngModel)]="form.initialDraftDate" />
         </label>
         <label>
           Future draft date
-          <input type="date" name="futureDraftDate" [(ngModel)]="form.futureDraftDate" />
+          <input type="date" name="futureDraftDate" min="2000-01-01" max="2100-12-31" [(ngModel)]="form.futureDraftDate" />
         </label>
         <label class="full">
           Who is paying?
           <app-select [options]="payerOptions" [ngModel]="form.payer" name="payer"
             (ngModelChange)="form.payer = $event; touch()" />
         </label>
+        <label class="full">
+          Payment method
+          <app-select [options]="paymentMethodOptions" [ngModel]="form.paymentMethod" name="paymentMethod"
+            (ngModelChange)="form.paymentMethod = $event; touch()" placeholder="Select a payment method…" />
+        </label>
       </div>
 
-      @if (form.payer) {
+      @if (form.payer && form.paymentMethod === 'BANK_ACCOUNT') {
         <div class="section">
           <h3 class="section-title">
             {{ form.payer === 'SELF' ? 'Bank account (customer)' : "Bank account (someone else's)" }}
@@ -245,7 +256,9 @@
             } @else {
               <label>
                 Payer's Social Security Number
-                <input type="text" name="payerSocial" placeholder="123-00-1234" [(ngModel)]="form.payerSocial" />
+                <input type="text" name="payerSocial" inputmode="numeric" maxlength="9" placeholder="123456789"
+                  [ngModel]="form.payerSocial" (ngModelChange)="onPayerSocialChange($event)" />
+                <span class="hint">Exactly 9 digits.</span>
               </label>
             }
             <label>
@@ -258,13 +271,55 @@
                 (ngModelChange)="form.accountType = $event; touch()" />
             </label>
             <label>
+              Joint or single account
+              <app-select [options]="accountOwnershipOptions" [ngModel]="form.accountOwnership" name="accountOwnership"
+                (ngModelChange)="form.accountOwnership = $event; touch()" placeholder="Select…" />
+            </label>
+            <label>
+              Account opening state
+              <input type="text" name="accountOpeningState" [(ngModel)]="form.accountOpeningState" />
+            </label>
+            <label>
               Routing number
-              <input type="text" name="routingNumber" [(ngModel)]="form.routingNumber" />
+              <input type="text" name="routingNumber" inputmode="numeric" maxlength="9" placeholder="123456789"
+                [ngModel]="form.routingNumber" (ngModelChange)="onRoutingNumberChange($event)"
+                [class.invalid]="routingInvalid()" />
+                @if (routingInvalid()) {
+                  <span class="field-error">Routing number must be exactly 9 digits.</span>
+                }
               <span class="hint">Exactly 9 digits.</span>
             </label>
             <label>
               Account number
-              <input type="text" name="accountNumber" [(ngModel)]="form.accountNumber" />
+              <input type="text" name="accountNumber" inputmode="numeric" maxlength="17"
+                [ngModel]="form.accountNumber" (ngModelChange)="onAccountNumberChange($event)" />
+              <span class="hint">3 to 17 digits.</span>
+            </label>
+          </div>
+        </div>
+      }
+
+      @if (form.payer && form.paymentMethod === 'CARD') {
+        <div class="section">
+          <h3 class="section-title">
+            {{ form.payer === 'SELF' ? 'Card (customer)' : "Card (someone else's)" }}
+          </h3>
+          <div class="form-grid">
+            <label>
+              Card type
+              <app-select [options]="cardTypeOptions" [ngModel]="form.cardType" name="cardType"
+                (ngModelChange)="form.cardType = $event; touch()" placeholder="Select a card type…" />
+            </label>
+            <label>
+              Card number
+              <input type="text" name="cardNumber" inputmode="numeric" maxlength="19"
+                [ngModel]="form.cardNumber" (ngModelChange)="onCardNumberChange($event)" />
+              <span class="hint">13 to 19 digits.</span>
+            </label>
+            <label>
+              Expiry
+              <input type="text" name="cardExpiry" inputmode="numeric" maxlength="5" placeholder="MM/YY"
+                [ngModel]="form.cardExpiry" (ngModelChange)="onCardExpiryChange($event)" />
             </label>
           </div>
         </div>
@@ -287,6 +342,9 @@
       } @else {
         <span class="pending-note ok">Ready to submit — {{ completeness() }}% of the application filled in</span>
       }
+      <button class="btn btn--ghost" type="button" [disabled]="savingDraft() || submitting()" (click)="openDraftModal()">
+        <svg lucideNotebookPen></svg> Save as draft
+      </button>
       <button class="btn" type="submit" [disabled]="!canSubmit()">
         @if (submitting()) {
           <span class="spinner"></span> Submitting…
@@ -297,3 +355,49 @@
     </div>
   </form>
 </div>
+
+@if (draftModalOpen()) {
+  <app-modal title="Save as draft" subtitle="Pick a reason so admin can see why this lead is parked." (close)="closeDraftModal()">
+    <label>
+      Reason
+      <app-select
+        [options]="draftReasonOptions"
+        [ngModel]="form.draftReason"
+        [invalid]="showDraftReasonError() && !form.draftReason"
+        placeholder="Select a reason…"
+        name="draftReason"
+        (ngModelChange)="form.draftReason = $event; showDraftReasonError.set(false)"
+      />
+      @if (showDraftReasonError() && !form.draftReason) {
+        <span class="field-error">Pick a reason to save this as a draft.</span>
+      }
+    </label>
+
+    @if (form.draftReason === 'OTHER') {
+      <label>
+        Custom reason
+        <input
+          type="text"
+          name="draftReasonNote"
+          maxlength="200"
+          placeholder="Type the reason…"
+          [(ngModel)]="form.draftReasonNote"
+          (ngModelChange)="showDraftReasonError.set(false)"
+        />
+        @if (showDraftReasonError() && !form.draftReasonNote?.trim()) {
+          <span class="field-error">Type a reason to save this as a draft.</span>
+        }
+      </label>
+    }
+
+    <div footer>
+      <button class="btn" type="button" [disabled]="savingDraft()" (click)="saveDraft()">
+        @if (savingDraft()) {
+          <span class="spinner"></span> Saving…
+        } @else {
+          <svg lucideNotebookPen></svg> Save as draft
+        }
+      </button>
+    </div>
+  </app-modal>
+}

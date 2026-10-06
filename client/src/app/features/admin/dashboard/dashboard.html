@@ -115,6 +115,36 @@
         }
       </section>
 
+      <!-- ---------- Where leads come from ---------- -->
+      <section class="card">
+        <div class="inline-head">
+          <h2>Leads by source</h2>
+        </div>
+        <div class="mini-stats">
+          <div class="mini">
+            <span class="mini__ico tone-a"><svg lucideUserCheck></svg></span>
+            <span>
+              <span class="mini__v">{{ bySource().cpa }}</span>
+              <span class="mini__l">CPA</span>
+            </span>
+          </div>
+          <div class="mini">
+            <span class="mini__ico tone-gold"><svg lucideTag></svg></span>
+            <span>
+              <span class="mini__v">{{ bySource().cpl }}</span>
+              <span class="mini__l">CPL</span>
+            </span>
+          </div>
+          <div class="mini">
+            <span class="mini__ico tone-info"><svg lucideHeadset></svg></span>
+            <span>
+              <span class="mini__v">{{ bySource().retention }}</span>
+              <span class="mini__l">Retention</span>
+            </span>
+          </div>
+        </div>
+      </section>
+
       <div class="split">
         <!-- ---------- How leads are converting (counts, never dollars) ---------- -->
         <section class="card">
@@ -224,7 +254,7 @@
               <span class="who">
                 <span class="nm">{{ lead.customerName }}</span>
                 <span class="mt">
-                  @if (lead.closer) { {{ lead.closer.name }} } @else { CPL }
+                  @if (lead.closer) { {{ lead.closer.name }} } @else if (lead.retention) { {{ lead.retention.name }} } @else { CPL }
                   @if (lead.client) { → {{ lead.client.name }} }
                   · {{ timeAgo(lead.updatedAt) }}
                 </span>

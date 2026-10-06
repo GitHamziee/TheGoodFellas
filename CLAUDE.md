@@ -114,7 +114,7 @@ Three different Prisma `select` fragments, chosen per role/status combination:
 |---|---|---|---|
 | `/api/auth/login` | POST | public | No `/register` — see the no-self-registration note above |
 | `/api/auth/me` | GET | any | |
-| `/api/auth/change-password` | POST | any | Bumps tokenVersion — invalidates current token, client must re-login |
+| `/api/auth/change-password` | POST | ADMIN, MANAGER | Bumps tokenVersion — invalidates current token, client must re-login. Every other role has no self-service password change; an Admin resets their password via `PATCH /api/users/:id/reset-password` instead |
 | `/api/users` | GET/POST | ADMIN | List/create any account, role included (Admin creates every account here, Client included) |
 | `/api/users/:id/role` | PATCH | ADMIN | Role switch (bumps tokenVersion) |
 | `/api/users/:id/reset-password` | PATCH | ADMIN | `{ newPassword }` — sets it directly, no current-password check, bumps tokenVersion |
@@ -216,7 +216,7 @@ features/
   closer/                  dashboard, inbox (list, links out per-lead), enrich-lead (full form at /closer/leads/:id, conditional Payer section), history (masked), returned ("Sent Back to Me")
   admin/                    dashboard, queue (assign + edit-on-reject), leads (all, + Paid/Unpaid toggle), users (create + role switch), analytics-junior, analytics-closer, analytics-overall
   client/                    dashboard, assigned-leads ("New Leads", masked preview, accept/reject), lead-history (full detail, accepted only)
-  settings/                 ONE shared component, mounted at /{role}/settings in all 4 route trees — password change only
+  settings/                 ONE shared component, password change only — mounted only at /admin/settings and /manager/settings; every other role's `settings` path redirects to its dashboard/landing page and the nav omits the link, since self-service password change is ADMIN/MANAGER only
   chat/                      ONE shared component, mounted at /{junior,closer,admin}/chat — NOT in the client tree
 ```
 

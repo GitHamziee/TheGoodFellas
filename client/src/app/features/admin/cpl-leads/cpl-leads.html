@@ -82,12 +82,16 @@
     />
     <input
       type="date"
+      min="2000-01-01"
+      max="2100-12-31"
       [ngModel]="dateFrom()"
       (ngModelChange)="dateFrom.set($event)"
       aria-label="From date"
     />
     <input
       type="date"
+      min="2000-01-01"
+      max="2100-12-31"
       [ngModel]="dateTo()"
       (ngModelChange)="dateTo.set($event)"
       aria-label="To date"
@@ -199,6 +203,22 @@
                         <svg lucideUserCheck></svg> Assign
                       </button>
                     }
+                    @if (lead.status === 'ASSIGNED') {
+                      <button
+                        type="button"
+                        class="btn btn--sm btn--success"
+                        title="Approve on the client's behalf"
+                        [disabled]="busyId() === lead.id"
+                        (click)="approveLead(lead, $event)"
+                      >
+                        @if (busyId() === lead.id) {
+                          <span class="spinner"></span>
+                        } @else {
+                          <svg lucideCircleCheck></svg>
+                        }
+                        Approve
+                      </button>
+                    }
                   </div>
                 </td>
               </tr>
@@ -231,6 +251,20 @@
         </button>
         <button type="button" class="btn" (click)="detailLead.set(null); openAssign(lead)">
           <svg lucideUserCheck></svg> Assign to client
+        </button>
+      }
+      @if (lead.status === 'ASSIGNED') {
+        <button
+          type="button"
+          class="btn btn--success"
+          [disabled]="busyId() === lead.id"
+          (click)="approveLead(lead, $event)"
+        >
+          @if (busyId() === lead.id) {
+            <span class="spinner"></span> Approving…
+          } @else {
+            <svg lucideCircleCheck></svg> Approve on the client's behalf
+          }
         </button>
       }
       @if (lead.status === 'ACCEPTED' || lead.status === 'ASSIGNED_EXTERNAL') {

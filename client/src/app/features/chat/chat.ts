@@ -4,6 +4,7 @@ import {
   OnDestroy,
   afterRenderEffect,
   computed,
+  effect,
   inject,
   signal,
   viewChild,
@@ -14,7 +15,11 @@ import {
   LucideCheck,
   LucideChevronDown,
   LucideCircleAlert,
+  LucideDownload,
+  LucideFile,
+  LucideLoaderCircle,
   LucideMessageSquare,
+  LucidePaperclip,
   LucidePencil,
   LucideSendHorizontal,
   LucideTrash2,
@@ -22,9 +27,12 @@ import {
 } from '@lucide/angular';
 import { ChatService } from '../../core/services/chat.service';
 import { AuthService } from '../../core/services/auth.service';
-import { CHAT_ROOM_LABEL, ChatMessage, ChatRoomKey } from '../../core/models/chat.model';
+import { CHAT_ROOM_LABEL, ChatAttachment, ChatMessage, ChatRoomKey } from '../../core/models/chat.model';
 import { ROLE_LABEL } from '../../core/nav-config';
-import { getInitials } from '../../core/format-utils';
+import { formatFileSize, getInitials } from '../../core/format-utils';
+
+/** Generous — matches the server's MAX_ATTACHMENT_BYTES (see chat.service.ts on the server). */
+const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
 
 /** A message plus the presentation decisions made once, in the component, not in the template. */
 interface TimelineItem {
@@ -44,10 +52,10 @@ const BLOCK_GAP_MS = 5 * 60 * 1000;
 const NAME_COLORS = ['#b8952c', '#92592c', '#46586a', '#5c6a38', '#9c4f34', '#3d6b60'];
 
 const ROOM_MEMBERS: Record<ChatRoomKey, string> = {
-  CLOSERS: 'All closers + team lead + admin',
-  JUNIOR_CLOSERS: 'All junior closers + team lead + admin',
-  TEAM_LEADS: 'All team leads + admin',
-  RETENTION: 'All retention + admin',
+  CLOSERS: 'All closers + team lead + managers + admin',
+  JUNIOR_CLOSERS: 'All junior closers + team lead + managers + admin',
+  TEAM_LEADS: 'All team leads + managers + admin',
+  RETENTION: 'All retention + managers + admin',
 };
 
 @Component({
@@ -63,6 +71,10 @@ const ROOM_MEMBERS: Record<ChatRoomKey, string> = {
     LucideChevronDown,
     LucideCheck,
     LucideArrowLeft,
+    LucidePaperclip,
+    LucideFile,
+    LucideDownload,
+    LucideLoaderCircle,
   ],
   templateUrl: './chat.html',
   styleUrl: './chat.css',
@@ -72,6 +84,7 @@ export class Chat implements OnDestroy {
   private readonly auth = inject(AuthService);
 
   private readonly scroller = viewChild<ElementRef<HTMLDivElement>>('scroller');
+  private readonly fileInput = viewChild<ElementRef<HTMLInputElement>>('fileInput');
 
   readonly user = this.auth.user;
   readonly rooms = this.chat.availableRooms;
@@ -91,11 +104,19 @@ export class Chat implements OnDestroy {
   readonly openMenuId = signal<string | null>(null);
   /** Mobile: the list and the conversation share the screen, one at a time. */
   readonly mobileShowList = signal(false);
+  readonly uploading = signal(false);
+  readonly maxAttachmentBytes = MAX_ATTACHMENT_BYTES;
+
+  /** Object URLs for image attachments, fetched lazily (see the effect in the constructor)
+   * since <img> can't carry the Bearer token an attachment download needs. Revoked in
+   * ngOnDestroy — nothing else ever clears one once a room has been opened this session. */
+  private readonly imagePreviews = signal<Map<string, string>>(new Map());
 
   readonly roomLabel = CHAT_ROOM_LABEL;
   readonly roomMembers = ROOM_MEMBERS;
   readonly roleLabel = ROLE_LABEL;
   readonly getInitials = getInitials;
+  readonly formatFileSize = formatFileSize;
 
   readonly canSend = computed(() => this.draft().trim() !== '' && !this.sending() && this.activeRoom() !== null);
 
@@ -151,6 +172,35 @@ export class Chat implements OnDestroy {
 
       if (this.pinnedToBottom) el.scrollTop = el.scrollHeight;
     });
+
+    // Lazily fetches a preview for any image attachment that just came into view (new
+    // message, page of history, room switch) and doesn't have one cached yet.
+    effect(() => {
+      for (const message of this.chat.messages()) {
+        const attachment = message.attachment;
+        if (attachment && isImageAttachment(attachment) && !this.imagePreviews().has(message.id)) {
+          void this.loadPreview(message.id, attachment);
+        }
+      }
+    });
+  }
+
+  private async loadPreview(messageId: string, attachment: ChatAttachment): Promise<void> {
+    try {
+      const blob = await this.chat.fetchAttachmentBlob(attachment);
+      const url = URL.createObjectURL(blob);
+      this.imagePreviews.update((map) => new Map(map).set(messageId, url));
+    } catch {
+      // Leave it uncached — the file chip + "Save" button below still works as a fallback.
+    }
+  }
+
+  previewUrlFor(message: ChatMessage): string | null {
+    return this.imagePreviews().get(message.id) ?? null;
+  }
+
+  isImage(attachment: ChatAttachment): boolean {
+    return isImageAttachment(attachment);
   }
 
   private async init(): Promise<void> {
@@ -165,6 +215,7 @@ export class Chat implements OnDestroy {
 
   ngOnDestroy(): void {
     this.chat.closeRoom();
+    for (const url of this.imagePreviews().values()) URL.revokeObjectURL(url);
   }
 
   // ─── Conversation list ───
@@ -184,7 +235,8 @@ export class Chat implements OnDestroy {
     if (last.deleted) return 'This message was deleted';
 
     const who = last.sender.id === this.user()?.id ? 'You' : last.sender.name.split(' ')[0];
-    return `${who}: ${last.body}`;
+    const what = last.body || (last.attachment ? `📎 ${last.attachment.name}` : '');
+    return `${who}: ${what}`;
   }
 
   previewTimeFor(room: ChatRoomKey): string {
@@ -256,6 +308,58 @@ export class Chat implements OnDestroy {
       this.error.set(err?.error?.error ?? 'Message could not be sent.');
     } finally {
       this.sending.set(false);
+    }
+  }
+
+  // ─── Attachments ───
+
+  triggerFilePick(): void {
+    if (!this.activeRoom() || this.uploading()) return;
+    this.fileInput()?.nativeElement.click();
+  }
+
+  /** Whatever's already typed in the composer goes along as the file's caption, the same
+   * way an email client sends the file with the draft body. */
+  async onFileSelected(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0] ?? null;
+    input.value = ''; // clears the picker so choosing the same file twice fires change again
+
+    const room = this.activeRoom();
+    if (!file || !room) return;
+
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      this.error.set(`"${file.name}" is too large — ${formatFileSize(MAX_ATTACHMENT_BYTES)} max.`);
+      return;
+    }
+
+    this.uploading.set(true);
+    this.error.set(null);
+    this.pinnedToBottom = true;
+
+    try {
+      await this.chat.sendFile(file, this.draft());
+      this.draft.set('');
+    } catch (err: any) {
+      this.error.set(err?.error?.error ?? 'File could not be sent.');
+    } finally {
+      this.uploading.set(false);
+    }
+  }
+
+  /** Fetches the attachment (carrying the auth header, unlike a plain link) and saves it
+   * under its original filename. */
+  async downloadAttachment(attachment: ChatAttachment): Promise<void> {
+    try {
+      const blob = await this.chat.fetchAttachmentBlob(attachment);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = attachment.name;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      this.error.set('Could not download this file.');
     }
   }
 
@@ -341,6 +445,10 @@ export class Chat implements OnDestroy {
     for (let i = 0; i < id.length; i++) hash = id.charCodeAt(i) + ((hash << 5) - hash);
     return NAME_COLORS[Math.abs(hash) % NAME_COLORS.length];
   }
+}
+
+function isImageAttachment(attachment: ChatAttachment): boolean {
+  return !!attachment.type?.startsWith('image/');
 }
 
 function isSameDay(a: string, b: string): boolean {

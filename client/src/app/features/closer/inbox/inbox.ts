@@ -59,8 +59,9 @@ export class CloserInbox implements OnInit {
     sorters: {
       customerName: (l) => l.customerName,
       createdAt: (l) => new Date(l.createdAt).getTime(),
+      updatedAt: (l) => new Date(l.updatedAt ?? l.createdAt).getTime(),
     },
-    initialSort: { key: 'createdAt', dir: 'asc' },
+    initialSort: { key: 'updatedAt', dir: 'desc' },
     pageSize: 10,
   });
 

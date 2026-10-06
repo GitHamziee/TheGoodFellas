@@ -2,7 +2,8 @@ import { Router } from "express";
 import prisma from "../lib/prisma";
 import { apiError, apiSuccess } from "../lib/api-response";
 import { asyncHandler } from "../lib/async-handler";
-import { authenticate } from "../middleware/auth";
+import { authenticate, requireRole } from "../middleware/auth";
+import { getClientIp } from "../lib/client-ip";
 import * as authService from "../services/auth.service";
 
 const router = Router();
@@ -15,8 +16,19 @@ router.post(
     const { email, password } = req.body ?? {};
     if (!email || !password) return apiError(res, "Email and password are required", 400);
 
-    const result = await authService.login(email, password);
-    if ("error" in result) return apiError(res, result.error, result.status);
+    const clientIp = getClientIp(req);
+    const result = await authService.login(email, password, clientIp);
+    if ("error" in result) {
+      // TEMP DEBUG — remove once IP whitelisting is confirmed working end-to-end.
+      if (result.code === "IP_NOT_WHITELISTED") {
+        console.log("[ip-whitelist] login blocked", {
+          detectedIp: clientIp,
+          xForwardedFor: req.headers["x-forwarded-for"],
+          rawSocketIp: req.socket.remoteAddress,
+        });
+      }
+      return apiError(res, result.error, result.status, result.code);
+    }
     return apiSuccess(res, result.data);
   })
 );
@@ -34,9 +46,12 @@ router.get(
   })
 );
 
+// Self-service password change is Admin/Manager only — every other role gets their
+// password reset by an Admin via PATCH /api/users/:id/reset-password instead.
 router.post(
   "/change-password",
   authenticate,
+  requireRole("ADMIN", "MANAGER"),
   asyncHandler(async (req, res) => {
     const { currentPassword, newPassword } = req.body ?? {};
     if (!currentPassword || !newPassword) return apiError(res, "Both current and new password are required", 400);

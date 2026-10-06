@@ -37,6 +37,7 @@ const ROLE_ORDER: Role[] = [
   'RETENTION',
   'QA_JUNIOR_CLOSER',
   'QA_CLOSER',
+  'MANAGER',
   'ADMIN',
   'CLIENT',
 ];
@@ -50,6 +51,7 @@ const ROLE_TONE: Record<Role, string> = {
   QA_JUNIOR_CLOSER: 'tone-info',
   QA_CLOSER: 'tone-neutral',
   RETENTION: 'tone-a',
+  MANAGER: 'tone-gold',
 };
 
 @Component({

@@ -1,0 +1,403 @@
+<div class="page page--narrow">
+  <div class="page-head">
+    <div>
+      <a class="back-link" routerLink="/retention/dashboard"><svg lucideArrowLeft></svg> Dashboard</a>
+      <p class="sub">For a call you took directly — capture the full application in one go, no import needed. Submits straight to the admin team.</p>
+    </div>
+  </div>
+
+  @if (error()) {
+    <div class="error"><svg lucideCircleAlert></svg>{{ error() }}</div>
+  }
+
+  <div class="progress-card">
+    <div class="pl">
+      <span>Application completeness</span>
+      <strong>{{ completeness() }}%</strong>
+    </div>
+    <div class="pt"><span class="pb" [style.width.%]="completeness()"></span></div>
+    <p class="ph">Everything below is optional except name, phone and state — fill in as much as the customer gave you.</p>
+  </div>
+
+  <form appNoCopy (ngSubmit)="submit()" (input)="touch()" (change)="touch()">
+    <div class="card">
+    <!-- Personal -->
+    <div class="section">
+      <h2 class="section-title"><svg lucideUser></svg> Personal & contact</h2>
+      <div class="form-grid">
+        <label>
+          Customer's name <span class="req">Required</span>
+          <input type="text" name="customerName" [(ngModel)]="form.customerName"
+            [class.invalid]="showErrors() && !form.customerName" />
+          @if (showErrors() && !form.customerName) {
+            <span class="field-error">Enter the customer's name.</span>
+          }
+        </label>
+        <label>
+          Phone number <span class="req">Required</span>
+          <input type="tel" name="phone" [(ngModel)]="form.phone"
+            [class.invalid]="showErrors() && !form.phone" />
+          @if (showErrors() && !form.phone) {
+            <span class="field-error">Enter a contact number.</span>
+          }
+        </label>
+        <label>
+          State <span class="req">Required</span>
+          <input type="text" name="state" [(ngModel)]="form.state"
+            [class.invalid]="showErrors() && !form.state" />
+          @if (showErrors() && !form.state) {
+            <span class="field-error">Enter the customer's state.</span>
+          }
+        </label>
+        <label>
+          Zipcode
+          <input type="text" name="zipcode" [(ngModel)]="form.zipcode" />
+        </label>
+        <label class="full">
+          Mailing address
+          <input type="text" name="mailingAddress" [(ngModel)]="form.mailingAddress" />
+        </label>
+        <label>
+          Email <span class="hint">Optional</span>
+          <input type="email" name="email" [(ngModel)]="form.email" />
+        </label>
+        <label>
+          Marital status
+          <app-select [options]="maritalStatusOptions" [ngModel]="form.maritalStatus" name="maritalStatus"
+            (ngModelChange)="form.maritalStatus = $event; touch()" />
+        </label>
+        <label>
+          Birth state
+          <input type="text" name="birthState" [(ngModel)]="form.birthState" />
+        </label>
+        <label>
+          Gender
+          <app-select [options]="genderOptions" [ngModel]="form.gender" name="gender"
+            (ngModelChange)="form.gender = $event; touch()" />
+        </label>
+        <label>
+          Date of birth
+          <input type="date" name="dob" [min]="minDob" [max]="todayIso" [ngModel]="form.dob" (ngModelChange)="onDobChange($event)" />
+        </label>
+        <label>
+          Age
+          <input type="number" name="age" min="0" max="130" [(ngModel)]="form.age" />
+        </label>
+        <label>
+          Social Security Number
+          <input type="text" name="ssn" inputmode="numeric" maxlength="9" placeholder="123456789"
+            [ngModel]="form.ssn" (ngModelChange)="onSsnChange($event)" />
+          <span class="hint">Exactly 9 digits.</span>
+        </label>
+        <label>
+          DL / State ID #
+          <input type="text" name="dlStateId" [(ngModel)]="form.dlStateId" />
+        </label>
+        <label>
+          Yearly income <span class="hint">Whole dollars</span>
+          <input type="number" name="yearlyIncome" min="0" [(ngModel)]="form.yearlyIncome" />
+        </label>
+      </div>
+    </div>
+
+    <!-- Need & income -->
+    <div class="section">
+      <h2 class="section-title"><svg lucideWallet></svg> Need & income</h2>
+      <div class="form-grid">
+        <label>
+          Need
+          <app-select [options]="needOptions" [ngModel]="form.need" name="need"
+            (ngModelChange)="form.need = $event; touch()" />
+        </label>
+        <label>
+          Source of income
+          <app-select [options]="incomeSourceOptions" [ngModel]="form.incomeSource" name="incomeSource"
+            (ngModelChange)="form.incomeSource = $event; touch()" />
+        </label>
+        @if (form.incomeSource === 'RETIRED') {
+          <label>
+            Retired income type
+            <app-select [options]="retiredIncomeOptions" [ngModel]="form.retiredIncomeType" name="retiredIncomeType"
+              (ngModelChange)="form.retiredIncomeType = $event; touch()" />
+          </label>
+        }
+        @if (form.retiredIncomeType === 'SSDI') {
+          <label>
+            Nature of disability
+            <input type="text" name="natureOfDisability" [(ngModel)]="form.natureOfDisability" />
+          </label>
+        }
+        <label>
+          Annual income <span class="hint">Whole dollars</span>
+          <input type="number" name="annualIncome" min="0" [(ngModel)]="form.annualIncome" />
+        </label>
+      </div>
+    </div>
+
+    <!-- Health -->
+    <div class="section">
+      <h2 class="section-title"><svg lucideHeartPulse></svg> Physical & health</h2>
+      <div class="form-grid">
+        <label>
+          Height
+          <input type="text" name="height" placeholder="e.g. 5'10&quot;" [(ngModel)]="form.height" />
+        </label>
+        <label>
+          Weight <span class="hint">Pounds</span>
+          <input type="number" name="weight" min="0" [(ngModel)]="form.weight" />
+        </label>
+        <label>
+          Smoker
+          <app-select [options]="smokerOptions" [ngModel]="form.smoker" name="smoker"
+            (ngModelChange)="form.smoker = $event; touch()" />
+        </label>
+        <label>
+          Doctor's name
+          <input type="text" name="doctorName" [(ngModel)]="form.doctorName" />
+        </label>
+        <label class="full">
+          Health conditions
+          <textarea name="healthConditions" rows="2" [(ngModel)]="form.healthConditions"></textarea>
+        </label>
+        <label class="full">
+          Medications
+          <textarea name="medications" rows="2" [(ngModel)]="form.medications"></textarea>
+        </label>
+      </div>
+    </div>
+
+    <!-- Beneficiary -->
+    <div class="section">
+      <h2 class="section-title"><svg lucideUsers></svg> Beneficiary</h2>
+      <div class="form-grid">
+        <label>
+          Beneficiary name
+          <input type="text" name="beneficiaryName" [(ngModel)]="form.beneficiaryName" />
+        </label>
+        <label>
+          Relation
+          <input type="text" name="beneficiaryRelation" placeholder="e.g. Daughter" [(ngModel)]="form.beneficiaryRelation" />
+        </label>
+        <label>
+          Beneficiary date of birth
+          <input type="date" name="beneficiaryDob" [min]="minDob" [max]="todayIso" [(ngModel)]="form.beneficiaryDob" />
+        </label>
+      </div>
+    </div>
+
+    <!-- Policy -->
+    <div class="section">
+      <h2 class="section-title"><svg lucideShieldCheck></svg> Policy</h2>
+      <div class="form-grid">
+        <label>
+          Carrier name
+          <input type="text" name="carrierName" [(ngModel)]="form.carrierName" />
+        </label>
+        <label>
+          Plan type
+          <app-select [options]="planTypeOptions" [ngModel]="form.planType" name="planType"
+            (ngModelChange)="form.planType = $event; touch()" placeholder="Select a plan type…" />
+        </label>
+        <label>
+          Suggested client <span class="hint">Optional — helps admin decide who to assign this to</span>
+          <app-select [options]="clientOptions()" [ngModel]="form.suggestedClientId" name="suggestedClientId"
+            (ngModelChange)="form.suggestedClientId = $event; touch()" placeholder="No suggestion…" />
+        </label>
+        <label>
+          Coverage amount <span class="hint">Whole dollars</span>
+          <input type="number" name="coverageAmount" min="0" [(ngModel)]="form.coverageAmount" />
+        </label>
+        <label>
+          Monthly premium <span class="hint">Whole dollars</span>
+          <input type="number" name="monthlyPremiums" min="0" [(ngModel)]="form.monthlyPremiums" />
+        </label>
+        <label>
+          Annual premium <span class="hint">Monthly × 12, calculated</span>
+          <input type="number" name="annualPremium" [value]="annualPremium() ?? ''" readonly tabindex="-1" />
+        </label>
+      </div>
+    </div>
+
+    <!-- Billing -->
+    <div class="section">
+      <h2 class="section-title"><svg lucideBanknote></svg> Billing</h2>
+      <div class="form-grid">
+        <label>
+          Initial draft date
+          <input type="date" name="initialDraftDate" min="2000-01-01" max="2100-12-31" [(ngModel)]="form.initialDraftDate" />
+        </label>
+        <label>
+          Future draft date
+          <input type="date" name="futureDraftDate" min="2000-01-01" max="2100-12-31" [(ngModel)]="form.futureDraftDate" />
+        </label>
+        <label class="full">
+          Who is paying?
+          <app-select [options]="payerOptions" [ngModel]="form.payer" name="payer"
+            (ngModelChange)="form.payer = $event; touch()" />
+        </label>
+        <label class="full">
+          Payment method
+          <app-select [options]="paymentMethodOptions" [ngModel]="form.paymentMethod" name="paymentMethod"
+            (ngModelChange)="form.paymentMethod = $event; touch()" placeholder="Select a payment method…" />
+        </label>
+      </div>
+
+      @if (form.payer && form.paymentMethod === 'BANK_ACCOUNT') {
+        <div class="section">
+          <h3 class="section-title">
+            {{ form.payer === 'SELF' ? 'Bank account (customer)' : "Bank account (someone else's)" }}
+          </h3>
+          <div class="form-grid">
+            @if (form.payer === 'SELF') {
+              <label>
+                Bank name
+                <input type="text" name="bankName" [(ngModel)]="form.bankName" />
+              </label>
+            } @else {
+              <label>
+                Payer's Social Security Number
+                <input type="text" name="payerSocial" inputmode="numeric" maxlength="9" placeholder="123456789"
+                  [ngModel]="form.payerSocial" (ngModelChange)="onPayerSocialChange($event)" />
+                <span class="hint">Exactly 9 digits.</span>
+              </label>
+            }
+            <label>
+              Account title
+              <input type="text" name="accountTitle" [(ngModel)]="form.accountTitle" />
+            </label>
+            <label>
+              Account type
+              <app-select [options]="accountTypeOptions" [ngModel]="form.accountType" name="accountType"
+                (ngModelChange)="form.accountType = $event; touch()" />
+            </label>
+            <label>
+              Joint or single account
+              <app-select [options]="accountOwnershipOptions" [ngModel]="form.accountOwnership" name="accountOwnership"
+                (ngModelChange)="form.accountOwnership = $event; touch()" placeholder="Select…" />
+            </label>
+            <label>
+              Account opening state
+              <input type="text" name="accountOpeningState" [(ngModel)]="form.accountOpeningState" />
+            </label>
+            <label>
+              Routing number
+              <input type="text" name="routingNumber" inputmode="numeric" maxlength="9" placeholder="123456789"
+                [ngModel]="form.routingNumber" (ngModelChange)="onRoutingNumberChange($event)"
+                [class.invalid]="routingInvalid()" />
+                @if (routingInvalid()) {
+                  <span class="field-error">Routing number must be exactly 9 digits.</span>
+                }
+              <span class="hint">Exactly 9 digits.</span>
+            </label>
+            <label>
+              Account number
+              <input type="text" name="accountNumber" inputmode="numeric" maxlength="17"
+                [ngModel]="form.accountNumber" (ngModelChange)="onAccountNumberChange($event)" />
+              <span class="hint">3 to 17 digits.</span>
+            </label>
+          </div>
+        </div>
+      }
+
+      @if (form.payer && form.paymentMethod === 'CARD') {
+        <div class="section">
+          <h3 class="section-title">
+            {{ form.payer === 'SELF' ? 'Card (customer)' : "Card (someone else's)" }}
+          </h3>
+          <div class="form-grid">
+            <label>
+              Card type
+              <app-select [options]="cardTypeOptions" [ngModel]="form.cardType" name="cardType"
+                (ngModelChange)="form.cardType = $event; touch()" placeholder="Select a card type…" />
+            </label>
+            <label>
+              Card number
+              <input type="text" name="cardNumber" inputmode="numeric" maxlength="19"
+                [ngModel]="form.cardNumber" (ngModelChange)="onCardNumberChange($event)" />
+              <span class="hint">13 to 19 digits.</span>
+            </label>
+            <label>
+              Expiry
+              <input type="text" name="cardExpiry" inputmode="numeric" maxlength="5" placeholder="MM/YY"
+                [ngModel]="form.cardExpiry" (ngModelChange)="onCardExpiryChange($event)" />
+            </label>
+          </div>
+        </div>
+      }
+    </div>
+
+    <!-- Notes -->
+    <div class="section">
+      <h2 class="section-title"><svg lucideNotebookPen></svg> Notes for the admin team</h2>
+      <label>
+        Anything worth flagging <span class="hint">Optional</span>
+        <textarea name="closerNotes" rows="4" [(ngModel)]="form.closerNotes"></textarea>
+      </label>
+    </div>
+    </div>
+
+    <div class="form-actions">
+      @if (missing().length > 0) {
+        <span class="pending-note">Still needed: {{ missing().join(', ') }}</span>
+      } @else {
+        <span class="pending-note ok">Ready to submit — {{ completeness() }}% of the application filled in</span>
+      }
+      <button class="btn btn--ghost" type="button" [disabled]="savingDraft() || submitting()" (click)="openDraftModal()">
+        <svg lucideNotebookPen></svg> Save as draft
+      </button>
+      <button class="btn" type="submit" [disabled]="!canSubmit()">
+        @if (submitting()) {
+          <span class="spinner"></span> Submitting…
+        } @else {
+          <svg lucideSend></svg> Submit to admin
+        }
+      </button>
+    </div>
+  </form>
+</div>
+
+@if (draftModalOpen()) {
+  <app-modal title="Save as draft" subtitle="Pick a reason so admin can see why this lead is parked." (close)="closeDraftModal()">
+    <label>
+      Reason
+      <app-select
+        [options]="draftReasonOptions"
+        [ngModel]="form.draftReason"
+        [invalid]="showDraftReasonError() && !form.draftReason"
+        placeholder="Select a reason…"
+        name="draftReason"
+        (ngModelChange)="form.draftReason = $event; showDraftReasonError.set(false)"
+      />
+      @if (showDraftReasonError() && !form.draftReason) {
+        <span class="field-error">Pick a reason to save this as a draft.</span>
+      }
+    </label>
+
+    @if (form.draftReason === 'OTHER') {
+      <label>
+        Custom reason
+        <input
+          type="text"
+          name="draftReasonNote"
+          maxlength="200"
+          placeholder="Type the reason…"
+          [(ngModel)]="form.draftReasonNote"
+          (ngModelChange)="showDraftReasonError.set(false)"
+        />
+        @if (showDraftReasonError() && !form.draftReasonNote?.trim()) {
+          <span class="field-error">Type a reason to save this as a draft.</span>
+        }
+      </label>
+    }
+
+    <div footer>
+      <button class="btn" type="button" [disabled]="savingDraft()" (click)="saveDraft()">
+        @if (savingDraft()) {
+          <span class="spinner"></span> Saving…
+        } @else {
+          <svg lucideNotebookPen></svg> Save as draft
+        }
+      </button>
+    </div>
+  </app-modal>
+}
