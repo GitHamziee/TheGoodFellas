@@ -17,6 +17,7 @@ import { getAvatarTone, getInitials, humanizeEnum, isToday, timeAgo } from '../.
 import { Modal } from '../../../shared/ui/modal';
 import { LeadDetail } from '../../../shared/lead-detail';
 import { Detail, EmptyState, Pagination, SearchBox, SkeletonRows, StatTile } from '../../../shared/ui/ui';
+import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 
 @Component({
   selector: 'app-assigned-leads',
@@ -42,6 +43,7 @@ import { Detail, EmptyState, Pagination, SearchBox, SkeletonRows, StatTile } fro
   templateUrl: './assigned-leads.html',
 })
 export class AssignedLeads implements OnInit {
+  private readonly liveReload = reloadOnChange(() => this.refresh());
   private readonly leadService = inject(LeadService);
 
   readonly leads = signal<Lead[]>([]);
@@ -87,7 +89,7 @@ export class AssignedLeads implements OnInit {
   }
 
   async refresh(): Promise<void> {
-    this.loading.set(true);
+    if (!isSilentReload()) this.loading.set(true);
     try {
       this.leads.set(await this.leadService.assignedPreviews());
     } catch {

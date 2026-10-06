@@ -21,6 +21,7 @@ import {
   StatTile,
 } from '../../../shared/ui/ui';
 import { LeadDetail } from '../../../shared/lead-detail';
+import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 
 @Component({
   selector: 'app-client-lead-history',
@@ -43,6 +44,7 @@ import { LeadDetail } from '../../../shared/lead-detail';
   templateUrl: './lead-history.html',
 })
 export class ClientLeadHistory implements OnInit {
+  private readonly liveReload = reloadOnChange(() => this.ngOnInit());
   private readonly leadService = inject(LeadService);
 
   readonly leads = signal<Lead[]>([]);
@@ -95,7 +97,7 @@ export class ClientLeadHistory implements OnInit {
   });
 
   async ngOnInit(): Promise<void> {
-    this.loading.set(true);
+    if (!isSilentReload()) this.loading.set(true);
     try {
       this.leads.set(await this.leadService.clientHistory());
     } catch {

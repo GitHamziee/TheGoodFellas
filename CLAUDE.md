@@ -259,3 +259,8 @@ Per-page stat tiles are likewise `computed()` over the same loaded array, not a 
 - Chat access rules change in `lib/chat-rooms.ts` only — never by adding a role check in a route, a component, or the socket handler
 - No auto-commits unless explicitly asked
 - **Currency scope: PKR is Expenses-page bookkeeping only** — `Expense.amount`, `IncomePayment.pkrAmount` (written via `/api/leads/batch-payment`), and `ChargeBack.pkrAmount`. Every other money field — lead fields (`coverageAmount`, `monthlyPremiums`, `annualIncome`, `yearlyIncome`), the per-plan client/external-client pricing (`levelCost`/`gradedCost`/`modifiedCost`/`giCost`), and anything derived from them (e.g. Analytics' `annualPremiumRevenue`) — is USD (`formatMoney`), not PKR (`formatPkr`). Don't mix the two formatters or sum across them.
+
+---
+
+## Live Data Refresh
+Any successful non-GET `/api` write (except `/chat`, `/auth`) triggers a payload-free `data:changed` Socket.IO broadcast (middleware in `app.ts` → `emitDataChanged()` in `chat-gateway.ts`). It carries no data, so masking is unaffected. Client: `LiveUpdatesService` (own socket, debounced) exposes a `version` signal; list/dashboard/analytics components call `reloadOnChange(() => this.refresh())` as a field initializer and refetch **only their own data**. Loaders guard their skeleton with `if (!isSilentReload()) this.loading.set(true)` so updates land in place. Form pages (submit/enrich/edit) are deliberately excluded. A CLIENT socket now connects (no chat rooms) for this purpose.

@@ -15,6 +15,7 @@ import { createListView } from '../../../core/list-view';
 import { getAvatarTone, getInitials, humanizeEnum, isToday, timeAgo } from '../../../core/format-utils';
 import { Modal } from '../../../shared/ui/modal';
 import { Detail, EmptyState, Pagination, SearchBox, SkeletonRows, StatTile } from '../../../shared/ui/ui';
+import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 
 /** A lead sitting in the inbox longer than this is flagged as ageing. */
 const STALE_AFTER_DAYS = 3;
@@ -41,6 +42,7 @@ const STALE_AFTER_DAYS = 3;
   templateUrl: './inbox.html',
 })
 export class CloserInbox implements OnInit {
+  private readonly liveReload = reloadOnChange(() => this.ngOnInit());
   private readonly leadService = inject(LeadService);
 
   readonly leads = signal<LeadInboxPreview[]>([]);
@@ -76,7 +78,7 @@ export class CloserInbox implements OnInit {
   });
 
   async ngOnInit(): Promise<void> {
-    this.loading.set(true);
+    if (!isSilentReload()) this.loading.set(true);
     try {
       this.leads.set(await this.leadService.inbox());
     } catch {

@@ -19,6 +19,7 @@ import { getAvatarTone, getInitials } from '../../../core/format-utils';
 import { Modal } from '../../../shared/ui/modal';
 import { EmptyState, Pagination, SearchBox, SkeletonRows, StatTile } from '../../../shared/ui/ui';
 import { Select } from '../../../shared/ui/select';
+import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 
 const ROLE_TONE: Record<Role, string> = {
   ADMIN: 'tone-b',
@@ -58,6 +59,7 @@ const ROLE_TONE: Record<Role, string> = {
   templateUrl: './team.html',
 })
 export class AdminTeam implements OnInit {
+  private readonly liveReload = reloadOnChange(() => this.refresh());
   private readonly userService = inject(UserService);
   private readonly auth = inject(AuthService);
 
@@ -149,7 +151,7 @@ export class AdminTeam implements OnInit {
   }
 
   async refresh(): Promise<void> {
-    this.loading.set(true);
+    if (!isSilentReload()) this.loading.set(true);
     try {
       const users = await this.userService.listUsers();
       this.team.set(users.filter((u) => u.role !== 'CLIENT'));

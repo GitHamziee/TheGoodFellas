@@ -15,6 +15,7 @@ import { Expense, IncomePayment } from '../../../core/models/expense.model';
 import { formatDate, formatPkr, pluralize, toDateInput } from '../../../core/format-utils';
 import { Modal } from '../../../shared/ui/modal';
 import { EmptyState, SkeletonRows, StatTile } from '../../../shared/ui/ui';
+import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 
 @Component({
   selector: 'app-admin-expenses',
@@ -36,6 +37,7 @@ import { EmptyState, SkeletonRows, StatTile } from '../../../shared/ui/ui';
   templateUrl: './expenses.html',
 })
 export class AdminExpenses implements OnInit {
+  private readonly liveReload = reloadOnChange(() => this.refresh());
   private readonly expenseService = inject(ExpenseService);
 
   readonly expenses = signal<Expense[]>([]);
@@ -72,7 +74,7 @@ export class AdminExpenses implements OnInit {
   }
 
   async refresh(): Promise<void> {
-    this.loading.set(true);
+    if (!isSilentReload()) this.loading.set(true);
     try {
       const [expenses, income] = await Promise.all([this.expenseService.list(), this.expenseService.income()]);
       this.expenses.set(expenses);

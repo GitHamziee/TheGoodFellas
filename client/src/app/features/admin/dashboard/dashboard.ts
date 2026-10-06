@@ -18,6 +18,7 @@ import { AuthService } from '../../../core/services/auth.service';
 import { Lead, LeadStatus } from '../../../core/models/lead.model';
 import { getAvatarTone, getInitials, isThisMonth, timeAgo } from '../../../core/format-utils';
 import { EmptyState, SkeletonRows, StatusBadge } from '../../../shared/ui/ui';
+import { reloadOnChange } from '../../../core/live-reload';
 
 /** A lead sitting in an admin-owned status longer than this is called out as stalled. */
 const STALE_AFTER_DAYS = 2;
@@ -53,6 +54,7 @@ const FLOW: { status: LeadStatus; label: string; owner: string; mine: boolean }[
   styleUrl: './dashboard.css',
 })
 export class AdminDashboard implements OnInit {
+  private readonly liveReload = reloadOnChange(() => this.ngOnInit());
   private readonly leadService = inject(LeadService);
   private readonly auth = inject(AuthService);
 

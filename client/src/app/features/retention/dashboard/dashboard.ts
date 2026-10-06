@@ -12,6 +12,7 @@ import { AuthService } from '../../../core/services/auth.service';
 import { Lead } from '../../../core/models/lead.model';
 import { getAvatarTone, getInitials, humanizeEnum, isThisMonth, timeAgo } from '../../../core/format-utils';
 import { EmptyState, SkeletonRows, StatTile, StatusBadge } from '../../../shared/ui/ui';
+import { reloadOnChange } from '../../../core/live-reload';
 
 /**
  * Retention's landing page — mirrors Closer's dashboard shape (queue at a glance + recent
@@ -35,6 +36,7 @@ import { EmptyState, SkeletonRows, StatTile, StatusBadge } from '../../../shared
   templateUrl: './dashboard.html',
 })
 export class RetentionDashboard implements OnInit {
+  private readonly liveReload = reloadOnChange(() => this.ngOnInit());
   private readonly leadService = inject(LeadService);
   private readonly auth = inject(AuthService);
 

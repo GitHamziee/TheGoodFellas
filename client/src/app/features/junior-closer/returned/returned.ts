@@ -6,6 +6,7 @@ import { LeadService } from '../../../core/services/lead.service';
 import { createListView } from '../../../core/list-view';
 import { formatPhone, timeAgo } from '../../../core/format-utils';
 import { EmptyState, Pagination, SearchBox, SkeletonRows } from '../../../shared/ui/ui';
+import { reloadOnChange } from '../../../core/live-reload';
 
 /**
  * Leads the admin sent back to this junior closer to correct. Editing reuses the intake
@@ -27,6 +28,7 @@ import { EmptyState, Pagination, SearchBox, SkeletonRows } from '../../../shared
   templateUrl: './returned.html',
 })
 export class JuniorReturned implements OnInit {
+  private readonly liveReload = reloadOnChange(() => this.ngOnInit());
   private readonly leadService = inject(LeadService);
 
   readonly leads = signal<LeadIntakeEdit[]>([]);

@@ -8,6 +8,7 @@ import { formatDate, getAvatarTone, getInitials } from '../../../core/format-uti
 import { US_STATES } from '../../../core/us-states';
 import { Modal } from '../../../shared/ui/modal';
 import { EmptyState, Pagination, SearchBox, SkeletonRows, StatTile } from '../../../shared/ui/ui';
+import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 
 interface Draft {
   name: string;
@@ -41,6 +42,7 @@ interface Draft {
   templateUrl: './external-clients.html',
 })
 export class AdminExternalClients implements OnInit {
+  private readonly liveReload = reloadOnChange(() => this.refresh());
   private readonly externalClientService = inject(ExternalClientService);
 
   readonly externalClients = signal<ExternalClient[]>([]);
@@ -109,7 +111,7 @@ export class AdminExternalClients implements OnInit {
   }
 
   async refresh(): Promise<void> {
-    this.loading.set(true);
+    if (!isSilentReload()) this.loading.set(true);
     try {
       this.externalClients.set(await this.externalClientService.list());
     } catch {

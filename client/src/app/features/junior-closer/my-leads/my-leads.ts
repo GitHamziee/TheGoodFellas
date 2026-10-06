@@ -28,6 +28,7 @@ import {
   StatTile,
   StatusBadge,
 } from '../../../shared/ui/ui';
+import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 
 @Component({
   selector: 'app-my-leads',
@@ -50,6 +51,7 @@ import {
   templateUrl: './my-leads.html',
 })
 export class MyLeads implements OnInit {
+  private readonly liveReload = reloadOnChange(() => this.ngOnInit());
   private readonly leadService = inject(LeadService);
 
   readonly leads = signal<LeadHistoryRow[]>([]);
@@ -109,7 +111,7 @@ export class MyLeads implements OnInit {
   });
 
   async ngOnInit(): Promise<void> {
-    this.loading.set(true);
+    if (!isSilentReload()) this.loading.set(true);
     try {
       this.leads.set(await this.leadService.myLeads());
     } catch {

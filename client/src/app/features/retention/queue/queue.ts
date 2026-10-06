@@ -9,6 +9,7 @@ import { createListView } from '../../../core/list-view';
 import { formatPhone, getAvatarTone, getInitials, timeAgo } from '../../../core/format-utils';
 import { EmptyState, Pagination, SearchBox, SkeletonRows, StatTile, StatusBadge } from '../../../shared/ui/ui';
 import { Select } from '../../../shared/ui/select';
+import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 
 /**
  * The whole Retention team's shared queue — every AI-sourced lead Admin has handed out and
@@ -37,6 +38,7 @@ import { Select } from '../../../shared/ui/select';
   templateUrl: './queue.html',
 })
 export class RetentionQueue implements OnInit {
+  private readonly liveReload = reloadOnChange(() => this.refresh());
   private readonly leadService = inject(LeadService);
   private readonly auth = inject(AuthService);
 
@@ -105,7 +107,7 @@ export class RetentionQueue implements OnInit {
   }
 
   async refresh(): Promise<void> {
-    this.loading.set(true);
+    if (!isSilentReload()) this.loading.set(true);
     try {
       this.leads.set(await this.leadService.retentionQueue());
     } catch {

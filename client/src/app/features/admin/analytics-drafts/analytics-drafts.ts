@@ -13,6 +13,7 @@ import { getAvatarTone, getInitials, pluralize, timeAgo } from '../../../core/fo
 import { DRAFT_REASON_LABEL } from '../../../core/lead-options';
 import { Select } from '../../../shared/ui/select';
 import { EmptyState, SkeletonRows, StatTile } from '../../../shared/ui/ui';
+import { reloadOnChange } from '../../../core/live-reload';
 
 /** Stands in for "no junior closer" (a closer-built, self-/AI-sourced lead) in the
  * junior-closer filter — kept out of the real id space so it can never collide. */
@@ -35,6 +36,7 @@ const NO_JUNIOR = '__none__';
   templateUrl: './analytics-drafts.html',
 })
 export class AnalyticsDrafts implements OnInit {
+  private readonly liveReload = reloadOnChange(() => this.ngOnInit());
   private readonly analyticsService = inject(AnalyticsService);
 
   readonly data = signal<DraftsAnalyticsData | null>(null);

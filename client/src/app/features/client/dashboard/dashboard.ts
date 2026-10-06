@@ -19,6 +19,7 @@ import {
   timeAgo,
 } from '../../../core/format-utils';
 import { EmptyState, PaymentBadge, SkeletonRows, StatTile } from '../../../shared/ui/ui';
+import { reloadOnChange } from '../../../core/live-reload';
 
 @Component({
   selector: 'app-client-dashboard',
@@ -37,6 +38,7 @@ import { EmptyState, PaymentBadge, SkeletonRows, StatTile } from '../../../share
   templateUrl: './dashboard.html',
 })
 export class ClientDashboard implements OnInit {
+  private readonly liveReload = reloadOnChange(() => this.ngOnInit());
   private readonly leadService = inject(LeadService);
   private readonly auth = inject(AuthService);
 

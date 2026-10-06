@@ -11,6 +11,7 @@ import externalClientRoutes from "./routes/external-clients.routes";
 import expenseRoutes from "./routes/expenses.routes";
 import callReviewRoutes from "./routes/call-reviews.routes";
 import ipWhitelistRoutes from "./routes/ip-whitelist.routes";
+import { emitDataChanged } from "./realtime/chat-gateway";
 
 const app = express();
 
@@ -23,6 +24,18 @@ if (env.trustProxy) {
 
 app.use(cors({ origin: env.clientOrigin, credentials: true }));
 app.use(express.json());
+
+// Any successful write anywhere in the API nudges every connected portal to refetch, so no
+// service has to remember to broadcast. Chat has its own message-level events; auth writes
+// (login, password change) change nothing a list page shows.
+app.use("/api", (req, res, next) => {
+  if (!["GET", "HEAD", "OPTIONS"].includes(req.method) && !/^\/(chat|auth)(\/|$)/.test(req.path)) {
+    res.on("finish", () => {
+      if (res.statusCode < 400) emitDataChanged();
+    });
+  }
+  next();
+});
 
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 

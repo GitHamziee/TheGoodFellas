@@ -30,6 +30,7 @@ import {
   StatusBadge,
 } from '../../../shared/ui/ui';
 import { LeadDetail } from '../../../shared/lead-detail';
+import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 
 interface LookupUser {
   id: string;
@@ -73,6 +74,7 @@ const STATUS_FILTERS = [
   templateUrl: './cpl-leads.html',
 })
 export class AdminCplLeads implements OnInit {
+  private readonly liveReload = reloadOnChange(() => this.refresh());
   private readonly leadService = inject(LeadService);
   private readonly userService = inject(UserService);
   private readonly externalClientService = inject(ExternalClientService);
@@ -267,7 +269,7 @@ export class AdminCplLeads implements OnInit {
   }
 
   async refresh(): Promise<void> {
-    this.loading.set(true);
+    if (!isSilentReload()) this.loading.set(true);
     try {
       this.leads.set(await this.leadService.cplLeads());
     } catch {

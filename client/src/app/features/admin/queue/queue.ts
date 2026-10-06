@@ -28,6 +28,7 @@ import {
   StatusBadge,
 } from '../../../shared/ui/ui';
 import { LeadDetail } from '../../../shared/lead-detail';
+import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 
 interface LookupUser {
   id: string;
@@ -71,6 +72,7 @@ interface EditDraft {
   templateUrl: './queue.html',
 })
 export class AdminQueue implements OnInit {
+  private readonly liveReload = reloadOnChange(() => this.refresh());
   private readonly leadService = inject(LeadService);
   private readonly userService = inject(UserService);
   private readonly externalClientService = inject(ExternalClientService);
@@ -177,7 +179,7 @@ export class AdminQueue implements OnInit {
   }
 
   async refresh(): Promise<void> {
-    this.loading.set(true);
+    if (!isSilentReload()) this.loading.set(true);
     try {
       this.leads.set(await this.leadService.queue());
     } catch {

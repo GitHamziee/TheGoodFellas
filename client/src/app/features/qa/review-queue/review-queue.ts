@@ -8,6 +8,7 @@ import { formatPhone, timeAgo } from '../../../core/format-utils';
 import { Modal } from '../../../shared/ui/modal';
 import { LeadDetail } from '../../../shared/lead-detail';
 import { EmptyState, Pagination, SearchBox, SkeletonRows, StatTile, StatusBadge } from '../../../shared/ui/ui';
+import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 
 type QaRow = QaJuniorLeadRow | QaCloserLeadRow;
 
@@ -35,6 +36,7 @@ type QaRow = QaJuniorLeadRow | QaCloserLeadRow;
   styleUrl: './review-queue.css',
 })
 export class QaReviewQueue implements OnInit {
+  private readonly liveReload = reloadOnChange(() => this.reload());
   private readonly auth = inject(AuthService);
   private readonly leadService = inject(LeadService);
 
@@ -72,7 +74,7 @@ export class QaReviewQueue implements OnInit {
   }
 
   private async reload(): Promise<void> {
-    this.loading.set(true);
+    if (!isSilentReload()) this.loading.set(true);
     try {
       this.leads.set(
         this.lane() === 'JUNIOR_CLOSER' ? await this.leadService.qaJuniorQueue() : await this.leadService.qaCloserQueue(),

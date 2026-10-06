@@ -15,6 +15,7 @@ import { AuthService } from '../../../core/services/auth.service';
 import { LeadHistoryRow, LeadInboxPreview } from '../../../core/models/lead.model';
 import { getAvatarTone, getInitials, humanizeEnum, isThisMonth, timeAgo } from '../../../core/format-utils';
 import { EmptyState, SkeletonRows, StatTile, StatusBadge } from '../../../shared/ui/ui';
+import { reloadOnChange } from '../../../core/live-reload';
 
 const STALE_AFTER_DAYS = 3;
 
@@ -38,6 +39,7 @@ const STALE_AFTER_DAYS = 3;
   templateUrl: './dashboard.html',
 })
 export class CloserDashboard implements OnInit {
+  private readonly liveReload = reloadOnChange(() => this.ngOnInit());
   private readonly leadService = inject(LeadService);
   private readonly auth = inject(AuthService);
 

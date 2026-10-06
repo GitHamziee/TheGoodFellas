@@ -15,6 +15,7 @@ import { US_STATES } from '../../../core/us-states';
 import { PLAN_TYPE_OPTIONS } from '../../../core/lead-options';
 import { formatMoney } from '../../../core/format-utils';
 import { EmptyState, SearchBox, SkeletonRows, StatTile } from '../../../shared/ui/ui';
+import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 
 interface ClientBreakdown {
   name: string;
@@ -61,6 +62,7 @@ interface StateRow {
   templateUrl: './state-sheet.html',
 })
 export class StateSheet implements OnInit {
+  private readonly liveReload = reloadOnChange(() => this.ngOnInit());
   private readonly userService = inject(UserService);
 
   readonly clients = signal<ClientCoverage[]>([]);
@@ -137,7 +139,7 @@ export class StateSheet implements OnInit {
   });
 
   async ngOnInit(): Promise<void> {
-    this.loading.set(true);
+    if (!isSilentReload()) this.loading.set(true);
     try {
       this.clients.set(await this.userService.getStateSheet());
     } catch {

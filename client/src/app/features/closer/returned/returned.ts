@@ -6,6 +6,7 @@ import { LeadService } from '../../../core/services/lead.service';
 import { createListView } from '../../../core/list-view';
 import { formatPhone, timeAgo } from '../../../core/format-utils';
 import { EmptyState, Pagination, SearchBox, SkeletonRows } from '../../../shared/ui/ui';
+import { reloadOnChange } from '../../../core/live-reload';
 
 /**
  * Leads the admin sent back to this closer to correct. The editing itself reuses the
@@ -28,6 +29,7 @@ import { EmptyState, Pagination, SearchBox, SkeletonRows } from '../../../shared
   templateUrl: './returned.html',
 })
 export class CloserReturned implements OnInit {
+  private readonly liveReload = reloadOnChange(() => this.ngOnInit());
   private readonly leadService = inject(LeadService);
 
   readonly leads = signal<Lead[]>([]);

@@ -6,6 +6,7 @@ import { PLAN_TYPE_LABEL, PLAN_TYPE_OPTIONS } from '../../../core/lead-options';
 import { formatMoney, getAvatarTone, getInitials } from '../../../core/format-utils';
 import { EmptyState, SkeletonRows, StatTile } from '../../../shared/ui/ui';
 import { OutcomeAnalytics } from '../outcome-analytics';
+import { reloadOnChange } from '../../../core/live-reload';
 
 @Component({
   selector: 'app-analytics-closer',
@@ -111,6 +112,7 @@ import { OutcomeAnalytics } from '../outcome-analytics';
   `,
 })
 export class AnalyticsCloser implements OnInit {
+  private readonly liveReload = reloadOnChange(() => this.ngOnInit());
   private readonly analyticsService = inject(AnalyticsService);
 
   readonly rows = signal<UserOutcomeRow[]>([]);

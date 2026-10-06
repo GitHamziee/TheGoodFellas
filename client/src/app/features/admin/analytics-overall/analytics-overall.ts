@@ -20,6 +20,7 @@ import { Role } from '../../../core/models/user.model';
 import { ROLE_LABEL } from '../../../core/nav-config';
 import { pluralize } from '../../../core/format-utils';
 import { EmptyState, SkeletonRows, StatTile } from '../../../shared/ui/ui';
+import { reloadOnChange } from '../../../core/live-reload';
 
 const STATUS_ORDER: { status: LeadStatus; label: string; hint: string }[] = [
   { status: 'NEW', label: 'New', hint: 'Submitted by a junior closer, waiting on a closer' },
@@ -74,6 +75,7 @@ const ROLE_TONE: Record<Role, string> = {
   templateUrl: './analytics-overall.html',
 })
 export class AnalyticsOverall implements OnInit {
+  private readonly liveReload = reloadOnChange(() => this.ngOnInit());
   private readonly analyticsService = inject(AnalyticsService);
 
   readonly overall = signal<OverallAnalyticsData | null>(null);

@@ -6,6 +6,7 @@ import { AuthService } from '../../../core/services/auth.service';
 import { TeamLeadLeadRow } from '../../../core/models/lead.model';
 import { getAvatarTone, getInitials, isThisMonth, isThisWeek, timeAgo } from '../../../core/format-utils';
 import { EmptyState, SkeletonRows, StatTile } from '../../../shared/ui/ui';
+import { reloadOnChange } from '../../../core/live-reload';
 
 @Component({
   selector: 'app-team-lead-dashboard',
@@ -13,6 +14,7 @@ import { EmptyState, SkeletonRows, StatTile } from '../../../shared/ui/ui';
   templateUrl: './dashboard.html',
 })
 export class TeamLeadDashboard implements OnInit {
+  private readonly liveReload = reloadOnChange(() => this.ngOnInit());
   private readonly leadService = inject(LeadService);
   private readonly auth = inject(AuthService);
 

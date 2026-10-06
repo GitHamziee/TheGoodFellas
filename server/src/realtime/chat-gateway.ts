@@ -47,8 +47,8 @@ export function initChatGateway(httpServer: HttpServer): IOServer {
       // Same revocation rule as the REST middleware — a role or password change kills live sockets too.
       if (!user || user.tokenVersion !== payload.tokenVersion) return next(new Error("Unauthorized"));
 
-      // CLIENT has no channels; refuse the connection instead of holding an idle socket open.
-      if (roomsFor(user.role).length === 0) return next(new Error("Forbidden"));
+      // CLIENT has no chat channels but still connects: the socket also carries the
+      // payload-free `data:changed` nudge that tells every portal to refetch.
 
       socket.data.user = { id: user.id, name: user.name, role: user.role };
       next();
@@ -92,4 +92,13 @@ export function emitMessageCreated(room: ChatRoom, message: PublicMessage): void
 /** Broadcast an edit or soft-delete — clients replace the message with the same id in place. */
 export function emitMessageUpdated(room: ChatRoom, message: PublicMessage): void {
   io?.to(socketRoom(room)).emit("chat:message-updated", message);
+}
+
+/**
+ * Tells every connected portal "something changed, refetch". Deliberately carries no payload:
+ * clients reload through the normal REST endpoints, so role-based masking still applies and
+ * nothing sensitive ever rides on the broadcast.
+ */
+export function emitDataChanged(): void {
+  io?.emit("data:changed");
 }

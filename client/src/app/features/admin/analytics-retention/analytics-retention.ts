@@ -1,6 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { AnalyticsService, UserOutcomeRow } from '../../../core/services/analytics.service';
 import { OutcomeAnalytics } from '../outcome-analytics';
+import { reloadOnChange } from '../../../core/live-reload';
 
 @Component({
   selector: 'app-analytics-retention',
@@ -17,6 +18,7 @@ import { OutcomeAnalytics } from '../outcome-analytics';
   `,
 })
 export class AnalyticsRetention implements OnInit {
+  private readonly liveReload = reloadOnChange(() => this.ngOnInit());
   private readonly analyticsService = inject(AnalyticsService);
 
   readonly rows = signal<UserOutcomeRow[]>([]);

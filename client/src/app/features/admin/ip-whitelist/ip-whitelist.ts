@@ -6,6 +6,7 @@ import { WhitelistedIp } from '../../../core/models/ip-whitelist.model';
 import { formatDate, pluralize } from '../../../core/format-utils';
 import { Modal } from '../../../shared/ui/modal';
 import { EmptyState, SkeletonRows } from '../../../shared/ui/ui';
+import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 
 @Component({
   selector: 'app-admin-ip-whitelist',
@@ -23,6 +24,7 @@ import { EmptyState, SkeletonRows } from '../../../shared/ui/ui';
   templateUrl: './ip-whitelist.html',
 })
 export class AdminIpWhitelist implements OnInit {
+  private readonly liveReload = reloadOnChange(() => this.refresh());
   private readonly ipWhitelistService = inject(IpWhitelistService);
 
   readonly ips = signal<WhitelistedIp[]>([]);
@@ -54,7 +56,7 @@ export class AdminIpWhitelist implements OnInit {
   }
 
   async refresh(): Promise<void> {
-    this.loading.set(true);
+    if (!isSilentReload()) this.loading.set(true);
     try {
       this.ips.set(await this.ipWhitelistService.list());
     } catch {

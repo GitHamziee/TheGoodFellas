@@ -9,6 +9,7 @@ import { formatDateTime, formatPhone, getAvatarTone, getInitials } from '../../.
 import { Modal } from '../../../shared/ui/modal';
 import { EmptyState, Pagination, SearchBox, SkeletonRows, StatTile } from '../../../shared/ui/ui';
 import { LeadDetail } from '../../../shared/lead-detail';
+import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 
 interface LookupUser {
   id: string;
@@ -38,6 +39,7 @@ interface LookupUser {
   templateUrl: './retention.html',
 })
 export class AdminRetention implements OnInit {
+  private readonly liveReload = reloadOnChange(() => this.refresh());
   private readonly leadService = inject(LeadService);
   private readonly userService = inject(UserService);
 
@@ -86,7 +88,7 @@ export class AdminRetention implements OnInit {
   }
 
   async refresh(): Promise<void> {
-    this.loading.set(true);
+    if (!isSilentReload()) this.loading.set(true);
     try {
       this.leads.set(await this.leadService.retentionUnassigned());
     } catch {

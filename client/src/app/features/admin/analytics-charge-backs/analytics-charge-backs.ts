@@ -7,6 +7,7 @@ import {
 } from '../../../core/services/analytics.service';
 import { formatPkr, getAvatarTone, getInitials, pluralize, timeAgo } from '../../../core/format-utils';
 import { EmptyState, SkeletonRows, StatTile } from '../../../shared/ui/ui';
+import { reloadOnChange } from '../../../core/live-reload';
 
 @Component({
   selector: 'app-analytics-charge-backs',
@@ -14,6 +15,7 @@ import { EmptyState, SkeletonRows, StatTile } from '../../../shared/ui/ui';
   templateUrl: './analytics-charge-backs.html',
 })
 export class AnalyticsChargeBacks implements OnInit {
+  private readonly liveReload = reloadOnChange(() => this.ngOnInit());
   private readonly analyticsService = inject(AnalyticsService);
 
   readonly data = signal<ChargeBackAnalyticsData | null>(null);

@@ -19,6 +19,7 @@ import {
   timeAgo,
 } from '../../../core/format-utils';
 import { EmptyState, SkeletonRows, StatTile, StatusBadge } from '../../../shared/ui/ui';
+import { reloadOnChange } from '../../../core/live-reload';
 
 @Component({
   selector: 'app-junior-dashboard',
@@ -37,6 +38,7 @@ import { EmptyState, SkeletonRows, StatTile, StatusBadge } from '../../../shared
   templateUrl: './dashboard.html',
 })
 export class JuniorDashboard implements OnInit {
+  private readonly liveReload = reloadOnChange(() => this.ngOnInit());
   private readonly leadService = inject(LeadService);
   private readonly auth = inject(AuthService);
 

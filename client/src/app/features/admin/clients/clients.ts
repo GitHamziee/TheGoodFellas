@@ -20,6 +20,7 @@ import { createListView } from '../../../core/list-view';
 import { getAvatarTone, getInitials } from '../../../core/format-utils';
 import { Modal } from '../../../shared/ui/modal';
 import { EmptyState, Pagination, SearchBox, SkeletonRows, StatTile } from '../../../shared/ui/ui';
+import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 
 const ROLE_TONE: Record<Role, string> = {
   ADMIN: 'tone-b',
@@ -59,6 +60,7 @@ const ROLE_TONE: Record<Role, string> = {
   templateUrl: './clients.html',
 })
 export class AdminClients implements OnInit {
+  private readonly liveReload = reloadOnChange(() => this.refresh());
   private readonly userService = inject(UserService);
   private readonly auth = inject(AuthService);
 
@@ -173,7 +175,7 @@ export class AdminClients implements OnInit {
   }
 
   async refresh(): Promise<void> {
-    this.loading.set(true);
+    if (!isSilentReload()) this.loading.set(true);
     try {
       this.clients.set(await this.userService.listUsers('CLIENT'));
     } catch {
