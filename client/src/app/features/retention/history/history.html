@@ -86,7 +86,7 @@
           </thead>
           <tbody>
             @for (lead of view.rows(); track lead.id) {
-              <tr class="clickable" (click)="selected.set(lead)">
+              <tr>
                 <td>
                   <div class="cell-main">{{ lead.customerName }}</div>
                   <div class="cell-sub">{{ lead.carrierName || '—' }}</div>
@@ -124,9 +124,3 @@
     }
   </div>
 </div>
-
-@if (selected(); as lead) {
-  <app-modal appNoCopy title="Lead details" [subtitle]="lead.customerName" [wide]="true" (close)="selected.set(null)">
-    <app-lead-detail [lead]="lead" [unmasked]="true" [allowCopy]="false" />
-  </app-modal>
-}

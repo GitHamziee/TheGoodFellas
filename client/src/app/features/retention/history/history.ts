@@ -10,25 +10,17 @@ import { LeadService } from '../../../core/services/lead.service';
 import { Lead } from '../../../core/models/lead.model';
 import { createListView } from '../../../core/list-view';
 import { formatPhone, getAvatarTone, getInitials, isThisMonth, timeAgo } from '../../../core/format-utils';
-import { Modal } from '../../../shared/ui/modal';
-import { LeadDetail } from '../../../shared/lead-detail';
 import { EmptyState, Pagination, SearchBox, SkeletonRows, StatTile, StatusBadge } from '../../../shared/ui/ui';
-import { NoCopy } from '../../../shared/no-copy.directive';
+import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 
 /**
  * Shared team history — every RETENTION lead the team has already worked past the queue,
- * not scoped to the caller (same philosophy as the queue page). Full detail except money:
- * `retentionHistory()` comes back with coverageAmount/monthlyPremiums stripped server-side,
- * so `<app-lead-detail>` simply never renders those rows (it hides fields it doesn't have).
- * `appNoCopy` + `[allowCopy]="false"` on the detail view block lifting the data out —
- * paste still works everywhere else, only copy/cut and the clipboard-copy button are blocked.
+ * not scoped to the caller (same philosophy as the queue page). List rows only — workers get no
+ * detail view of a submitted lead (details are for Clients only), and the server sends none.
  */
 @Component({
   selector: 'app-retention-history',
   imports: [
-    NoCopy,
-    Modal,
-    LeadDetail,
     StatTile,
     StatusBadge,
     SearchBox,
@@ -44,12 +36,12 @@ import { NoCopy } from '../../../shared/no-copy.directive';
   templateUrl: './history.html',
 })
 export class RetentionHistory implements OnInit {
+  private readonly liveReload = reloadOnChange(() => this.ngOnInit());
   private readonly leadService = inject(LeadService);
 
   readonly leads = signal<Lead[]>([]);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
-  readonly selected = signal<Lead | null>(null);
 
   readonly formatPhone = formatPhone;
   readonly timeAgo = timeAgo;
@@ -101,7 +93,7 @@ export class RetentionHistory implements OnInit {
   });
 
   async ngOnInit(): Promise<void> {
-    this.loading.set(true);
+    if (!isSilentReload()) this.loading.set(true);
     try {
       this.leads.set(await this.leadService.retentionHistory());
     } catch {

@@ -149,7 +149,12 @@ export class Select implements ControlValueAccessor, OnDestroy {
     if (this.open()) this.closeMenu();
   }
 
-  private readonly onScroll = () => this.close();
+  /** The capture-phase listener also sees the menu scrolling itself — that must not close it. */
+  private readonly onScroll = (event: Event) => {
+    const menu = this.menuRef?.nativeElement;
+    if (menu && event.target instanceof Node && menu.contains(event.target)) return;
+    this.close();
+  };
 
   private closeMenu(): void {
     this.open.set(false);

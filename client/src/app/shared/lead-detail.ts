@@ -187,7 +187,7 @@ export class LeadDetail {
   readonly lead = input.required<Lead>();
   /** Admin always sees full lead data server-side (FULL_INCLUDE) — set this to skip the
    * dot-masked reveal toggle entirely and show SSN/routing/account numbers plainly. */
-  readonly unmasked = input(false);
+  readonly unmasked = input(true);
   /** "Copy details" writes straight to the clipboard via `navigator.clipboard`, so it isn't
    * caught by an `appNoCopy` wrapper (that only blocks the browser's copy/cut events) — set
    * this false to hide the button entirely on a page where copying lead data out is meant

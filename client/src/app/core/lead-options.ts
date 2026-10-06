@@ -101,7 +101,7 @@ export const DRAFT_REASON_OPTIONS: { value: DraftReason; label: string }[] = [
   { value: 'OVER_AGE', label: 'Over age' },
   { value: 'CLOSED_DEAD_DEAL', label: 'Closed - dead deal' },
   { value: 'NOT_IN_SERVICE', label: 'Not in service' },
-  { value: 'OTHER', label: 'Other (type manually)' },
+  { value: 'OTHER', label: 'Other' },
 ];
 
 /** `humanizeEnum` would mangle acronyms here (DNC -> "Dnc", NOT_A_DM -> "Not a dm") the

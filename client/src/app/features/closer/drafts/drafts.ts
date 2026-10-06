@@ -15,14 +15,13 @@ import { formatPhone, getAvatarTone, getInitials, timeAgo } from '../../../core/
 import { DRAFT_REASON_LABEL } from '../../../core/lead-options';
 import { Modal } from '../../../shared/ui/modal';
 import { EmptyState, Pagination, SearchBox, SkeletonRows, StatTile } from '../../../shared/ui/ui';
-import { LeadDetail } from '../../../shared/lead-detail';
+import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 
 @Component({
   selector: 'app-closer-drafts',
   imports: [
     RouterLink,
     Modal,
-    LeadDetail,
     StatTile,
     SearchBox,
     Pagination,
@@ -38,6 +37,7 @@ import { LeadDetail } from '../../../shared/lead-detail';
   templateUrl: './drafts.html',
 })
 export class CloserDrafts implements OnInit {
+  private readonly liveReload = reloadOnChange(() => this.ngOnInit());
   private readonly leadService = inject(LeadService);
 
   readonly leads = signal<Lead[]>([]);
@@ -71,7 +71,7 @@ export class CloserDrafts implements OnInit {
   });
 
   async ngOnInit(): Promise<void> {
-    this.loading.set(true);
+    if (!isSilentReload()) this.loading.set(true);
     try {
       this.leads.set(await this.leadService.drafts());
     } catch {

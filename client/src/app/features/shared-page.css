@@ -352,8 +352,20 @@ input[readonly] {
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-lg);
   max-height: 240px;
+  scrollbar-width: thin; /* overrides the site-wide hidden scrollbar so the list reads as scrollable */
+  scrollbar-color: var(--border) transparent;
   overflow-y: auto;
   animation: dropdown-pop 0.12s ease both;
+}
+
+.dropdown-menu::-webkit-scrollbar {
+  display: block;
+  width: 6px;
+}
+
+.dropdown-menu::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
 }
 
 .dropdown-option {
