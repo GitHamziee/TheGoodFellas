@@ -186,10 +186,10 @@ model User {
   // Per-plan lead cost (USD) this CLIENT pays — set at account creation, editable after.
   // Meaningless for other roles; left null for them. Four fixed columns rather than a
   // separate pricing table since PlanType is a fixed 4-value set, not admin-configurable.
-  levelCost    Int?
-  gradedCost   Int?
-  modifiedCost Int?
-  giCost       Int?
+  levelCost      Int?
+  gradedCost     Int?
+  modifiedCost   Int?
+  giCost         Int?
   // Lowest monthly premium (USD) this client will accept on a lead — CLIENT accounts only,
   // set at creation, editable after like the four costs above. Shown against the client on
   // the State Sheet.
@@ -211,17 +211,17 @@ model User {
 
   stateCarriers ClientStateCarrier[]
 
-  submittedLeads    Lead[]        @relation("JuniorCloserLeads")
-  closerLeads       Lead[]        @relation("CloserLeads")
-  clientLeads       Lead[]        @relation("ClientLeads")
-  retentionLeads    Lead[]        @relation("RetentionLeads")
-  suggestedClientLeads Lead[]     @relation("SuggestedClientLeads")
-  clientChargeBacks ChargeBack[]  @relation("ClientChargeBacks")
-  chatMessages      ChatMessage[]
-  chatReads         ChatRead[]
-  leadReviews       LeadReview[]
-  callReviewsGiven    CallReview[] @relation("CallReviewsGiven")
-  callReviewsReceived CallReview[] @relation("CallReviewsReceived")
+  submittedLeads       Lead[]        @relation("JuniorCloserLeads")
+  closerLeads          Lead[]        @relation("CloserLeads")
+  clientLeads          Lead[]        @relation("ClientLeads")
+  retentionLeads       Lead[]        @relation("RetentionLeads")
+  suggestedClientLeads Lead[]        @relation("SuggestedClientLeads")
+  clientChargeBacks    ChargeBack[]  @relation("ClientChargeBacks")
+  chatMessages         ChatMessage[]
+  chatReads            ChatRead[]
+  leadReviews          LeadReview[]
+  callReviewsGiven     CallReview[]  @relation("CallReviewsGiven")
+  callReviewsReceived  CallReview[]  @relation("CallReviewsReceived")
 
   @@index([role])
 }
@@ -243,17 +243,17 @@ model ClientStateCarrier {
 }
 
 model Lead {
-  id               String  @id @default(cuid())
+  id                String  @id @default(cuid())
   // Null when a Closer creates the lead from scratch (self- or AI-sourced calls) —
   // no Junior Closer was ever involved.
-  juniorCloserId   String?
+  juniorCloserId    String?
   // Null for a CPL lead — CPL skips the Closer step entirely, forever.
-  closerId         String?
-  clientId         String?
-  externalClientId String?
+  closerId          String?
+  clientId          String?
+  externalClientId  String?
   // Set only for RETENTION leads — who Admin handed a form-submitted lead to. Null while an
   // imported lead is still sitting unassigned in the admin retention-import queue.
-  retentionId      String?
+  retentionId       String?
   // Non-binding hint a Closer or Retention person can set on a lead they build/enrich
   // themselves — "I think this fits Client X" — so Admin has a heads-up in the queue.
   // Never gates or performs the actual assignment; Admin still explicitly assigns via
@@ -317,29 +317,29 @@ model Lead {
   monthlyPremiums Int?
 
   // ─── Closer enrichment — billing ───
-  initialDraftDate DateTime?
-  futureDraftDate  DateTime?
-  payer            PayerType?
+  initialDraftDate    DateTime?
+  futureDraftDate     DateTime?
+  payer               PayerType?
   // Bank account vs card — gates which of the two field groups below applies.
-  paymentMethod    PaymentMethod?
-  bankName         String? // Payer = SELF
-  accountTitle     String? // both
-  payerSocial      String? // Payer = SOMEONE_ELSE
-  accountType      AccountType?
-  accountOwnership AccountOwnership?
+  paymentMethod       PaymentMethod?
+  bankName            String? // Payer = SELF
+  accountTitle        String? // both
+  payerSocial         String? // Payer = SOMEONE_ELSE
+  accountType         AccountType?
+  accountOwnership    AccountOwnership?
   // State the bank account was opened in — not necessarily the customer's current state.
   accountOpeningState String?
-  routingNumber    String?
-  accountNumber    String?
-  cardType         CardType?
-  cardNumber       String?
-  cardExpiry       String? // MM/YY
+  routingNumber       String?
+  accountNumber       String?
+  cardType            CardType?
+  cardNumber          String?
+  cardExpiry          String? // MM/YY
 
   closerNotes String?
 
   // Set when the closer parks a NEW/DRAFT lead instead of submitting it. Cleared on
   // final submit. See DraftReason above for the enum values.
-  draftReason DraftReason?
+  draftReason     DraftReason?
   // Free-text reason, only set when draftReason = OTHER (the closer typed it manually).
   draftReasonNote String?
 
@@ -363,15 +363,16 @@ model Lead {
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 
-  juniorCloser   User?           @relation("JuniorCloserLeads", fields: [juniorCloserId], references: [id], onDelete: Cascade)
-  closer         User?           @relation("CloserLeads", fields: [closerId], references: [id], onDelete: Cascade)
-  client         User?           @relation("ClientLeads", fields: [clientId], references: [id], onDelete: SetNull)
-  externalClient ExternalClient? @relation("ExternalClientLeads", fields: [externalClientId], references: [id], onDelete: SetNull)
-  retention      User?           @relation("RetentionLeads", fields: [retentionId], references: [id], onDelete: Cascade)
-  suggestedClient User?          @relation("SuggestedClientLeads", fields: [suggestedClientId], references: [id], onDelete: SetNull)
-  incomePayment  IncomePayment?  @relation(fields: [incomePaymentId], references: [id], onDelete: SetNull)
-  chargeBacks    ChargeBack[]
-  qaReviews      LeadReview[]
+  juniorCloser    User?           @relation("JuniorCloserLeads", fields: [juniorCloserId], references: [id], onDelete: Cascade)
+  closer          User?           @relation("CloserLeads", fields: [closerId], references: [id], onDelete: Cascade)
+  client          User?           @relation("ClientLeads", fields: [clientId], references: [id], onDelete: SetNull)
+  externalClient  ExternalClient? @relation("ExternalClientLeads", fields: [externalClientId], references: [id], onDelete: SetNull)
+  retention       User?           @relation("RetentionLeads", fields: [retentionId], references: [id], onDelete: Cascade)
+  suggestedClient User?           @relation("SuggestedClientLeads", fields: [suggestedClientId], references: [id], onDelete: SetNull)
+  incomePayment   IncomePayment?  @relation(fields: [incomePaymentId], references: [id], onDelete: SetNull)
+  chargeBacks     ChargeBack[]
+  qaReviews       LeadReview[]
+  callReviews     CallReview[]
 
   @@index([juniorCloserId])
   @@index([closerId])
@@ -407,7 +408,8 @@ model LeadReview {
 }
 
 // A QA reviewer flagging something wrong on a live call with a Junior Closer or Closer,
-// written directly against that person — no lead involved. Unlimited per person. There is
+// written directly against that person. Unlimited per person. `leadId` optionally points at
+// the lead the call was about (null when the call wasn't tied to one, or the lead is gone). There is
 // deliberately no "pass" outcome — a call with nothing wrong just never gets a row here,
 // so `comment` (what went wrong) is required, not optional. Internal metrics only.
 model CallReview {
@@ -415,13 +417,16 @@ model CallReview {
   reviewerId String
   revieweeId String
   comment    String
+  leadId     String?
   createdAt  DateTime @default(now())
 
-  reviewer User @relation("CallReviewsGiven", fields: [reviewerId], references: [id], onDelete: Cascade)
-  reviewee User @relation("CallReviewsReceived", fields: [revieweeId], references: [id], onDelete: Cascade)
+  lead     Lead? @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  reviewer User  @relation("CallReviewsGiven", fields: [reviewerId], references: [id], onDelete: Cascade)
+  reviewee User  @relation("CallReviewsReceived", fields: [revieweeId], references: [id], onDelete: Cascade)
 
   @@index([revieweeId])
   @@index([reviewerId])
+  @@index([leadId])
   @@index([createdAt])
 }
 
@@ -500,10 +505,10 @@ model ExternalClient {
   // Per-plan lead cost (PKR), same shape as User.levelCost etc. above — set at creation,
   // editable after. Lets ASSIGNED_EXTERNAL leads carry real pricing instead of the 0 they
   // contributed to revenue analytics before this existed.
-  levelCost    Int?
-  gradedCost   Int?
-  modifiedCost Int?
-  giCost       Int?
+  levelCost                Int?
+  gradedCost               Int?
+  modifiedCost             Int?
+  giCost                   Int?
   // Same coverage fields as CLIENT-role User accounts (minimumPremium, states, carriers,
   // stateCarriers, acceptsOnlineBankPayment) — an external client is priced and licensed
   // the same way a real CLIENT account is, it just has no login.

@@ -1,5 +1,6 @@
-import { Router } from 'express';
-import { apiSuccess } from '../lib/api-response';
+import { Router, type Request, type Response } from 'express';
+import { apiError, apiSuccess } from '../lib/api-response';
+import type { QaLane } from '../services/analytics.service';
 import { asyncHandler } from '../lib/async-handler';
 import { authenticate, requireRole } from '../middleware/auth';
 import * as analyticsService from '../services/analytics.service';
@@ -88,41 +89,39 @@ router.get(
   })
 );
 
-// ─── QA Reports — internal quality metrics from LeadReview/CallReview. Shared with Team
-// Lead like the outcome analytics above (no revenue/expense data in these either).
+// ─── QA Reports — detail rows behind the Transfer / Live Call reports. Shared with Team Lead
+// for the junior lane only (no revenue/expense data in these either); the closer lane is
+// enforced here, not just hidden in the client nav.
+function parseLane(req: Request, res: Response): QaLane | null {
+  const lane = req.params.lane;
+  if (lane !== 'junior' && lane !== 'closer') {
+    apiError(res, "lane must be 'junior' or 'closer'", 400);
+    return null;
+  }
+  if (lane === 'closer' && req.user!.role === 'TEAM_LEAD') {
+    apiError(res, 'Forbidden', 403);
+    return null;
+  }
+  return lane;
+}
+
 router.get(
-  '/qa-junior-closers',
+  '/qa-transfer/:lane',
   requireRole('ADMIN', 'MANAGER', 'TEAM_LEAD'),
-  asyncHandler(async (_req, res) => {
-    const rows = await analyticsService.qaJuniorAnalytics();
-    return apiSuccess(res, { rows });
+  asyncHandler(async (req, res) => {
+    const lane = parseLane(req, res);
+    if (!lane) return;
+    return apiSuccess(res, { detail: await analyticsService.qaTransferDetail(lane) });
   })
 );
 
 router.get(
-  '/qa-closers',
+  '/call-reviews/:lane',
   requireRole('ADMIN', 'MANAGER', 'TEAM_LEAD'),
-  asyncHandler(async (_req, res) => {
-    const rows = await analyticsService.qaCloserAnalytics();
-    return apiSuccess(res, { rows });
-  })
-);
-
-router.get(
-  '/call-reviews-junior',
-  requireRole('ADMIN', 'MANAGER', 'TEAM_LEAD'),
-  asyncHandler(async (_req, res) => {
-    const issues = await analyticsService.callReviewJuniorAnalytics();
-    return apiSuccess(res, { issues });
-  })
-);
-
-router.get(
-  '/call-reviews-closer',
-  requireRole('ADMIN', 'MANAGER', 'TEAM_LEAD'),
-  asyncHandler(async (_req, res) => {
-    const issues = await analyticsService.callReviewCloserAnalytics();
-    return apiSuccess(res, { issues });
+  asyncHandler(async (req, res) => {
+    const lane = parseLane(req, res);
+    if (!lane) return;
+    return apiSuccess(res, { detail: await analyticsService.callReviewDetail(lane) });
   })
 );
 

@@ -1,4 +1,4 @@
-import { Lead } from './lead.model';
+import { DCode, Lead, LeadStatus, LeadType } from './lead.model';
 
 export type ReviewOutcome = 'PASS' | 'FAIL';
 
@@ -35,29 +35,70 @@ export interface CallReview {
   comment: string;
   createdAt: string;
   reviewee: ReviewParty;
+  /** The lead the call was about, when the reviewer attached one. */
+  lead?: CallLeadRef | null;
 }
 
-/** One row of a Live Call Report — how many issues QA has flagged against this person. */
-export interface CallReviewBucket {
+/** Minimal lead reference for the "which lead was this call about?" picker and QA's own list. */
+export interface CallLeadRef {
+  id: string;
+  customerName: string;
+  state: string | null;
+  createdAt: string;
+}
+
+/** Everyone in a lane — so people with no activity still show up in a report. */
+export interface QaPerson {
   id: string;
   name: string;
   email: string;
-  count: number;
 }
 
-/** One flagged issue as it appears in a Live Call Report's recent-issues list — carries
- * both parties, unlike CallReview above (which only needs the reviewee, since it's
- * rendered on a page already scoped to "reviews I wrote"). */
+/** Masked lead summary carried on a QA report row — no phone/SSN/bank fields. */
+export interface QaLeadSummary {
+  id: string;
+  customerName: string;
+  leadType: LeadType;
+  dCode: DCode | null;
+  state: string | null;
+  status: LeadStatus;
+  createdAt: string;
+  juniorCloserId: string | null;
+  juniorCloser: QaPerson | null;
+  closer: QaPerson | null;
+}
+
+/** One QA verdict on a lead, as the Transfer Report sees it. */
+export interface QaReviewRow {
+  id: string;
+  outcome: ReviewOutcome;
+  comment: string | null;
+  createdAt: string;
+  reviewer: QaPerson;
+  lead: QaLeadSummary;
+}
+
+export interface QaTransferDetail {
+  people: QaPerson[];
+  reviews: QaReviewRow[];
+  /** Leads still waiting on QA for this lane, oldest first. */
+  pending: QaLeadSummary[];
+}
+
+/** One flagged live-call issue — both parties, unlike CallReview (reviewee only). */
 export interface CallReviewIssue {
   id: string;
   comment: string;
   createdAt: string;
   reviewee: ReviewParty;
   reviewer: ReviewParty;
+  /** Null when the call was not tied to a lead. */
+  lead: QaLeadSummary | null;
 }
 
-export interface CallReviewAnalytics {
-  total: number;
-  byPerson: CallReviewBucket[];
-  recent: CallReviewIssue[];
+export interface CallReviewDetail {
+  people: QaPerson[];
+  issues: CallReviewIssue[];
 }
+
+export type QaLane = 'junior' | 'closer';

@@ -1,34 +1,16 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
-import { AnalyticsService } from '../../../core/services/analytics.service';
-import { CallReviewAnalytics } from '../../../core/models/review.model';
-import { IssueAnalytics } from '../issue-analytics';
+import { Component } from '@angular/core';
+import { QaCallReport } from '../qa-call-report';
 
-/** Live Call Report — issues QA has flagged against each Closer's live calls. */
+/** Live Call Report — issues flagged against Closers. */
 @Component({
   selector: 'app-qa-live-call-closer',
-  imports: [IssueAnalytics],
+  imports: [QaCallReport],
   template: `
-    <app-issue-analytics
-      subtitle="Live-call issues QA has flagged for each closer."
+    <app-qa-call-report
+      lane="closer"
       peopleLabel="Closers"
-      emptyTitle="No closers yet"
-      emptyHint="Create closer accounts and flagged issues will show up here."
-      [source]="issues()"
-      [loading]="loading()"
+      subtitle="Live-call issues QA has flagged for each Closer — repeat offenders, trend and full comment history."
     />
   `,
 })
-export class QaLiveCallCloser implements OnInit {
-  private readonly analyticsService = inject(AnalyticsService);
-
-  readonly issues = signal<CallReviewAnalytics>({ total: 0, byPerson: [], recent: [] });
-  readonly loading = signal(true);
-
-  async ngOnInit(): Promise<void> {
-    try {
-      this.issues.set(await this.analyticsService.callReviewsCloser());
-    } finally {
-      this.loading.set(false);
-    }
-  }
-}
+export class QaLiveCallCloser {}

@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { API_BASE_URL } from '../config';
 import { DraftReason, LeadParty, LeadStatus, PlanType } from '../models/lead.model';
-import { CallReviewAnalytics } from '../models/review.model';
+import { CallReviewDetail, QaLane, QaTransferDetail } from '../models/review.model';
 
 interface ApiSuccess<T> {
   data: T;
@@ -147,28 +147,16 @@ export class AnalyticsService {
     return res.data.chargeBacks;
   }
 
-  // ─── QA Reports — reuse UserOutcomeRow (accepted/rejected stand in for PASS/FAIL) ──
-  /** Transfer Report — how QA scored the leads each Junior Closer submitted. */
-  async qaJuniorClosers(): Promise<UserOutcomeRow[]> {
-    const res = await firstValueFrom(this.http.get<ApiSuccess<{ rows: UserOutcomeRow[] }>>(`${BASE}/qa-junior-closers`));
-    return res.data.rows;
+  // ─── QA Reports — detail rows; the report components aggregate in memory ──
+  /** Transfer Report — every QA verdict on a lane's leads, plus what's still awaiting QA. */
+  async qaTransfer(lane: QaLane): Promise<QaTransferDetail> {
+    const res = await firstValueFrom(this.http.get<ApiSuccess<{ detail: QaTransferDetail }>>(`${BASE}/qa-transfer/${lane}`));
+    return res.data.detail;
   }
 
-  /** Transfer Report — how QA scored the leads each Closer enriched. */
-  async qaClosers(): Promise<UserOutcomeRow[]> {
-    const res = await firstValueFrom(this.http.get<ApiSuccess<{ rows: UserOutcomeRow[] }>>(`${BASE}/qa-closers`));
-    return res.data.rows;
-  }
-
-  /** Live Call Report — issues QA has flagged against each Junior Closer's live calls. */
-  async callReviewsJunior(): Promise<CallReviewAnalytics> {
-    const res = await firstValueFrom(this.http.get<ApiSuccess<{ issues: CallReviewAnalytics }>>(`${BASE}/call-reviews-junior`));
-    return res.data.issues;
-  }
-
-  /** Live Call Report — issues QA has flagged against each Closer's live calls. */
-  async callReviewsCloser(): Promise<CallReviewAnalytics> {
-    const res = await firstValueFrom(this.http.get<ApiSuccess<{ issues: CallReviewAnalytics }>>(`${BASE}/call-reviews-closer`));
-    return res.data.issues;
+  /** Live Call Report — every issue QA has flagged against a lane's people. */
+  async callReviews(lane: QaLane): Promise<CallReviewDetail> {
+    const res = await firstValueFrom(this.http.get<ApiSuccess<{ detail: CallReviewDetail }>>(`${BASE}/call-reviews/${lane}`));
+    return res.data.detail;
   }
 }

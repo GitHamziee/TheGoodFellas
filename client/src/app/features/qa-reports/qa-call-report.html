@@ -1,0 +1,308 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <p class="sub">{{ subtitle() }}</p>
+    </div>
+  </div>
+
+  @if (error()) {
+    <div class="error">{{ error() }}</div>
+  }
+
+  <div class="toolbar">
+    <app-select
+      [options]="personOptions()"
+      [ngModel]="personId()"
+      (ngModelChange)="personId.set($event)"
+      ariaLabel="Filter by person"
+    />
+    <app-select
+      [options]="reviewerOptions()"
+      [ngModel]="reviewerId()"
+      (ngModelChange)="reviewerId.set($event)"
+      ariaLabel="Filter by QA reviewer"
+    />
+    <div class="pills">
+      @for (pill of rangePills; track pill.value) {
+        <button
+          type="button"
+          class="pill"
+          [class.active]="!from() && !to() && range() === pill.value"
+          (click)="setRange(pill.value)"
+        >
+          {{ pill.label }}
+        </button>
+      }
+    </div>
+    <input type="date" min="2000-01-01" max="2100-12-31" [ngModel]="from()" (ngModelChange)="setFrom($event)" aria-label="From date" />
+    <input type="date" min="2000-01-01" max="2100-12-31" [ngModel]="to()" (ngModelChange)="setTo($event)" aria-label="To date" />
+  </div>
+
+  <div class="stats-row">
+    <app-stat-tile [value]="tiles().issues" label="Issues flagged" tone="tone-danger">
+      <svg lucideFlag></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="tiles().flagged" label="People flagged" tone="tone-gold">
+      <svg lucideUsers></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="tiles().repeat" [label]="'Repeat (' + repeatThreshold + '+ in 30d)'" tone="tone-a">
+      <svg lucideTriangleAlert></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="tiles().clean" label="No issues" tone="tone-success">
+      <svg lucideLayers></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="tiles().top" label="Most flagged" tone="tone-c">
+      <svg lucideFlag></svg>
+    </app-stat-tile>
+  </div>
+
+  <div class="pills tabs">
+    <button type="button" class="pill" [class.active]="tab() === 'overview'" (click)="tab.set('overview')">
+      {{ peopleLabel() }}
+    </button>
+    <button type="button" class="pill" [class.active]="tab() === 'log'" (click)="tab.set('log')">
+      Issue log <span class="n">{{ scoped().length }}</span>
+    </button>
+    <button type="button" class="pill" [class.active]="tab() === 'reviewers'" (click)="tab.set('reviewers')">
+      QA reviewers <span class="n">{{ reviewers().length }}</span>
+    </button>
+  </div>
+
+  @if (loading()) {
+    <div class="card card--flush"><app-skeleton-rows [count]="6" /></div>
+  } @else {
+    @switch (tab()) {
+      @case ('overview') {
+        <div class="card">
+          <div class="inline-head">
+            <h2>Issues per week</h2>
+            <span class="count">Last 8 weeks</span>
+          </div>
+          <div class="trend">
+            @for (b of trend(); track b.label) {
+              <div class="trend-col" [title]="b.label + ' — ' + b.total + ' issue(s)'">
+                <span class="trend-val">{{ b.total || '' }}</span>
+                <div class="trend-plot">
+                  <div class="trend-stack" [style.height.%]="b.heightPct">
+                    <span class="trend-seg trend-seg--bad" style="height: 100%; border-radius: 3px"></span>
+                  </div>
+                </div>
+                <span class="trend-lbl">{{ b.label }}</span>
+              </div>
+            }
+          </div>
+        </div>
+
+        <div class="toolbar">
+          <app-search-box
+            [value]="peopleView.search()"
+            placeholder="Search by name or email…"
+            (valueChange)="peopleView.setSearch($event)"
+          />
+        </div>
+
+        <div class="card card--flush">
+          @if (peopleView.rows().length === 0) {
+            <app-empty-state title="Nobody to show" hint="No one matches the current filters.">
+              <svg lucideUsers></svg>
+            </app-empty-state>
+          } @else {
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th class="sortable" (click)="peopleView.toggleSort('name')">
+                      Name <span class="arrow">{{ sortArrow(peopleView, 'name') }}</span>
+                    </th>
+                    <th class="sortable right" (click)="peopleView.toggleSort('inRange')">
+                      In range <span class="arrow">{{ sortArrow(peopleView, 'inRange') }}</span>
+                    </th>
+                    <th class="sortable right hide-sm" (click)="peopleView.toggleSort('last30')">
+                      Last 30d <span class="arrow">{{ sortArrow(peopleView, 'last30') }}</span>
+                    </th>
+                    <th class="right hide-md">vs prior 30d</th>
+                    <th class="sortable right hide-sm" (click)="peopleView.toggleSort('allTime')">
+                      All time <span class="arrow">{{ sortArrow(peopleView, 'allTime') }}</span>
+                    </th>
+                    <th class="sortable hide-md" (click)="peopleView.toggleSort('lastFlagged')">
+                      Last flagged <span class="arrow">{{ sortArrow(peopleView, 'lastFlagged') }}</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (row of peopleView.rows(); track row.id) {
+                    <tr class="clickable" (click)="selectedPerson.set(row)">
+                      <td>
+                        <div class="person">
+                          <span class="avatar-sm" [class]="getAvatarTone(row.id)">{{ getInitials(row.name) }}</span>
+                          <span class="who">
+                            <span class="cell-main">{{ row.name }}</span>
+                            <span class="cell-sub">{{ row.email }}</span>
+                          </span>
+                        </div>
+                      </td>
+                      <td class="right num">
+                        @if (row.inRange === 0) {
+                          <span class="empty">None</span>
+                        } @else {
+                          <strong>{{ row.inRange }}</strong>
+                        }
+                      </td>
+                      <td class="right num hide-sm" [class.stale]="row.last30 >= repeatThreshold">{{ row.last30 }}</td>
+                      <td class="right num hide-md">
+                        <span [class]="deltaClass(row.delta)">{{ deltaText(row.delta) }}</span>
+                      </td>
+                      <td class="right num hide-sm">{{ row.allTime }}</td>
+                      <td class="hide-md">{{ row.lastFlagged ? timeAgo(row.lastFlagged) : '—' }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+            <app-pagination
+              [page]="peopleView.page()"
+              [totalPages]="peopleView.totalPages()"
+              [total]="peopleView.total()"
+              (pageChange)="peopleView.page.set($event)"
+            />
+          }
+        </div>
+      }
+
+      @case ('log') {
+        <div class="toolbar">
+          <app-search-box
+            [value]="logView.search()"
+            placeholder="Search person, lead, reviewer, or comment…"
+            (valueChange)="logView.setSearch($event)"
+          />
+        </div>
+
+        <div class="card card--flush">
+          @if (logView.rows().length === 0) {
+            <app-empty-state title="No issues flagged" hint="Nothing has been flagged for the current filters.">
+              <svg lucideFlag></svg>
+            </app-empty-state>
+          } @else {
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th class="sortable" (click)="logView.toggleSort('person')">
+                      {{ peopleLabel() }} <span class="arrow">{{ sortArrow(logView, 'person') }}</span>
+                    </th>
+                    <th class="sortable" (click)="logView.toggleSort('lead')">
+                      Lead <span class="arrow">{{ sortArrow(logView, 'lead') }}</span>
+                    </th>
+                    <th>What went wrong</th>
+                    <th class="sortable hide-md" (click)="logView.toggleSort('reviewer')">
+                      Flagged by <span class="arrow">{{ sortArrow(logView, 'reviewer') }}</span>
+                    </th>
+                    <th class="sortable right hide-sm" (click)="logView.toggleSort('createdAt')">
+                      When <span class="arrow">{{ sortArrow(logView, 'createdAt') }}</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (i of logView.rows(); track i.id) {
+                    <tr>
+                      <td class="cell-main">{{ i.reviewee.name }}</td>
+                      <td>
+                        @if (i.lead; as lead) {
+                          <button type="button" class="link-btn" (click)="peekLead.set(lead)">{{ lead.customerName }}</button>
+                        } @else {
+                          <span class="empty">No lead</span>
+                        }
+                      </td>
+                      <td class="why">{{ i.comment }}</td>
+                      <td class="hide-md">{{ i.reviewer.name }}</td>
+                      <td class="right hide-sm" [title]="formatDateTime(i.createdAt)">{{ timeAgo(i.createdAt) }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+            <app-pagination
+              [page]="logView.page()"
+              [totalPages]="logView.totalPages()"
+              [total]="logView.total()"
+              (pageChange)="logView.page.set($event)"
+            />
+          }
+        </div>
+      }
+
+      @case ('reviewers') {
+        <div class="card card--flush">
+          @if (reviewers().length === 0) {
+            <app-empty-state title="No issues logged" hint="QA reviewer activity shows up once issues are flagged.">
+              <svg lucideUsers></svg>
+            </app-empty-state>
+          } @else {
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>QA reviewer</th>
+                    <th class="right">Issues logged</th>
+                    <th class="right">People flagged</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (r of reviewers(); track r.id) {
+                    <tr>
+                      <td>
+                        <div class="person">
+                          <span class="avatar-sm" [class]="getAvatarTone(r.id)">{{ getInitials(r.name) }}</span>
+                          <span class="cell-main">{{ r.name }}</span>
+                        </div>
+                      </td>
+                      <td class="right num">{{ r.count }}</td>
+                      <td class="right num">{{ r.people }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </div>
+      }
+    }
+  }
+</div>
+
+@if (selectedPerson(); as p) {
+  <app-modal [title]="p.name" [subtitle]="p.email" [wide]="true" (close)="selectedPerson.set(null)">
+    <div class="inline-head">
+      <h2>Every flagged issue</h2>
+      <span class="count">{{ personHistory().length }} total · {{ p.last30 }} in the last 30 days</span>
+    </div>
+    @if (personHistory().length === 0) {
+      <p class="muted">No issues have ever been flagged for this person.</p>
+    } @else {
+      <div class="issue-feed">
+        @for (i of personHistory(); track i.id) {
+          <div class="issue-row">
+            <div class="issue-body">
+              <div class="issue-head">
+                <strong>{{ formatDateTime(i.createdAt) }}</strong>
+                <span class="issue-meta">{{ timeAgo(i.createdAt) }}</span>
+              </div>
+              <p class="issue-comment">{{ i.comment }}</p>
+              <span class="issue-meta">
+                Flagged by {{ i.reviewer.name }}
+                @if (i.lead; as lead) {
+                  · Lead: <button type="button" class="link-btn" (click)="peekLead.set(lead)">{{ lead.customerName }}</button>
+                }
+              </span>
+            </div>
+          </div>
+        }
+      </div>
+    }
+  </app-modal>
+}
+
+@if (peekLead(); as lead) {
+  <app-qa-lead-peek [lead]="lead" (close)="peekLead.set(null)" />
+}

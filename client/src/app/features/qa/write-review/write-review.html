@@ -25,7 +25,7 @@
             type="button"
             class="pick-row"
             [class.chosen]="chosenPersonId() === person.id"
-            (click)="chosenPersonId.set(person.id)"
+            (click)="choosePerson(person.id)"
           >
             <span class="avatar-sm" [class]="getAvatarTone(person.id)">{{ getInitials(person.name) }}</span>
             <span class="who">
@@ -41,6 +41,21 @@
             <svg lucideUserCheck></svg>
           </app-empty-state>
         }
+      </div>
+    }
+
+    @if (chosenPersonId()) {
+      <div class="form-grid">
+        <label class="full">
+          Which lead was this call about?
+          <app-select
+            [options]="leadOptions()"
+            [ngModel]="chosenLeadId()"
+            (ngModelChange)="chosenLeadId.set($event)"
+            [placeholder]="loadingLeads() ? 'Loading leads…' : 'Not tied to a lead'"
+            ariaLabel="Lead this call was about"
+          />
+        </label>
       </div>
     }
 
@@ -82,6 +97,7 @@
           <thead>
             <tr>
               <th>Person</th>
+              <th>Lead</th>
               <th>What went wrong</th>
               <th>When</th>
             </tr>
@@ -90,6 +106,7 @@
             @for (r of mine(); track r.id) {
               <tr>
                 <td class="cell-main">{{ r.reviewee.name }}</td>
+                <td>{{ r.lead?.customerName || '—' }}</td>
                 <td>{{ r.comment }}</td>
                 <td [title]="formatDateTime(r.createdAt)">{{ timeAgo(r.createdAt) }}</td>
               </tr>

@@ -1,4 +1,4 @@
-import type { PlanType } from '@prisma/client';
+import type { Prisma, PlanType, Role } from '@prisma/client';
 import prisma from '../lib/prisma';
 
 const PLAN_TYPES: PlanType[] = ['LEVEL', 'GRADED', 'MODIFIED', 'GI'];
@@ -47,54 +47,73 @@ export function retentionAnalytics() {
   return perUserOutcome('RETENTION', 'retentionId');
 }
 
-// ─── QA metrics ─────────────────────────────────────────────────
-// Both sections below reuse the UserOutcomeRow shape (total/accepted/rejected) that the
-// lead-outcome analytics above already return, with `accepted`/`rejected` standing in for
-// PASS/FAIL — same shape, different meaning, so the client's existing OutcomeAnalytics
-// table/chart component can render QA metrics with no changes. Internal metrics only,
+// ─── QA reports ─────────────────────────────────────────────────
+// The QA report pages need the rows behind the numbers (who failed, why, which lead, who
+// reviewed it, when), so these return raw detail and the client aggregates in memory — same
+// "client-side over a loaded array" convention as the list pages. Internal metrics only,
 // derived from LeadReview/CallReview — never from Lead.status.
 
-/** Per Junior Closer / Closer, how QA scored the leads whose intake/enrichment they submitted. */
-async function leadReviewOutcome(role: 'JUNIOR_CLOSER' | 'CLOSER', qaRole: 'QA_JUNIOR_CLOSER' | 'QA_CLOSER') {
-  const groupField = role === 'JUNIOR_CLOSER' ? 'juniorCloserId' : 'closerId';
-  const users = await prisma.user.findMany({ where: { role }, select: { id: true, name: true, email: true } });
-  const reviews = await prisma.leadReview.findMany({
-    where: { role: qaRole },
-    select: { outcome: true, lead: { select: { juniorCloserId: true, closerId: true } } },
-  });
+export type QaLane = 'junior' | 'closer';
 
-  const counts = new Map<string, { total: number; accepted: number; rejected: number }>();
-  for (const r of reviews) {
-    const targetId = r.lead[groupField];
-    if (!targetId) continue;
-    const entry = counts.get(targetId) ?? { total: 0, accepted: 0, rejected: 0 };
-    entry.total += 1;
-    if (r.outcome === 'PASS') entry.accepted += 1;
-    else entry.rejected += 1;
-    counts.set(targetId, entry);
-  }
+const personSelect = { id: true, name: true, email: true } as const;
 
-  return users.map((u) => ({ id: u.id, name: u.name, email: u.email, ...(counts.get(u.id) ?? { total: 0, accepted: 0, rejected: 0 }) }));
-}
+const leadSelect = {
+  id: true,
+  customerName: true,
+  leadType: true,
+  dCode: true,
+  state: true,
+  status: true,
+  createdAt: true,
+  juniorCloserId: true,
+  juniorCloser: { select: personSelect },
+  closer: { select: personSelect },
+} as const;
 
-export function qaJuniorAnalytics() {
-  return leadReviewOutcome('JUNIOR_CLOSER', 'QA_JUNIOR_CLOSER');
-}
+/**
+ * Transfer Report detail for one lane: every QA verdict on a Junior Closer's intake (or a
+ * Closer's enrichment) with the lead summary, the leads still awaiting QA (same predicates
+ * as the QA reviewers' own queues in lead.service.ts), and everyone in the role so people
+ * with no activity still appear. Lead summary is masked — no phone/SSN/bank fields.
+ */
+export async function qaTransferDetail(lane: QaLane) {
+  const role: Role = lane === 'junior' ? 'JUNIOR_CLOSER' : 'CLOSER';
+  const qaRole: Role = lane === 'junior' ? 'QA_JUNIOR_CLOSER' : 'QA_CLOSER';
 
-export function qaCloserAnalytics() {
-  return leadReviewOutcome('CLOSER', 'QA_CLOSER');
+  const pendingWhere: Prisma.LeadWhereInput =
+    lane === 'junior'
+      ? { juniorCloserId: { not: null }, qaReviews: { none: { role: qaRole } } }
+      : { closerId: { not: null }, status: { notIn: ['NEW', 'DRAFT'] }, qaReviews: { none: { role: qaRole } } };
+
+  const [people, reviews, pending] = await Promise.all([
+    prisma.user.findMany({ where: { role }, select: personSelect, orderBy: { name: 'asc' } }),
+    prisma.leadReview.findMany({
+      where: { role: qaRole },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        outcome: true,
+        comment: true,
+        createdAt: true,
+        reviewer: { select: personSelect },
+        lead: { select: leadSelect },
+      },
+    }),
+    prisma.lead.findMany({ where: pendingWhere, select: leadSelect, orderBy: { createdAt: 'asc' } }),
+  ]);
+
+  return { people, reviews, pending };
 }
 
 /**
- * Per Junior Closer / Closer, how many live-call issues QA has flagged against them —
- * unrelated to any lead. There is no "pass" side to this: CallReview only exists to log
- * a problem, so the metric is an issue count, not a rate. Includes everyone in the role
- * even with zero flags, same as the recent-issues list stays capped like
- * chargeBackAnalytics's `recent` above.
+ * Live Call Report detail for one lane: every issue QA has flagged against a person in the
+ * role — all of them, no cap. There is no "pass" side (CallReview only exists to log a
+ * problem), so the metric is an issue count over time, not a rate.
  */
-async function callReviewIssues(role: 'JUNIOR_CLOSER' | 'CLOSER') {
-  const [people, reviews] = await Promise.all([
-    prisma.user.findMany({ where: { role }, select: { id: true, name: true, email: true } }),
+export async function callReviewDetail(lane: QaLane) {
+  const role: Role = lane === 'junior' ? 'JUNIOR_CLOSER' : 'CLOSER';
+  const [people, issues] = await Promise.all([
+    prisma.user.findMany({ where: { role }, select: personSelect, orderBy: { name: 'asc' } }),
     prisma.callReview.findMany({
       where: { reviewee: { role } },
       orderBy: { createdAt: 'desc' },
@@ -102,32 +121,13 @@ async function callReviewIssues(role: 'JUNIOR_CLOSER' | 'CLOSER') {
         id: true,
         comment: true,
         createdAt: true,
-        reviewee: { select: { id: true, name: true, email: true } },
-        reviewer: { select: { id: true, name: true, email: true } },
+        reviewee: { select: personSelect },
+        reviewer: { select: personSelect },
+        lead: { select: leadSelect },
       },
     }),
   ]);
-
-  const countByPerson = new Map<string, number>();
-  for (const r of reviews) countByPerson.set(r.reviewee.id, (countByPerson.get(r.reviewee.id) ?? 0) + 1);
-
-  const byPerson = people
-    .map((p) => ({ id: p.id, name: p.name, email: p.email, count: countByPerson.get(p.id) ?? 0 }))
-    .sort((a, b) => b.count - a.count);
-
-  return {
-    total: reviews.length,
-    byPerson,
-    recent: reviews.slice(0, 20),
-  };
-}
-
-export function callReviewJuniorAnalytics() {
-  return callReviewIssues('JUNIOR_CLOSER');
-}
-
-export function callReviewCloserAnalytics() {
-  return callReviewIssues('CLOSER');
+  return { people, issues };
 }
 
 // ─── Sales by plan (Closer) ────────────────────────────────────

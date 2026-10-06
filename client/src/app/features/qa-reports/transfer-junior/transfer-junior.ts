@@ -1,39 +1,16 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
-import { AnalyticsService, UserOutcomeRow } from '../../../core/services/analytics.service';
-import { OutcomeAnalytics } from '../../admin/outcome-analytics';
+import { Component } from '@angular/core';
+import { QaTransferReport } from '../qa-transfer-report';
 
-/** Transfer Report — how QA scored the leads each Junior Closer submitted (intake quality). */
+/** Transfer Report — every QA verdict on a Junior Closer's intake. */
 @Component({
   selector: 'app-qa-transfer-junior',
-  imports: [OutcomeAnalytics],
+  imports: [QaTransferReport],
   template: `
-    <app-outcome-analytics
-      subtitle="How QA scored each junior closer's submitted lead information."
-      peopleLabel="Junior closers"
-      totalLabel="Leads reviewed"
-      goodLabel="Pass"
-      badLabel="Fail"
-      rateLabel="Pass rate"
-      noneLabel="No reviews yet"
-      unitLabel="reviews"
-      emptyTitle="No reviews yet"
-      emptyHint="Once QA reviews a junior closer's submitted leads, results show up here."
-      [source]="rows()"
-      [loading]="loading()"
+    <app-qa-transfer-report
+      lane="junior"
+      peopleLabel="Junior Closers"
+      subtitle="How QA scored each Junior Closer's submitted lead information — who's failing, why, and whether it's improving."
     />
   `,
 })
-export class QaTransferJunior implements OnInit {
-  private readonly analyticsService = inject(AnalyticsService);
-
-  readonly rows = signal<UserOutcomeRow[]>([]);
-  readonly loading = signal(true);
-
-  async ngOnInit(): Promise<void> {
-    try {
-      this.rows.set(await this.analyticsService.qaJuniorClosers());
-    } finally {
-      this.loading.set(false);
-    }
-  }
-}
+export class QaTransferJunior {}

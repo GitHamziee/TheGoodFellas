@@ -21,6 +21,19 @@ router.post(
 );
 
 router.get(
+  '/leads',
+  requireRole('QA_JUNIOR_CLOSER', 'QA_CLOSER'),
+  asyncHandler(async (req, res) => {
+    const result = await callReviewService.listLeadsForReviewee(
+      req.user! as { id: string; role: 'QA_JUNIOR_CLOSER' | 'QA_CLOSER' },
+      req.query.revieweeId
+    );
+    if ('error' in result) return apiError(res, result.error, result.status);
+    return apiSuccess(res, result.data);
+  })
+);
+
+router.get(
   '/mine',
   requireRole('QA_JUNIOR_CLOSER', 'QA_CLOSER'),
   asyncHandler(async (req, res) => {

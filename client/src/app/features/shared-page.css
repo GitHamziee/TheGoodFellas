@@ -2185,3 +2185,91 @@ a.feed-row--link:hover { background: var(--gold-50); }
 @media (max-width: 900px) {
   .split { grid-template-columns: 1fr; }
 }
+
+/* ---------- QA reports: weekly column chart, deltas, issue feed ---------- */
+.trend {
+  display: flex;
+  align-items: stretch;
+  gap: 0.6rem;
+  height: 11rem;
+  padding-top: 0.25rem;
+}
+
+.trend--sm { height: 8rem; }
+
+.trend-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  border-radius: var(--radius-sm);
+}
+
+.trend-col:hover { background: var(--gray-50); }
+
+.trend-plot {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.trend-stack {
+  width: 100%;
+  max-width: 2.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 2px;
+}
+
+.trend-seg { display: block; width: 100%; }
+.trend-seg--good { background: var(--chart-good); border-radius: 0 0 3px 3px; }
+.trend-seg--bad  { background: var(--chart-bad);  border-radius: 3px 3px 0 0; }
+
+.trend-val { font-size: 0.74rem; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; min-height: 1em; }
+.trend-rate { font-size: 0.68rem; color: var(--gray-500); min-height: 1em; font-variant-numeric: tabular-nums; }
+.trend-lbl { font-size: 0.68rem; color: var(--gray-500); white-space: nowrap; }
+
+.delta { font-size: 0.78rem; font-weight: 600; color: var(--gray-500); white-space: nowrap; }
+.delta--up { color: var(--success-700); }
+.delta--down { color: var(--danger-700); }
+
+.muted { color: var(--gray-500); font-size: 0.8rem; }
+.why { max-width: 26rem; font-size: 0.84rem; line-height: 1.4; }
+.stale { color: var(--danger-700); font-weight: 700; }
+.reason-text { font-size: 0.85rem; line-height: 1.4; }
+
+.issue-feed { display: flex; flex-direction: column; gap: 0.9rem; }
+.issue-row { display: flex; gap: 0.65rem; align-items: flex-start; }
+.issue-row--btn {
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.issue-row--btn:hover { background: var(--gray-50); }
+.issue-body { flex: 1; min-width: 0; }
+.issue-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
+.issue-meta { font-size: 0.72rem; color: var(--gray-500); white-space: nowrap; }
+.issue-comment { margin: 0.2rem 0 0.3rem; font-size: 0.84rem; color: var(--text); line-height: 1.45; }
+
+.link-btn {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--gold-800);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.link-btn:hover { text-decoration: underline; }
