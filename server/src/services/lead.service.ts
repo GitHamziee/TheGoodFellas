@@ -121,6 +121,18 @@ const TEAM_LEAD_SELECT = {
   closer: { select: { id: true, name: true } },
 } as const;
 
+// Manager oversees Closer + Retention leads only; Junior-Closer-originated leads belong to
+// Team Lead. The split is by origin: a lead a Junior Closer started always has juniorCloserId
+// set, while a Closer's self-/AI-sourced lead and every Retention lead never does.
+type AdminViewer = 'ADMIN' | 'MANAGER';
+const managerScope = (viewer?: AdminViewer) => (viewer === 'MANAGER' ? { juniorCloserId: null } : {});
+
+/** True when every given lead is one a MANAGER may act on (non-existent ids pass; the action 404s). */
+export async function leadsInManagerScope(leadIds: string[]): Promise<boolean> {
+  const outOfScope = await prisma.lead.count({ where: { id: { in: leadIds }, juniorCloserId: { not: null } } });
+  return outOfScope === 0;
+}
+
 // Client preview for an ASSIGNED-but-not-yet-accepted lead — enough to decide accept/reject,
 // none of the sensitive underwriting/financial/identity fields (SSN, bank/routing, DOB, etc.).
 const CLIENT_PREVIEW_SELECT = {
@@ -134,6 +146,20 @@ const CLIENT_PREVIEW_SELECT = {
   createdAt: true,
   updatedAt: true,
   closer: { select: { id: true, name: true } },
+} as const;
+
+// Retention team's shared history list — just the columns the table shows. Details of a
+// submitted lead are for Clients only, so nothing beyond these is ever sent.
+const RETENTION_HISTORY_SELECT = {
+  id: true,
+  customerName: true,
+  phone: true,
+  state: true,
+  carrierName: true,
+  status: true,
+  createdAt: true,
+  updatedAt: true,
+  retention: { select: { id: true, name: true } },
 } as const;
 
 // ─── Junior Closer ──────────────────────────────────────────────
@@ -271,9 +297,9 @@ export async function listDraftsForCloser(closerId: string) {
 }
 
 /** Every closer's parked drafts, not just one — Admin's oversight view. Full detail, same as listAllLeadsForAdmin. */
-export async function listDraftsForAdmin() {
+export async function listDraftsForAdmin(viewer?: AdminViewer) {
   return prisma.lead.findMany({
-    where: { status: 'DRAFT' },
+    where: { status: 'DRAFT', ...managerScope(viewer) },
     include: FULL_INCLUDE,
     orderBy: { updatedAt: 'desc' },
   });
@@ -722,9 +748,9 @@ export async function batchMarkPaid(
   return { data: { count: eligibleIds.length } };
 }
 
-export async function listQueueForAdmin() {
+export async function listQueueForAdmin(viewer?: AdminViewer) {
   return prisma.lead.findMany({
-    where: { status: { in: ['SUBMITTED', 'REJECTED'] } },
+    where: { status: { in: ['SUBMITTED', 'REJECTED'] }, ...managerScope(viewer) },
     include: FULL_INCLUDE,
     orderBy: { updatedAt: 'desc' },
   });
@@ -755,9 +781,17 @@ export async function markLeadChargedBack(
   }
   if (!lead.clientId) return { error: 'Lead has no client on record', status: 400 };
 
+  const pkr = Math.trunc(amountNum);
+
   await prisma.$transaction([
     prisma.chargeBack.create({
-      data: { leadId, clientId: lead.clientId, pkrAmount: Math.trunc(amountNum), reason: reason.trim() },
+      data: { leadId, clientId: lead.clientId, pkrAmount: pkr, reason: reason.trim() },
+    }),
+    // Mirror the chargeback into the Expenses ledger as a negative entry so the books
+    // reflect it without a second manual step. Expense has no edit/link by design, so the
+    // description carries the lead + reason.
+    prisma.expense.create({
+      data: { description: `Charge-back: ${lead.customerName} — ${reason.trim()}`, amount: -pkr },
     }),
     prisma.lead.updateMany({
       where: { id: leadId, status: 'ACCEPTED', paymentStatus: 'PAID' },
@@ -769,39 +803,90 @@ export async function markLeadChargedBack(
   return { data: { lead: result } };
 }
 
+/**
+ * Batch counterpart of markLeadChargedBack, mirroring batchMarkPaid: one PKR total and
+ * one reason for however many selected leads are actually eligible (ACCEPTED + PAID with
+ * a client on record — ineligible ids are silently skipped). The total is split evenly
+ * across the leads (remainder on the first) so per-lead ChargeBack rows still sum to what
+ * the admin entered; the Expenses ledger gets a single negative entry for the batch.
+ */
+export async function batchChargeBack(
+  leadIds: unknown,
+  pkrAmount: unknown,
+  reason: unknown
+): Promise<ServiceResult<{ count: number }>> {
+  if (!Array.isArray(leadIds) || leadIds.length === 0 || !leadIds.every((id) => typeof id === 'string')) {
+    return { error: 'Select at least one lead', status: 400 };
+  }
+  if (!isNonEmptyString(reason)) return { error: 'A reason is required', status: 400 };
+
+  const amountNum = typeof pkrAmount === 'number' ? pkrAmount : typeof pkrAmount === 'string' ? Number(pkrAmount) : NaN;
+  if (!Number.isFinite(amountNum) || amountNum <= 0) return { error: 'Enter the PKR amount charged back', status: 400 };
+
+  const eligible = await prisma.lead.findMany({
+    where: { id: { in: leadIds }, status: 'ACCEPTED', paymentStatus: 'PAID', clientId: { not: null } },
+    select: { id: true, clientId: true, customerName: true },
+  });
+  if (eligible.length === 0) return { error: 'None of the selected leads can be charged back', status: 400 };
+
+  const total = Math.trunc(amountNum);
+  const share = Math.floor(total / eligible.length);
+  const remainder = total - share * eligible.length;
+  const trimmedReason = reason.trim();
+  const names = eligible.map((l) => l.customerName).join(', ');
+
+  await prisma.$transaction([
+    ...eligible.map((l, i) =>
+      prisma.chargeBack.create({
+        data: { leadId: l.id, clientId: l.clientId!, pkrAmount: share + (i === 0 ? remainder : 0), reason: trimmedReason },
+      })
+    ),
+    prisma.expense.create({
+      data: { description: `Charge-back: ${names} — ${trimmedReason}`, amount: -total },
+    }),
+    prisma.lead.updateMany({
+      where: { id: { in: eligible.map((l) => l.id) }, status: 'ACCEPTED', paymentStatus: 'PAID' },
+      data: { status: 'CHARGED_BACK', clientId: null, paymentStatus: 'UNPAID', closedAt: null },
+    }),
+  ]);
+
+  return { data: { count: eligible.length } };
+}
+
 /** Charged-back leads waiting to be reassigned to a different client/external client. */
-export async function listChargeBacksForAdmin() {
+export async function listChargeBacksForAdmin(viewer?: AdminViewer) {
   return prisma.lead.findMany({
-    where: { status: 'CHARGED_BACK' },
+    where: { status: 'CHARGED_BACK', ...managerScope(viewer) },
     include: FULL_INCLUDE,
     orderBy: { updatedAt: 'desc' },
   });
 }
 
-export async function listAllLeadsForAdmin() {
+export async function listAllLeadsForAdmin(viewer?: AdminViewer) {
   return prisma.lead.findMany({
+    where: managerScope(viewer),
     include: FULL_INCLUDE,
     orderBy: { updatedAt: 'desc' },
   });
 }
 
 /** All CPL leads, any status — the dedicated Admin "CPL Leads" page filters client-side. */
-export async function listCplLeadsForAdmin() {
+export async function listCplLeadsForAdmin(viewer?: AdminViewer) {
   return prisma.lead.findMany({
-    where: { leadType: 'CPL' },
+    where: { leadType: 'CPL', ...managerScope(viewer) },
     include: FULL_INCLUDE,
     orderBy: { updatedAt: 'desc' },
   });
 }
 
 // ─── Team Lead ──────────────────────────────────────────────────
-/** Submitted leads, masked — Team Lead's read-only oversight of Junior Closers' work.
- * Scoped to leads a Junior Closer actually originated (juniorCloserId set) — a Closer's
- * own self-/AI-sourced lead (no Junior Closer involved) falls outside what this role
- * oversees, same cutoff QA_JUNIOR_CLOSER uses in getLeadById below. */
-export async function listSubmittedForTeamLead() {
+/** Every Junior-Closer-originated lead, any status, masked — Team Lead's read-only oversight
+ * of Junior Closers' work. Scoped to leads a Junior Closer actually originated
+ * (juniorCloserId set) — a Closer's own self-/AI-sourced lead (no Junior Closer involved)
+ * falls outside what this role oversees, same cutoff QA_JUNIOR_CLOSER uses in getLeadById. */
+export async function listLeadsForTeamLead() {
   return prisma.lead.findMany({
-    where: { status: 'SUBMITTED', juniorCloserId: { not: null } },
+    where: { juniorCloserId: { not: null } },
     select: TEAM_LEAD_SELECT,
     orderBy: { updatedAt: 'desc' },
   });
@@ -958,17 +1043,16 @@ export async function saveRetentionLeadAsDraft(
 /**
  * Leads the Retention team has already worked past the queue (submitted, assigned,
  * accepted, rejected, etc.) — shared team history, not scoped to the caller, same
- * "any teammate can see it" philosophy as listRetentionQueue above. Money fields
- * (coverage amount, monthly premium) are stripped: Retention's job ends at submitting
- * a clean lead to admin, and what a client ends up paying isn't theirs to see.
+ * "any teammate can see it" philosophy as listRetentionQueue above. Workers never
+ * see a submitted lead's details — only the list-row fields in RETENTION_HISTORY_SELECT.
  */
 export async function listRetentionHistory() {
   const leads = await prisma.lead.findMany({
     where: { leadType: 'RETENTION', retentionId: { not: null }, status: { notIn: ['NEW', 'DRAFT'] } },
-    include: FULL_INCLUDE,
+    select: RETENTION_HISTORY_SELECT,
     orderBy: { updatedAt: 'desc' },
   });
-  return leads.map((lead) => ({ ...lead, coverageAmount: null, monthlyPremiums: null }));
+  return leads;
 }
 
 // ─── QA ─────────────────────────────────────────────────────────
@@ -1174,8 +1258,10 @@ export async function getLeadById(leadId: string, requester: Requester): Promise
   const lead = await prisma.lead.findUnique({ where: { id: leadId } });
   if (!lead) return { error: 'Lead not found', status: 404 };
 
-  // MANAGER gets the same full, unmasked view ADMIN does — the exclusions on that role
+  // MANAGER gets the same full, unmasked view ADMIN does, but only of Closer/Retention leads
+  // (Junior-Closer-originated leads are Team Lead's); the other exclusions on that role
   // (Clients/Team/External Clients/Expenses) are page-level, not lead-detail masking.
+  if (requester.role === 'MANAGER' && lead.juniorCloserId) return { error: 'Forbidden', status: 403 };
   if (requester.role === 'ADMIN' || requester.role === 'MANAGER') {
     return { data: { lead: await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE }) } };
   }
@@ -1201,10 +1287,9 @@ export async function getLeadById(leadId: string, requester: Requester): Promise
   }
 
   if (requester.role === 'TEAM_LEAD') {
-    // Read-only oversight of Junior Closers' submitted work — same masking and
-    // juniorCloserId scope as the list endpoint, and only while it's actually sitting
-    // there (not once it's moved on).
-    if (lead.status !== 'SUBMITTED' || !lead.juniorCloserId) return { error: 'Forbidden', status: 403 };
+    // Read-only oversight of Junior Closers' work — same masking and juniorCloserId
+    // scope as the list endpoint, any status.
+    if (!lead.juniorCloserId) return { error: 'Forbidden', status: 403 };
     const masked = await prisma.lead.findUnique({ where: { id: leadId }, select: TEAM_LEAD_SELECT });
     return { data: { lead: masked } };
   }

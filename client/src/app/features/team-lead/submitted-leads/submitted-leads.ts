@@ -13,7 +13,8 @@ import {
   timeAgo,
 } from '../../../core/format-utils';
 import { Modal } from '../../../shared/ui/modal';
-import { Detail, EmptyState, Pagination, SearchBox, SkeletonRows, StatTile } from '../../../shared/ui/ui';
+import { Detail, EmptyState, Pagination, SearchBox, SkeletonRows, StatTile, StatusBadge } from '../../../shared/ui/ui';
+import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 
 type DateRange = '' | 'day' | 'week' | 'month';
 
@@ -23,6 +24,7 @@ type DateRange = '' | 'day' | 'week' | 'month';
     Modal,
     Detail,
     StatTile,
+    StatusBadge,
     SearchBox,
     Pagination,
     EmptyState,
@@ -34,6 +36,7 @@ type DateRange = '' | 'day' | 'week' | 'month';
   templateUrl: './submitted-leads.html',
 })
 export class TeamLeadSubmittedLeads implements OnInit {
+  private readonly liveReload = reloadOnChange(() => this.ngOnInit());
   private readonly leadService = inject(LeadService);
 
   readonly leads = signal<TeamLeadLeadRow[]>([]);
@@ -98,11 +101,11 @@ export class TeamLeadSubmittedLeads implements OnInit {
   });
 
   async ngOnInit(): Promise<void> {
-    this.loading.set(true);
+    if (!isSilentReload()) this.loading.set(true);
     try {
       this.leads.set(await this.leadService.teamLeadSubmitted());
     } catch {
-      this.error.set('Could not load submitted leads. Refresh to try again.');
+      this.error.set('Could not load leads. Refresh to try again.');
     } finally {
       this.loading.set(false);
     }

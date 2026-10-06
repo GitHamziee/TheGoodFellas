@@ -21,6 +21,24 @@ router.post(
 
 router.use(authenticate);
 
+// A MANAGER may only act on Closer/Retention leads — Junior-Closer-originated leads are Team
+// Lead's. Covers every admin mutation that targets a lead by :id or by a batch of leadIds.
+router.use(
+  asyncHandler(async (req, res, next) => {
+    if (req.user!.role !== 'MANAGER' || req.method === 'GET') return next();
+    const ids: unknown[] = [];
+    if (typeof req.params.id === 'string') ids.push(req.params.id);
+    const m = req.path.match(/^\/(?:retention\/)?([^/]+)\//);
+    if (m && m[1] !== 'batch-payment') ids.push(m[1]);
+    if (Array.isArray(req.body?.leadIds)) ids.push(...req.body.leadIds);
+    const strings = ids.filter((id): id is string => typeof id === 'string');
+    if (strings.length && !(await leadService.leadsInManagerScope(strings))) {
+      return apiError(res, 'Forbidden', 403);
+    }
+    return next();
+  })
+);
+
 // ─── Junior Closer ──────────────────────────────────────────────
 router.post(
   '/',
@@ -164,8 +182,8 @@ router.post(
 router.get(
   '/queue',
   requireRole('ADMIN', 'MANAGER'),
-  asyncHandler(async (_req, res) => {
-    const leads = await leadService.listQueueForAdmin();
+  asyncHandler(async (req, res) => {
+    const leads = await leadService.listQueueForAdmin(req.user!.role as 'ADMIN' | 'MANAGER');
     return apiSuccess(res, { leads });
   })
 );
@@ -173,8 +191,8 @@ router.get(
 router.get(
   '/all',
   requireRole('ADMIN', 'MANAGER'),
-  asyncHandler(async (_req, res) => {
-    const leads = await leadService.listAllLeadsForAdmin();
+  asyncHandler(async (req, res) => {
+    const leads = await leadService.listAllLeadsForAdmin(req.user!.role as 'ADMIN' | 'MANAGER');
     return apiSuccess(res, { leads });
   })
 );
@@ -182,8 +200,8 @@ router.get(
 router.get(
   '/charge-backs',
   requireRole('ADMIN', 'MANAGER'),
-  asyncHandler(async (_req, res) => {
-    const leads = await leadService.listChargeBacksForAdmin();
+  asyncHandler(async (req, res) => {
+    const leads = await leadService.listChargeBacksForAdmin(req.user!.role as 'ADMIN' | 'MANAGER');
     return apiSuccess(res, { leads });
   })
 );
@@ -191,8 +209,8 @@ router.get(
 router.get(
   '/cpl',
   requireRole('ADMIN', 'MANAGER'),
-  asyncHandler(async (_req, res) => {
-    const leads = await leadService.listCplLeadsForAdmin();
+  asyncHandler(async (req, res) => {
+    const leads = await leadService.listCplLeadsForAdmin(req.user!.role as 'ADMIN' | 'MANAGER');
     return apiSuccess(res, { leads });
   })
 );
@@ -201,8 +219,8 @@ router.get(
 router.get(
   '/admin/drafts',
   requireRole('ADMIN', 'MANAGER'),
-  asyncHandler(async (_req, res) => {
-    const leads = await leadService.listDraftsForAdmin();
+  asyncHandler(async (req, res) => {
+    const leads = await leadService.listDraftsForAdmin(req.user!.role as 'ADMIN' | 'MANAGER');
     return apiSuccess(res, { leads });
   })
 );
@@ -265,6 +283,17 @@ router.patch(
     const result = await leadService.batchMarkPaid(leadIds, pkrAmount, note);
     if ('error' in result) return apiError(res, result.error, result.status);
     return apiSuccess(res, result.data, 'Leads marked paid');
+  })
+);
+
+router.patch(
+  '/batch-charge-back',
+  requireRole('ADMIN', 'MANAGER'),
+  asyncHandler(async (req, res) => {
+    const { leadIds, pkrAmount, reason } = req.body ?? {};
+    const result = await leadService.batchChargeBack(leadIds, pkrAmount, reason);
+    if ('error' in result) return apiError(res, result.error, result.status);
+    return apiSuccess(res, result.data, 'Leads marked charged back');
   })
 );
 
@@ -401,10 +430,10 @@ router.get(
 
 // ─── Team Lead ──────────────────────────────────────────────────
 router.get(
-  '/team-lead/submitted',
+  '/team-lead/leads',
   requireRole('TEAM_LEAD'),
   asyncHandler(async (_req, res) => {
-    const leads = await leadService.listSubmittedForTeamLead();
+    const leads = await leadService.listLeadsForTeamLead();
     return apiSuccess(res, { leads });
   })
 );
