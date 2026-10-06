@@ -282,6 +282,14 @@ export class LeadService {
     return res.data;
   }
 
+  /** Charges back many ACCEPTED + PAID leads at once — one PKR total and one reason for the batch. */
+  async batchChargeBack(leadIds: string[], pkrAmount: number, reason: string): Promise<{ count: number }> {
+    const res = await firstValueFrom(
+      this.http.patch<ApiSuccess<{ count: number }>>(`${BASE}/batch-charge-back`, { leadIds, pkrAmount, reason })
+    );
+    return res.data;
+  }
+
   // ─── Client ─────────────────────────────────────────────────
   /** "New Leads" page — ASSIGNED, masked preview until accepted. */
   async assignedPreviews(): Promise<Lead[]> {
@@ -309,7 +317,7 @@ export class LeadService {
   /** Masked, read-only view of the admin's SUBMITTED queue. */
   async teamLeadSubmitted(): Promise<TeamLeadLeadRow[]> {
     const res = await firstValueFrom(
-      this.http.get<ApiSuccess<{ leads: TeamLeadLeadRow[] }>>(`${BASE}/team-lead/submitted`)
+      this.http.get<ApiSuccess<{ leads: TeamLeadLeadRow[] }>>(`${BASE}/team-lead/leads`)
     );
     return res.data.leads;
   }
@@ -335,14 +343,6 @@ export class LeadService {
       this.http.patch<ApiSuccess<{ lead: Lead }>>(`${BASE}/retention/${id}/assign`, { retentionId })
     );
     return res.data.lead;
-  }
-
-  /** Every RETENTION lead, any status — the dedicated "Retention Leads" reporting page,
-   *  same pattern as cplLeads() below. retentionUnassigned() above is the intake triage
-   *  inbox; this is the full pipeline view. */
-  async retentionAllLeads(): Promise<Lead[]> {
-    const res = await firstValueFrom(this.http.get<ApiSuccess<{ leads: Lead[] }>>(`${BASE}/retention/all`));
-    return res.data.leads;
   }
 
   // ─── Retention ────────────────────────────────────────────────

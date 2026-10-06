@@ -1,4 +1,4 @@
-import { Routes } from '@angular/router';
+﻿import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
 import { roleGuard } from './core/guards/role.guard';
 
@@ -141,11 +141,7 @@ export const routes: Routes = [
         path: 'retention',
         loadComponent: () => import('./features/admin/retention/retention').then((m) => m.AdminRetention),
       },
-      {
-        path: 'retention-leads',
-        loadComponent: () =>
-          import('./features/admin/retention-leads/retention-leads').then((m) => m.AdminRetentionLeads),
-      },
+      { path: 'retention-leads', redirectTo: 'leads', pathMatch: 'full' },
       {
         path: 'cpl-leads',
         loadComponent: () => import('./features/admin/cpl-leads/cpl-leads').then((m) => m.AdminCplLeads),
@@ -268,11 +264,7 @@ export const routes: Routes = [
         path: 'retention',
         loadComponent: () => import('./features/admin/retention/retention').then((m) => m.AdminRetention),
       },
-      {
-        path: 'retention-leads',
-        loadComponent: () =>
-          import('./features/admin/retention-leads/retention-leads').then((m) => m.AdminRetentionLeads),
-      },
+      { path: 'retention-leads', redirectTo: 'leads', pathMatch: 'full' },
       {
         path: 'cpl-leads',
         loadComponent: () => import('./features/admin/cpl-leads/cpl-leads').then((m) => m.AdminCplLeads),

@@ -1,8 +1,8 @@
 <div class="page">
   <div class="page-head">
     <div>
-      <h1>CPA Leads</h1>
-      <p class="sub">The full CPA pipeline — Junior → Closer → Admin → Client. CPL (live-transfer) leads live on their own page.</p>
+      <h1>CPA &amp; Retention Leads</h1>
+      <p class="sub">CPA (Junior → Closer → Admin → Client) and Retention (AI-sourced) leads in one pipeline — same assignment and payment flow. Use the source filter to narrow. CPL (live-transfer) leads live on their own page.</p>
     </div>
   </div>
 
@@ -33,7 +33,7 @@
     </app-stat-tile>
   </div>
 
-  @if (error() && !batchModalOpen() && !chargeBackLead()) {
+  @if (error() && !batchModalOpen() && !chargeBackModalOpen()) {
     <div class="error">{{ error() }}</div>
   }
   @if (notice()) {
@@ -45,8 +45,21 @@
       <span><strong>{{ selectedCount() }}</strong> lead{{ selectedCount() === 1 ? '' : 's' }} selected</span>
       <div class="row-actions">
         <button type="button" class="btn btn--sm btn--ghost" (click)="clearSelection()">Clear</button>
-        <button type="button" class="btn btn--sm btn--success" (click)="openBatchModal()">
-          <svg lucideBanknote></svg> Mark Paid
+        <button
+          type="button"
+          class="btn btn--sm btn--success"
+          [disabled]="payableSelectedCount() === 0"
+          (click)="openBatchModal()"
+        >
+          <svg lucideBanknote></svg> Mark Paid ({{ payableSelectedCount() }})
+        </button>
+        <button
+          type="button"
+          class="btn btn--sm btn--danger"
+          [disabled]="chargeableSelectedCount() === 0"
+          (click)="openChargeBackModal()"
+        >
+          <svg lucideBanknoteX></svg> Charge Back ({{ chargeableSelectedCount() }})
         </button>
       </div>
     </div>
@@ -57,6 +70,13 @@
       [value]="view.search()"
       placeholder="Search name, phone, state, or person…"
       (valueChange)="view.setSearch($event)"
+    />
+
+    <app-select
+      [options]="sourceOptions"
+      [ngModel]="sourceFilter()"
+      (ngModelChange)="setSourceFilter($event)"
+      ariaLabel="Filter by source"
     />
 
     <app-select
@@ -90,7 +110,7 @@
           <svg lucideFileText></svg>
         </app-empty-state>
       } @else {
-        <app-empty-state title="No CPA leads yet" hint="Leads appear here once junior closers start submitting them.">
+        <app-empty-state title="No leads yet" hint="Leads appear here once junior closers or retention start submitting them.">
           <svg lucideFileText></svg>
         </app-empty-state>
       }
@@ -110,7 +130,7 @@
               <th class="sortable" (click)="view.toggleSort('customerName')">
                 Customer <span class="arrow">{{ sortArrow('customerName') }}</span>
               </th>
-              <th class="hide-sm">Closer</th>
+              <th class="hide-sm">Closer / Retention</th>
               <th class="hide-md">Client</th>
               <th class="sortable" (click)="view.toggleSort('status')">
                 Status <span class="arrow">{{ sortArrow('status') }}</span>
@@ -129,17 +149,33 @@
                   <input
                     type="checkbox"
                     [checked]="isSelected(lead)"
-                    [disabled]="!isEligibleForBatchPaid(lead)"
+                    [disabled]="!isSelectable(lead)"
                     (change)="toggleSelect(lead, $event)"
                     [attr.aria-label]="'Select ' + lead.customerName"
                   />
                 </td>
                 <td>
-                  <div class="cell-main">{{ lead.customerName }}</div>
+                  <div class="cell-main">
+                    {{ lead.customerName }}
+                    @if (lead.leadType === 'RETENTION') {
+                      <span class="chip"><svg lucideHeadset></svg>Retention</span>
+                    }
+                  </div>
                   <div class="cell-sub">{{ formatPhone(lead.phone) }} · {{ lead.state }}</div>
                 </td>
                 <td class="hide-sm">
-                  @if (lead.closer) {
+                  @if (lead.leadType === 'RETENTION') {
+                    @if (lead.retention) {
+                      <div class="person">
+                        <span class="avatar-sm" [class]="getAvatarTone(lead.retention.id)">
+                          {{ getInitials(lead.retention.name) }}
+                        </span>
+                        <span class="nm">{{ lead.retention.name }}</span>
+                      </div>
+                    } @else {
+                      <span class="empty">Unassigned</span>
+                    }
+                  } @else if (lead.closer) {
                     <div class="person">
                       <span class="avatar-sm" [class]="getAvatarTone(lead.closer.id)">
                         {{ getInitials(lead.closer.name) }}
@@ -182,16 +218,23 @@
                 </td>
                 <td (click)="$event.stopPropagation()">
                   <div class="row-actions">
-                    @if (lead.status === 'SUBMITTED' || lead.status === 'REJECTED') {
-                      <button
-                        type="button"
-                        class="btn btn--sm btn--icon btn--ghost"
-                        title="Send back"
-                        aria-label="Send back"
-                        (click)="openReturn(lead, $event)"
-                      >
-                        <svg lucideUndo2></svg>
+                    @if (lead.leadType === 'RETENTION' && lead.status === 'NEW') {
+                      <button type="button" class="btn btn--sm" (click)="openAssignRetention(lead, $event)">
+                        <svg lucideHeadset></svg> {{ lead.retention ? 'Reassign' : 'Assign' }}
                       </button>
+                    }
+                    @if (lead.status === 'SUBMITTED' || lead.status === 'REJECTED') {
+                      @if (lead.leadType !== 'RETENTION') {
+                        <button
+                          type="button"
+                          class="btn btn--sm btn--icon btn--ghost"
+                          title="Send back"
+                          aria-label="Send back"
+                          (click)="openReturn(lead, $event)"
+                        >
+                          <svg lucideUndo2></svg>
+                        </button>
+                      }
                       <button
                         type="button"
                         class="btn btn--sm btn--icon btn--ghost"
@@ -227,7 +270,7 @@
                         Approve
                       </button>
                     }
-                    @if (lead.status !== 'SUBMITTED' && lead.status !== 'REJECTED' && lead.status !== 'ASSIGNED') {
+                    @if (lead.status !== 'SUBMITTED' && lead.status !== 'REJECTED' && lead.status !== 'ASSIGNED' && !(lead.leadType === 'RETENTION' && lead.status === 'NEW')) {
                       <span class="empty">—</span>
                     }
                   </div>
@@ -258,10 +301,17 @@
     <app-lead-detail [lead]="lead" [unmasked]="true" />
 
     <div footer>
-      @if (lead.status === 'SUBMITTED' || lead.status === 'REJECTED') {
-        <button type="button" class="btn btn--ghost" (click)="selected.set(null); openReturn(lead)">
-          <svg lucideUndo2></svg> Send back
+      @if (lead.leadType === 'RETENTION' && lead.status === 'NEW') {
+        <button type="button" class="btn" (click)="selected.set(null); openAssignRetention(lead)">
+          <svg lucideHeadset></svg> {{ lead.retention ? 'Reassign' : 'Assign to retention' }}
         </button>
+      }
+      @if (lead.status === 'SUBMITTED' || lead.status === 'REJECTED') {
+        @if (lead.leadType !== 'RETENTION') {
+          <button type="button" class="btn btn--ghost" (click)="selected.set(null); openReturn(lead)">
+            <svg lucideUndo2></svg> Send back
+          </button>
+        }
         <button type="button" class="btn btn--ghost" (click)="selected.set(null); openAssignExternal(lead)">
           <svg lucideBuilding2></svg> Assign to external
         </button>
@@ -285,11 +335,6 @@
       }
       @if (lead.status === 'ACCEPTED' || lead.status === 'ASSIGNED_EXTERNAL') {
         @if (lead.paymentStatus === 'PAID') {
-          @if (lead.status === 'ACCEPTED') {
-            <button type="button" class="btn btn--danger" (click)="openChargeBack(lead, $event)">
-              <svg lucideBanknoteX></svg> Charge back
-            </button>
-          }
           <button
             type="button"
             class="btn btn--ghost"
@@ -387,6 +432,64 @@
           <span class="spinner"></span> Sending…
         } @else {
           <svg lucideUndo2></svg> Send back
+        }
+      </button>
+    </div>
+  </app-modal>
+}
+
+<!-- Assign to retention person -->
+@if (assignRetentionLead(); as lead) {
+  <app-modal
+    title="Assign to retention"
+    [subtitle]="'Choose who works ' + lead.customerName"
+    (close)="assignRetentionLead.set(null)"
+  >
+    @if (error()) {
+      <div class="error">{{ error() }}</div>
+    }
+
+    <app-search-box
+      [value]="retentionSearch()"
+      placeholder="Search retention staff by name or email…"
+      (valueChange)="retentionSearch.set($event)"
+    />
+
+    <div class="pick-list">
+      @for (person of filteredRetentionPeople(); track person.id) {
+        <button
+          type="button"
+          class="pick-row"
+          [class.chosen]="chosenRetentionId() === person.id"
+          (click)="chosenRetentionId.set(person.id)"
+        >
+          <span class="avatar-sm" [class]="getAvatarTone(person.id)">{{ getInitials(person.name) }}</span>
+          <span class="who">
+            <span class="cell-main">{{ person.name }}</span>
+            <span class="cell-sub">{{ person.email }}</span>
+          </span>
+          @if (chosenRetentionId() === person.id) {
+            <svg lucideCircleCheck class="tick"></svg>
+          }
+        </button>
+      } @empty {
+        <app-empty-state title="No retention staff match" hint="Clear the search to see everyone.">
+          <svg lucideHeadset></svg>
+        </app-empty-state>
+      }
+    </div>
+
+    <div footer>
+      <button
+        type="button"
+        class="btn"
+        [disabled]="!chosenRetentionId() || busyId() === lead.id"
+        (click)="confirmAssignRetention()"
+      >
+        @if (busyId() === lead.id) {
+          <span class="spinner"></span> Assigning…
+        } @else {
+          <svg lucideHeadset></svg> Confirm assignment
         }
       </button>
     </div>
@@ -509,15 +612,19 @@
   </app-modal>
 }
 
-@if (chargeBackLead(); as lead) {
-  <app-modal title="Charge back this lead" [subtitle]="lead.customerName" (close)="closeChargeBackModal()">
+@if (chargeBackModalOpen()) {
+  <app-modal
+    title="Charge back leads"
+    [subtitle]="chargeableSelectedCount() + ' lead' + (chargeableSelectedCount() === 1 ? '' : 's') + ' selected'"
+    (close)="closeChargeBackModal()"
+  >
     @if (error()) {
       <div class="error">{{ error() }}</div>
     }
 
     <div class="form-grid">
       <label>
-        PKR clawed back <span class="hint">Amount charged back</span>
+        PKR clawed back <span class="hint">Total for this batch</span>
         <input type="number" min="0" [(ngModel)]="chargeBackPkrAmount" name="chargeBackPkrAmount" placeholder="0" />
       </label>
       <label class="full">

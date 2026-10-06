@@ -8,6 +8,7 @@ import {
   LucideCircleX,
   LucideClock,
   LucideFileText,
+  LucideHeadset,
   LucideInbox,
   LucideLayers,
   LucideSend,
@@ -34,6 +35,7 @@ import {
 } from '../../../shared/ui/ui';
 import { Select } from '../../../shared/ui/select';
 import { LeadDetail } from '../../../shared/lead-detail';
+import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 
 const STATUS_FILTERS: { label: string; value: string }[] = [
   { label: 'All', value: '' },
@@ -42,6 +44,7 @@ const STATUS_FILTERS: { label: string; value: string }[] = [
   { label: 'Assigned', value: 'ASSIGNED' },
   { label: 'Accepted', value: 'ACCEPTED' },
   { label: 'Rejected', value: 'REJECTED' },
+  { label: 'Sent back', value: 'RETURNED_TO_RETENTION' },
   { label: 'Assigned (External)', value: 'ASSIGNED_EXTERNAL' },
   { label: 'Charged Back', value: 'CHARGED_BACK' },
 ];
@@ -79,10 +82,12 @@ interface LookupUser {
     LucideUndo2,
     LucideBuilding2,
     LucideUserCheck,
+    LucideHeadset,
   ],
   templateUrl: './leads.html',
 })
 export class AdminLeads implements OnInit {
+  private readonly liveReload = reloadOnChange(() => this.refresh());
   private readonly leadService = inject(LeadService);
   private readonly userService = inject(UserService);
   private readonly externalClientService = inject(ExternalClientService);
@@ -96,6 +101,11 @@ export class AdminLeads implements OnInit {
   readonly notice = signal<string | null>(null);
   readonly selected = signal<Lead | null>(null);
   readonly closerFilter = signal('');
+  readonly sourceFilter = signal('');
+  readonly retentionPeople = signal<LookupUser[]>([]);
+  readonly assignRetentionLead = signal<Lead | null>(null);
+  readonly retentionSearch = signal('');
+  readonly chosenRetentionId = signal('');
 
   /** Which lead each queue-style modal is acting on — only one is ever open at a time. */
   readonly assignLead = signal<Lead | null>(null);
@@ -126,7 +136,7 @@ export class AdminLeads implements OnInit {
   batchNote = '';
 
   /** Lead being charged back — single-record action, mirrors the batch "Mark Paid" modal. */
-  readonly chargeBackLead = signal<Lead | null>(null);
+  readonly chargeBackModalOpen = signal(false);
   readonly chargeBackSubmitting = signal(false);
   chargeBackPkrAmount: number | null = null;
   chargeBackReason = '';
@@ -145,19 +155,29 @@ export class AdminLeads implements OnInit {
     ...this.closers().map((c) => ({ value: c.id, label: c.name })),
   ]);
 
-  /** This page is the CPA counterpart to the dedicated CPL Leads page — CPL leads never
-   * appear here, same way they never appear mixed into any other CPA-only view. */
-  private readonly cpaLeads = computed(() => this.leads().filter((l) => l.leadType === 'CPA'));
+  /** CPA and Retention leads share this page (same admin actions, same payment flow). CPL
+   * leads stay on their own page. */
+  private readonly cpaLeads = computed(() =>
+    this.leads().filter((l) => l.leadType === 'CPA' || l.leadType === 'RETENTION'),
+  );
+
+  readonly sourceOptions = [
+    { value: '', label: 'All sources' },
+    { value: 'CPA', label: 'CPA' },
+    { value: 'RETENTION', label: 'Retention' },
+  ];
 
   private readonly byCloser = computed(() => {
     const closerId = this.closerFilter();
-    const rows = this.cpaLeads();
+    const source = this.sourceFilter();
+    let rows = this.cpaLeads();
+    if (source) rows = rows.filter((l) => l.leadType === source);
     return closerId ? rows.filter((l) => l.closer?.id === closerId) : rows;
   });
 
   readonly view = createListView<Lead>({
     source: this.byCloser,
-    searchFields: (l) => [l.customerName, l.phone, l.state, l.closer?.name, l.client?.name, l.externalClient?.name, l.juniorCloser?.name],
+    searchFields: (l) => [l.customerName, l.phone, l.state, l.closer?.name, l.client?.name, l.externalClient?.name, l.juniorCloser?.name, l.retention?.name],
     statusOf: (l) => l.status,
     sorters: {
       customerName: (l) => l.customerName,
@@ -192,8 +212,17 @@ export class AdminLeads implements OnInit {
     const counts: Record<string, number> = { '': rows.length };
     for (const filter of STATUS_FILTERS) counts[filter.value] = 0;
     counts[''] = rows.length;
-    for (const lead of rows) counts[lead.status] += 1;
+    for (const lead of rows) counts[lead.status] = (counts[lead.status] ?? 0) + 1;
     return counts;
+  });
+
+  /** Retention-staff dropdown, narrowed by the search box inside the assign-retention modal. */
+  readonly filteredRetentionPeople = computed(() => {
+    const term = this.retentionSearch().trim().toLowerCase();
+    if (!term) return this.retentionPeople();
+    return this.retentionPeople().filter(
+      (p) => p.name.toLowerCase().includes(term) || p.email.toLowerCase().includes(term),
+    );
   });
 
   readonly selectedCount = computed(() => this.selectedIds().size);
@@ -203,13 +232,33 @@ export class AdminLeads implements OnInit {
     return lead.paymentStatus === 'UNPAID' && (lead.status === 'ACCEPTED' || lead.status === 'ASSIGNED_EXTERNAL');
   }
 
+  /** Only ACCEPTED + PAID leads can be batch-charged back. */
+  isEligibleForBatchChargeBack(lead: Lead): boolean {
+    return lead.paymentStatus === 'PAID' && lead.status === 'ACCEPTED';
+  }
+
+  /** A row is selectable if either batch action (Mark Paid / Charge Back) applies to it. */
+  isSelectable(lead: Lead): boolean {
+    return this.isEligibleForBatchPaid(lead) || this.isEligibleForBatchChargeBack(lead);
+  }
+
+  private selectedLeads(): Lead[] {
+    const ids = this.selectedIds();
+    return this.leads().filter((l) => ids.has(l.id));
+  }
+
+  readonly payableSelectedCount = computed(() => this.selectedLeads().filter((l) => this.isEligibleForBatchPaid(l)).length);
+  readonly chargeableSelectedCount = computed(
+    () => this.selectedLeads().filter((l) => this.isEligibleForBatchChargeBack(l)).length,
+  );
+
   isSelected(lead: Lead): boolean {
     return this.selectedIds().has(lead.id);
   }
 
   toggleSelect(lead: Lead, event: Event): void {
     event.stopPropagation();
-    if (!this.isEligibleForBatchPaid(lead)) return;
+    if (!this.isSelectable(lead)) return;
     this.selectedIds.update((ids) => {
       const next = new Set(ids);
       if (next.has(lead.id)) next.delete(lead.id);
@@ -220,12 +269,12 @@ export class AdminLeads implements OnInit {
 
   /** Header checkbox — true only when every eligible row on the current page is selected. */
   readonly allVisibleEligibleSelected = computed(() => {
-    const eligible = this.view.rows().filter((l) => this.isEligibleForBatchPaid(l));
+    const eligible = this.view.rows().filter((l) => this.isSelectable(l));
     return eligible.length > 0 && eligible.every((l) => this.selectedIds().has(l.id));
   });
 
   toggleSelectAllVisible(): void {
-    const eligible = this.view.rows().filter((l) => this.isEligibleForBatchPaid(l));
+    const eligible = this.view.rows().filter((l) => this.isSelectable(l));
     const allSelected = this.allVisibleEligibleSelected();
     this.selectedIds.update((ids) => {
       const next = new Set(ids);
@@ -263,17 +312,53 @@ export class AdminLeads implements OnInit {
   });
 
   async ngOnInit(): Promise<void> {
-    const [clients, externalClients] = await Promise.all([
+    const [clients, externalClients, retentionPeople] = await Promise.all([
       this.userService.listClients(),
       this.externalClientService.list(),
+      this.userService.listRetention(),
       this.refresh(),
     ]);
     this.clients.set(clients);
     this.externalClients.set(externalClients);
+    this.retentionPeople.set(retentionPeople);
+  }
+
+  setSourceFilter(value: string): void {
+    this.sourceFilter.set(value);
+    this.view.page.set(1);
+  }
+
+  // ─── Assign to retention person (unworked retention leads only) ──
+  openAssignRetention(lead: Lead, event?: Event): void {
+    event?.stopPropagation();
+    this.error.set(null);
+    this.retentionSearch.set('');
+    this.chosenRetentionId.set(lead.retention?.id ?? '');
+    this.assignRetentionLead.set(lead);
+  }
+
+  async confirmAssignRetention(): Promise<void> {
+    const lead = this.assignRetentionLead();
+    const retentionId = this.chosenRetentionId();
+    if (!lead || !retentionId) return;
+
+    this.error.set(null);
+    this.busyId.set(lead.id);
+    try {
+      const updated = await this.leadService.assignRetention(lead.id, retentionId);
+      this.leads.update((rows) => rows.map((l) => (l.id === lead.id ? updated : l)));
+      if (this.selected()?.id === lead.id) this.selected.set(updated);
+      this.assignRetentionLead.set(null);
+      this.notice.set(`${lead.customerName} assigned to ${updated.retention?.name ?? 'retention'}.`);
+    } catch (err: any) {
+      this.error.set(err?.error?.error ?? 'Could not assign the lead.');
+    } finally {
+      this.busyId.set(null);
+    }
   }
 
   async refresh(): Promise<void> {
-    this.loading.set(true);
+    if (!isSilentReload()) this.loading.set(true);
     try {
       this.leads.set(await this.leadService.allLeads());
     } catch {
@@ -424,7 +509,7 @@ export class AdminLeads implements OnInit {
   }
 
   openBatchModal(): void {
-    if (this.selectedCount() === 0) return;
+    if (this.payableSelectedCount() === 0) return;
     this.error.set(null);
     this.batchPkrAmount = null;
     this.batchNote = '';
@@ -444,7 +529,7 @@ export class AdminLeads implements OnInit {
     this.error.set(null);
     this.batchSubmitting.set(true);
     try {
-      const leadIds = [...this.selectedIds()];
+      const leadIds = this.selectedLeads().filter((l) => this.isEligibleForBatchPaid(l)).map((l) => l.id);
       const { count } = await this.leadService.batchMarkPaid(leadIds, this.batchPkrAmount, this.batchNote.trim() || undefined);
       await this.refresh();
       this.clearSelection();
@@ -458,26 +543,23 @@ export class AdminLeads implements OnInit {
   }
 
   /**
-   * Opens the charge-back modal for an ACCEPTED + PAID lead. Marking a lead charged back
-   * is deliberately not a quick toggle — it requires the PKR amount clawed back and a
-   * reason, same reasoning as why marking a lead PAID requires going through the batch
-   * modal above.
+   * Opens the batch charge-back modal for the selected ACCEPTED + PAID leads. Like Mark
+   * Paid, it's a batch action that requires the PKR amount (one total for the batch) plus
+   * a reason — never a quick toggle.
    */
-  openChargeBack(lead: Lead, event?: Event): void {
-    event?.stopPropagation();
+  openChargeBackModal(): void {
+    if (this.chargeableSelectedCount() === 0) return;
     this.error.set(null);
     this.chargeBackPkrAmount = null;
     this.chargeBackReason = '';
-    this.chargeBackLead.set(lead);
+    this.chargeBackModalOpen.set(true);
   }
 
   closeChargeBackModal(): void {
-    this.chargeBackLead.set(null);
+    this.chargeBackModalOpen.set(false);
   }
 
   async confirmChargeBack(): Promise<void> {
-    const lead = this.chargeBackLead();
-    if (!lead) return;
     if (!this.chargeBackPkrAmount || this.chargeBackPkrAmount <= 0) {
       this.error.set('Enter the PKR amount charged back.');
       return;
@@ -490,13 +572,15 @@ export class AdminLeads implements OnInit {
     this.error.set(null);
     this.chargeBackSubmitting.set(true);
     try {
-      const updated = await this.leadService.chargeBackLead(lead.id, this.chargeBackPkrAmount, this.chargeBackReason.trim());
-      this.leads.update((rows) => rows.map((l) => (l.id === lead.id ? updated : l)));
-      if (this.selected()?.id === lead.id) this.selected.set(updated);
-      this.chargeBackLead.set(null);
-      this.notice.set(`${lead.customerName} marked charged back — ${formatPkr(this.chargeBackPkrAmount)} recorded.`);
+      const leadIds = this.selectedLeads().filter((l) => this.isEligibleForBatchChargeBack(l)).map((l) => l.id);
+      const { count } = await this.leadService.batchChargeBack(leadIds, this.chargeBackPkrAmount, this.chargeBackReason.trim());
+      const amount = this.chargeBackPkrAmount;
+      await this.refresh();
+      this.clearSelection();
+      this.chargeBackModalOpen.set(false);
+      this.notice.set(`Charged back ${count} lead${count === 1 ? '' : 's'} — ${formatPkr(amount)} recorded.`);
     } catch (err: any) {
-      this.error.set(err?.error?.error ?? 'Could not mark this lead charged back.');
+      this.error.set(err?.error?.error ?? 'Could not charge back these leads.');
     } finally {
       this.chargeBackSubmitting.set(false);
     }

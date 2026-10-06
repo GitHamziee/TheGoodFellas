@@ -1,4 +1,4 @@
-import { Role } from './models/user.model';
+﻿import { Role } from './models/user.model';
 
 export type NavIcon =
   | 'dashboard'
@@ -59,12 +59,11 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
     { label: 'External Clients', path: '/admin/external-clients', icon: 'building' },
     { label: 'State Sheet', path: '/admin/state-sheet', icon: 'states' },
     { label: 'Queue', path: '/admin/queue', icon: 'queue' },
-    { label: 'CPA Leads', path: '/admin/leads', icon: 'leads' },
+    { label: 'CPA & Retention Leads', path: '/admin/leads', icon: 'leads' },
     { label: 'CPL Leads', path: '/admin/cpl-leads', icon: 'cpl' },
     { label: 'Drafts', path: '/admin/drafts', icon: 'drafts' },
     { label: 'Charge Backs', path: '/admin/charge-backs', icon: 'chargeback' },
     { label: 'Retention Imports', path: '/admin/retention', icon: 'inbox' },
-    { label: 'Retention Leads', path: '/admin/retention-leads', icon: 'headset' },
     { label: 'Expenses', path: '/admin/expenses', icon: 'expenses' },
     {
       label: 'Analytics',
@@ -103,12 +102,11 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
     { label: 'Dashboard', path: '/manager/dashboard', icon: 'dashboard' },
     { label: 'State Sheet', path: '/manager/state-sheet', icon: 'states' },
     { label: 'Queue', path: '/manager/queue', icon: 'queue' },
-    { label: 'CPA Leads', path: '/manager/leads', icon: 'leads' },
+    { label: 'CPA & Retention Leads', path: '/manager/leads', icon: 'leads' },
     { label: 'CPL Leads', path: '/manager/cpl-leads', icon: 'cpl' },
     { label: 'Drafts', path: '/manager/drafts', icon: 'drafts' },
     { label: 'Charge Backs', path: '/manager/charge-backs', icon: 'chargeback' },
     { label: 'Retention Imports', path: '/manager/retention', icon: 'inbox' },
-    { label: 'Retention Leads', path: '/manager/retention-leads', icon: 'headset' },
     {
       label: 'Analytics',
       path: '/manager/analytics',
@@ -146,7 +144,7 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
   // sees anything Closer-scoped (State Sheet, Closer analytics/QA) on this nav.
   TEAM_LEAD: [
     { label: 'Dashboard', path: '/team-lead/dashboard', icon: 'dashboard' },
-    { label: 'Submitted Leads', path: '/team-lead/submitted-leads', icon: 'queue' },
+    { label: 'Junior Closer Leads', path: '/team-lead/submitted-leads', icon: 'queue' },
     { label: 'Analytics', path: '/team-lead/analytics/junior-closers', icon: 'analytics' },
     {
       label: 'QA Reports',
