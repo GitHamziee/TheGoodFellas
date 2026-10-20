@@ -76,7 +76,7 @@ export class AuthService {
       case 'QA_CLOSER':
         return '/qa-closer/review-queue';
       case 'RETENTION':
-        return '/retention/queue';
+        return '/retention/leads';
       case 'MANAGER':
         return '/manager/dashboard';
     }

@@ -1,52 +1,128 @@
 /** Shared display formatting. Mirrors R4Referral's lib/format-utils.ts conventions. */
 
-/** "Today" / "Yesterday" / "5d ago" / "3mo ago" / "2y ago" */
-export function timeAgo(dateStr: string | null | undefined): string {
-  if (!dateStr) return '—';
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const days = Math.floor(diff / 86400000);
-  if (days <= 0) return 'Today';
-  if (days === 1) return 'Yesterday';
-  if (days < 30) return `${days}d ago`;
-  const months = Math.floor(days / 30);
-  if (months < 12) return `${months}mo ago`;
-  return `${Math.floor(months / 12)}y ago`;
+/** Every date/time in the app is shown and bucketed in US Pacific time (PST/PDT), whatever the
+ * viewer's own timezone is. Never use the bare local-time Date getters for display or day maths. */
+export const APP_TIME_ZONE = 'America/Los_Angeles';
+
+const PARTS_FORMAT = new Intl.DateTimeFormat('en-US', {
+  timeZone: APP_TIME_ZONE,
+  year: 'numeric',
+  month: 'numeric',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: 'numeric',
+  second: 'numeric',
+  weekday: 'short',
+  hourCycle: 'h23',
+});
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+export interface PacificParts {
+  year: number;
+  month: number; // 1-12
+  day: number;
+  hour: number;
+  minute: number;
+  weekday: number; // 0 = Sunday
 }
 
-/** "Mar 9, 2026" */
+/** Calendar fields of an instant as read on a Pacific-time wall clock. */
+export function pacificParts(date: Date | string | number = new Date()): PacificParts {
+  const out: Record<string, string> = {};
+  for (const p of PARTS_FORMAT.formatToParts(new Date(date))) out[p.type] = p.value;
+  return {
+    year: Number(out['year']),
+    month: Number(out['month']),
+    day: Number(out['day']),
+    hour: Number(out['hour']),
+    minute: Number(out['minute']),
+    weekday: WEEKDAYS.indexOf(out['weekday']),
+  };
+}
+
+/** The instant (epoch ms) at which the Pacific wall clock reads 00:00 on the given calendar day.
+ * Month/day may overflow (e.g. day 0 or -3) — they are normalised like `Date.UTC`. */
+export function pacificStartOfDay(year: number, month: number, day: number): number {
+  const wall = Date.UTC(year, month - 1, day);
+  let guess = wall;
+  for (let i = 0; i < 2; i++) {
+    const p = pacificParts(guess);
+    const seen = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute);
+    guess += wall - seen;
+  }
+  return guess;
+}
+
+/** Midnight (Pacific) at the start of today. */
+export function pacificToday(now: Date = new Date()): number {
+  const p = pacificParts(now);
+  return pacificStartOfDay(p.year, p.month, p.day);
+}
+
+/** Midnight (Pacific) of the Monday that starts the current week. */
+export function pacificWeekStart(now: Date = new Date()): number {
+  const p = pacificParts(now);
+  return pacificStartOfDay(p.year, p.month, p.day - ((p.weekday + 6) % 7));
+}
+
+/** yyyy-MM-dd of an instant, read in Pacific time. */
+export function pacificIsoDate(date: Date | string | number = new Date()): string {
+  const p = pacificParts(date);
+  return `${p.year}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}`;
+}
+
+/** A date-only value (a DOB, a draft date) is stored as UTC midnight. Showing it in Pacific time
+ * would slip it back a day, so those are read as plain calendar dates instead. */
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}(T00:00:00(\.0+)?Z?)?$/;
+
+function pad(n: number): string {
+  return String(n).padStart(2, '0');
+}
+
+/** US numeric date, "03/09/2026". */
 export function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
+  if (DATE_ONLY.test(dateStr)) return `${dateStr.slice(5, 7)}/${dateStr.slice(8, 10)}/${dateStr.slice(0, 4)}`;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '—';
+  const p = pacificParts(d);
+  return `${pad(p.month)}/${pad(p.day)}/${p.year}`;
 }
 
-/** "Mar 9, 2026, 02:30 PM" */
+/** Submitted/updated stamps show the actual US date rather than a relative "5d ago". */
+export function timeAgo(dateStr: string | null | undefined): string {
+  return formatDate(dateStr);
+}
+
+/** "03/09/2026, 02:30 PM PST" — Pacific time. */
 export function formatDateTime(dateStr: string | null | undefined): string {
   if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: '2-digit',
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '—';
+  return `${formatDate(dateStr)}, ${formatTime(d)}`;
+}
+
+/** "2:30 PM PST" — Pacific time, with the zone label so PST vs PDT is never ambiguous. */
+export function formatTime(date: Date | string | number): string {
+  return new Date(date).toLocaleTimeString('en-US', {
+    timeZone: APP_TIME_ZONE,
+    hour: 'numeric',
     minute: '2-digit',
+    timeZoneName: 'short',
   });
 }
 
 /** ISO date for a date input's value. */
 export function toDateInput(dateStr: string | null | undefined): string {
   if (!dateStr) return '';
+  if (DATE_ONLY.test(dateStr)) return dateStr.slice(0, 10);
   const d = new Date(dateStr);
-  return isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
+  return isNaN(d.getTime()) ? '' : pacificIsoDate(d);
 }
 
-/** Today in the yyyy-MM-dd shape a `<input type="date">` min/max expects. Native date
- * inputs have no digit limit on the year segment without one — leave it unset and Chrome
- * lets you keep typing past 4 digits (e.g. a year of "221465"). */
+/** Today (Pacific) in the yyyy-MM-dd shape a date field's min/max expects. */
 export function todayDateInput(): string {
-  return new Date().toISOString().slice(0, 10);
+  return pacificIsoDate();
 }
 
 /** Strips non-digit characters and caps length as you type — for SSN/routing/account/card
@@ -63,17 +139,15 @@ export function formatCardExpiry(value: string): string {
   return `${digits.slice(0, 2)}/${digits.slice(2)}`;
 }
 
-/** Whole years between a date of birth and today — undefined if the dob is missing/invalid. */
+/** Whole years between a date of birth and today (Pacific) — undefined if the dob is missing/invalid. */
 export function calculateAge(dob: string | null | undefined): number | undefined {
   if (!dob) return undefined;
-  const birth = new Date(dob);
-  if (isNaN(birth.getTime())) return undefined;
-  const today = new Date();
-  let age = today.getFullYear() - birth.getFullYear();
-  const hadBirthdayThisYear =
-    today.getMonth() > birth.getMonth() ||
-    (today.getMonth() === birth.getMonth() && today.getDate() >= birth.getDate());
-  if (!hadBirthdayThisYear) age--;
+  const iso = toDateInput(dob);
+  if (!iso) return undefined;
+  const [by, bm, bd] = iso.split('-').map(Number);
+  const today = pacificParts();
+  let age = today.year - by;
+  if (today.month < bm || (today.month === bm && today.day < bd)) age--;
   return age >= 0 ? age : undefined;
 }
 
@@ -118,10 +192,29 @@ export function humanizeEnum(value: string | null | undefined): string {
   return lower.charAt(0).toUpperCase() + lower.slice(1);
 }
 
+/** Formats digits as "555-234-567" while typing; capped at `maxDigits` (9, or 10 for Retention). */
+export function formatPhoneInput(value: string, maxDigits = 9): string {
+  const digits = value.replace(/\D/g, '').slice(0, maxDigits);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
+/** Same rule the server enforces: exactly 9 digits — or 10 for Retention (`maxDigits` = 10, 9 still accepted). */
+export function isValidUsPhone(value: string | null | undefined, maxDigits = 9): boolean {
+  const len = (value ?? '').replace(/\D/g, '').length;
+  return len === 9 || (maxDigits === 10 && len === 10);
+}
+
+/** Zipcode: exactly 5 digits. */
+export function isValidZip(value: string | null | undefined): boolean {
+  return /^\d{5}$/.test((value ?? '').trim());
+}
+
 export function formatPhone(phone: string | null | undefined): string {
   if (!phone) return '—';
   const digits = phone.replace(/\D/g, '');
-  if (digits.length === 10) return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  if (digits.length === 9 || digits.length === 10) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
   return phone;
 }
 
@@ -168,30 +261,47 @@ export function orDash(value: string | number | null | undefined): string {
   return String(value);
 }
 
-/** True when the date falls on the current calendar day. */
+/** True when the date falls on the current calendar day (Pacific). */
 export function isToday(dateStr: string): boolean {
-  const d = new Date(dateStr);
-  const now = new Date();
-  return (
-    d.getDate() === now.getDate() &&
-    d.getMonth() === now.getMonth() &&
-    d.getFullYear() === now.getFullYear()
-  );
+  const t = new Date(dateStr).getTime();
+  const start = pacificToday();
+  return t >= start && t < pacificStartOfDay(...ymd(start, 1));
 }
 
-/** True when the date falls within the current calendar week (Sunday–Saturday). */
+/** True when the date falls within the current calendar week (Pacific, Sunday–Saturday). */
 export function isThisWeek(dateStr: string): boolean {
-  const d = new Date(dateStr);
-  const now = new Date();
-  const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
-  const endOfWeek = new Date(startOfWeek);
-  endOfWeek.setDate(startOfWeek.getDate() + 7);
-  return d >= startOfWeek && d < endOfWeek;
+  const t = new Date(dateStr).getTime();
+  const now = pacificParts();
+  const start = pacificStartOfDay(now.year, now.month, now.day - now.weekday);
+  return t >= start && t < pacificStartOfDay(now.year, now.month, now.day - now.weekday + 7);
 }
 
-/** True when the date falls in the current calendar month. */
+/** True when the date falls in the current calendar month (Pacific). */
 export function isThisMonth(dateStr: string): boolean {
-  const d = new Date(dateStr);
-  const now = new Date();
-  return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  const a = pacificParts(dateStr);
+  const b = pacificParts();
+  return a.month === b.month && a.year === b.year;
+}
+
+/** [year, month, day + offset] of an instant read in Pacific time. */
+function ymd(instant: number, dayOffset: number): [number, number, number] {
+  const p = pacificParts(instant);
+  return [p.year, p.month, p.day + dayOffset];
+}
+
+/**
+ * How a Junior Closer's submission reads from their side. A CPA lead is "Approved" once it has
+ * reached the admin; a CPL lead skips the Closer, so it only counts as accepted when the
+ * Client actually accepts it. A CPL still in flight shows as SUBMITTED.
+ */
+export function juniorOutcome(l: { status: string; leadType?: string }): 'ACCEPTED' | 'RETURNED_TO_JUNIOR' | 'PENDING' {
+  if (l.status === 'RETURNED_TO_JUNIOR') return 'RETURNED_TO_JUNIOR';
+  if (l.leadType === 'CPL') return l.status === 'ACCEPTED' ? 'ACCEPTED' : 'PENDING';
+  return ['NEW', 'DRAFT'].includes(l.status) ? 'PENDING' : 'ACCEPTED';
+}
+
+/** % of QA-reviewed leads that passed; null until QA has reviewed at least one. */
+export function qaPassRate(rows: { qaReviews?: { outcome: 'PASS' | 'FAIL' }[] }[]): number | null {
+  const verdicts = rows.flatMap((l) => l.qaReviews ?? []);
+  return verdicts.length ? Math.round((verdicts.filter((v) => v.outcome === 'PASS').length / verdicts.length) * 100) : null;
 }

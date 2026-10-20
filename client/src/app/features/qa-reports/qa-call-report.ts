@@ -11,6 +11,7 @@ import { EmptyState, Pagination, SearchBox, SkeletonRows, StatTile } from '../..
 import { QaLeadPeek } from './qa-lead-peek';
 import { RANGE_PILLS, RangeKey, bucketIndex, inRange, lastWeeks } from './qa-stats';
 import { reloadOnChange } from '../../core/live-reload';
+import { DateInput } from '../../shared/ui/date-input';
 
 type Tab = 'overview' | 'log' | 'reviewers';
 
@@ -45,7 +46,7 @@ const REPEAT_THRESHOLD = 3;
  */
 @Component({
   selector: 'app-qa-call-report',
-  imports: [
+  imports: [DateInput, 
     FormsModule,
     Modal,
     Select,

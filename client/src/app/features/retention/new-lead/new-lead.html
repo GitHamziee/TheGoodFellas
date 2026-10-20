@@ -35,7 +35,7 @@
         </label>
         <label>
           Phone number <span class="req">Required</span>
-          <input type="tel" name="phone" [(ngModel)]="form.phone"
+          <input appPhone [maxDigits]="10" name="phone" [(ngModel)]="form.phone"
             [class.invalid]="showErrors() && !form.phone" />
           @if (showErrors() && !form.phone) {
             <span class="field-error">Enter a contact number.</span>
@@ -43,22 +43,21 @@
         </label>
         <label>
           State <span class="req">Required</span>
-          <input type="text" name="state" [(ngModel)]="form.state"
-            [class.invalid]="showErrors() && !form.state" />
+          <app-select [options]="stateOptions" [searchable]="true" name="state" [(ngModel)]="form.state" [invalid]="showErrors() && !form.state" />
           @if (showErrors() && !form.state) {
             <span class="field-error">Enter the customer's state.</span>
           }
         </label>
         <label>
           Zipcode
-          <input type="text" name="zipcode" [(ngModel)]="form.zipcode" />
+          <input appZip name="zipcode" [(ngModel)]="form.zipcode" />
         </label>
         <label class="full">
           Mailing address
           <input type="text" name="mailingAddress" [(ngModel)]="form.mailingAddress" />
         </label>
         <label>
-          Email <span class="hint">Optional</span>
+          <span>Email <span class="hint">Optional</span></span>
           <input type="email" name="email" [(ngModel)]="form.email" />
         </label>
         <label>
@@ -68,7 +67,7 @@
         </label>
         <label>
           Birth state
-          <input type="text" name="birthState" [(ngModel)]="form.birthState" />
+          <app-select [options]="stateOptions" [searchable]="true" name="birthState" [(ngModel)]="form.birthState" />
         </label>
         <label>
           Gender
@@ -77,7 +76,7 @@
         </label>
         <label>
           Date of birth
-          <input type="date" name="dob" [min]="minDob" [max]="todayIso" [ngModel]="form.dob" (ngModelChange)="onDobChange($event)" />
+          <app-date-input name="dob" [min]="minDob" [max]="todayIso" [ngModel]="form.dob" (ngModelChange)="onDobChange($event)"></app-date-input>
         </label>
         <label>
           Age
@@ -94,7 +93,7 @@
           <input type="text" name="dlStateId" [(ngModel)]="form.dlStateId" />
         </label>
         <label>
-          Yearly income <span class="hint">Whole dollars</span>
+          <span>Yearly income <span class="hint">Whole dollars</span></span>
           <input type="number" name="yearlyIncome" min="0" [(ngModel)]="form.yearlyIncome" />
         </label>
       </div>
@@ -128,7 +127,7 @@
           </label>
         }
         <label>
-          Annual income <span class="hint">Whole dollars</span>
+          <span>Annual income <span class="hint">Whole dollars</span></span>
           <input type="number" name="annualIncome" min="0" [(ngModel)]="form.annualIncome" />
         </label>
       </div>
@@ -143,7 +142,7 @@
           <input type="text" name="height" placeholder="e.g. 5'10&quot;" [(ngModel)]="form.height" />
         </label>
         <label>
-          Weight <span class="hint">Pounds</span>
+          <span>Weight <span class="hint">Pounds</span></span>
           <input type="number" name="weight" min="0" [(ngModel)]="form.weight" />
         </label>
         <label>
@@ -180,7 +179,7 @@
         </label>
         <label>
           Beneficiary date of birth
-          <input type="date" name="beneficiaryDob" [min]="minDob" [max]="todayIso" [(ngModel)]="form.beneficiaryDob" />
+          <app-date-input name="beneficiaryDob" [min]="minDob" [max]="todayIso" [(ngModel)]="form.beneficiaryDob"></app-date-input>
         </label>
       </div>
     </div>
@@ -204,15 +203,15 @@
             (ngModelChange)="form.suggestedClientId = $event; touch()" placeholder="No suggestion…" />
         </label>
         <label>
-          Coverage amount <span class="hint">Whole dollars</span>
+          <span>Coverage amount <span class="hint">Whole dollars</span></span>
           <input type="number" name="coverageAmount" min="0" [(ngModel)]="form.coverageAmount" />
         </label>
         <label>
-          Monthly premium <span class="hint">Whole dollars</span>
+          <span>Monthly premium <span class="hint">Whole dollars</span></span>
           <input type="number" name="monthlyPremiums" min="0" [(ngModel)]="form.monthlyPremiums" />
         </label>
         <label>
-          Annual premium <span class="hint">Monthly × 12, calculated</span>
+          <span>Annual premium <span class="hint">Monthly × 12, calculated</span></span>
           <input type="number" name="annualPremium" [value]="annualPremium() ?? ''" readonly tabindex="-1" />
         </label>
       </div>
@@ -224,11 +223,11 @@
       <div class="form-grid">
         <label>
           Initial draft date
-          <input type="date" name="initialDraftDate" min="2000-01-01" max="2100-12-31" [(ngModel)]="form.initialDraftDate" />
+          <app-date-input name="initialDraftDate" min="2000-01-01" max="2100-12-31" [(ngModel)]="form.initialDraftDate"></app-date-input>
         </label>
         <label>
           Future draft date
-          <input type="date" name="futureDraftDate" min="2000-01-01" max="2100-12-31" [(ngModel)]="form.futureDraftDate" />
+          <app-date-input name="futureDraftDate" min="2000-01-01" max="2100-12-31" [(ngModel)]="form.futureDraftDate"></app-date-input>
         </label>
         <label class="full">
           Who is paying?
@@ -277,7 +276,7 @@
             </label>
             <label>
               Account opening state
-              <input type="text" name="accountOpeningState" [(ngModel)]="form.accountOpeningState" />
+              <app-select [options]="stateOptions" [searchable]="true" name="accountOpeningState" [(ngModel)]="form.accountOpeningState" />
             </label>
             <label>
               Routing number
@@ -330,7 +329,7 @@
     <div class="section">
       <h2 class="section-title"><svg lucideNotebookPen></svg> Notes for the admin team</h2>
       <label>
-        Anything worth flagging <span class="hint">Optional</span>
+        <span>Anything worth flagging <span class="hint">Optional</span></span>
         <textarea name="closerNotes" rows="4" [(ngModel)]="form.closerNotes"></textarea>
       </label>
     </div>

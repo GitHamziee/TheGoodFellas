@@ -6,7 +6,7 @@ import { LeadStatus, PaymentStatus } from '../../core/models/lead.model';
 @Component({
   selector: 'app-stat-tile',
   template: `
-    <div class="stat">
+    <div class="stat" [attr.data-tone]="tone()">
       <div class="ico" [class]="tone()"><ng-content /></div>
       <div>
         <div class="value">{{ value() }}</div>
@@ -19,6 +19,41 @@ export class StatTile {
   readonly value = input<string | number>(0);
   readonly label = input('');
   readonly tone = input('tone-gold');
+}
+
+/**
+ * Dark page banner with a soft tinted glow — the admin pages' equivalent of the client dashboard hero.
+ * The eyebrow icon is projected (`<svg lucideX>`); anything else projected becomes the action buttons.
+ * `tone` only shifts the glow/accent hue so each section of the portal feels distinct.
+ */
+@Component({
+  selector: 'app-page-hero',
+  template: `
+    <section class="phero" [class.bare]="!eyebrow()" [attr.data-tone]="tone()">
+      <div class="phero-copy">
+        <span class="phero-eyebrow"><ng-content select="svg" /> {{ eyebrow() }}</span>
+        <h1>{{ title() }}</h1>
+        @if (sub()) {
+          <p>{{ sub() }}</p>
+        }
+        <div class="phero-actions"><ng-content /></div>
+      </div>
+      @if (count() !== null) {
+        <div class="phero-count" aria-hidden="true">
+          <span class="n">{{ count() }}</span>
+          <span class="l">{{ countLabel() }}</span>
+        </div>
+      }
+    </section>
+  `,
+})
+export class PageHero {
+  readonly eyebrow = input('');
+  readonly title = input.required<string>();
+  readonly sub = input('');
+  readonly count = input<string | number | null>(null);
+  readonly countLabel = input('');
+  readonly tone = input<'gold' | 'bronze' | 'steel' | 'moss' | 'clay' | 'teal' | 'green' | 'red'>('gold');
 }
 
 /** Placeholder shown when a list has no rows. Icon is projected. */
@@ -122,8 +157,8 @@ const STATUS_LABEL: Record<LeadStatus, string> = {
   NEW: 'New',
   SUBMITTED: 'Submitted',
   ASSIGNED: 'Assigned',
-  ACCEPTED: 'Accepted',
-  REJECTED: 'Rejected',
+  ACCEPTED: 'Approved',
+  REJECTED: 'Declined',
   RETURNED_TO_JUNIOR: 'Sent back — Junior',
   RETURNED_TO_CLOSER: 'Sent back — Closer',
   RETURNED_TO_RETENTION: 'Sent back — Retention',

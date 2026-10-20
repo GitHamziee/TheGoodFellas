@@ -4,23 +4,23 @@ import { AnalyticsService, ClosePlanRow } from '../../../core/services/analytics
 import { PlanType } from '../../../core/models/lead.model';
 import { PLAN_TYPE_LABEL, PLAN_TYPE_OPTIONS } from '../../../core/lead-options';
 import { formatMoney, getAvatarTone, getInitials } from '../../../core/format-utils';
-import { EmptyState, SkeletonRows, StatTile } from '../../../shared/ui/ui';
+import { PageHero, EmptyState, SkeletonRows, StatTile } from '../../../shared/ui/ui';
 import { reloadOnChange } from '../../../core/live-reload';
 
 @Component({
   selector: 'app-analytics-client',
-  imports: [StatTile, EmptyState, SkeletonRows, LucideLayers, LucideBanknote],
+  imports: [PageHero, StatTile, EmptyState, SkeletonRows, LucideLayers, LucideBanknote],
   template: `
-    <div class="page-head">
-      <div>
-        <h2>Sales by plan</h2>
-        <p class="sub">
-          Expected revenue ($) from accepted leads — count × that client's cost for the plan. Handed-off
-          external-client leads aren't included (no pricing exists for those). Not a record of money
-          actually collected; see the Expenses page for that.
-        </p>
-      </div>
-    </div>
+    <app-page-hero
+      eyebrow="Analytics"
+      title="Sales by plan"
+      sub="Expected revenue ($) from approved leads — count × that client's cost for the plan. Handed-off external-client leads aren't included (no pricing exists for those). Not a record of money actually collected; see the Expenses page for that."
+      tone="teal"
+      [count]="loading() ? '–' : formatMoney(totalRevenue())"
+      countLabel="expected revenue"
+    >
+      <svg lucideBanknote></svg>
+    </app-page-hero>
 
     @if (!loading()) {
       <div class="stats-row">
@@ -36,7 +36,7 @@ import { reloadOnChange } from '../../../core/live-reload';
       @if (loading()) {
         <app-skeleton-rows [count]="5" />
       } @else if (rows().length === 0) {
-        <app-empty-state title="Nothing sold yet" hint="Once a client's leads are accepted, their plan breakdown shows up here.">
+        <app-empty-state title="Nothing sold yet" hint="Once a client's leads are approved, their plan breakdown shows up here.">
           <svg lucideLayers></svg>
         </app-empty-state>
       } @else {
@@ -105,6 +105,8 @@ export class AnalyticsClient implements OnInit {
       revenue: rows.reduce((sum, r) => sum + (r.plans.find((p) => p.planType === planType)?.revenue ?? 0), 0),
     })) as { planType: PlanType; count: number; revenue: number }[];
   });
+
+  readonly totalRevenue = computed(() => this.planTotals().reduce((sum, p) => sum + p.revenue, 0));
 
   async ngOnInit(): Promise<void> {
     try {

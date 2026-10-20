@@ -7,15 +7,10 @@ import {
   LeadHistoryRow,
   LeadInboxPreview,
   LeadIntakeEdit,
-  LeadPreview,
   TeamLeadLeadRow,
 } from '../models/lead.model';
 import { LeadReviewRow, QaCloserLeadRow, QaJuniorLeadRow, ReviewOutcome } from '../models/review.model';
-
-interface ApiSuccess<T> {
-  data: T;
-  message?: string;
-}
+import type { ApiSuccess } from '../api';
 
 const BASE = `${API_BASE_URL}/leads`;
 
@@ -258,11 +253,13 @@ export class LeadService {
     return res.data.lead;
   }
 
-  /** Admin override of the client's own accept step — records a decision made over the
-   *  phone instead of waiting for the client to log in and accept it themselves. */
-  async approveLead(id: string): Promise<Lead> {
-    const res = await firstValueFrom(this.http.patch<ApiSuccess<{ lead: Lead }>>(`${BASE}/${id}/approve`, {}));
-    return res.data.lead;
+  /** Admin override of the client's own approve/decline step, for many leads at once — records
+   *  a decision made over the phone. Works for client-assigned and external-assigned leads. */
+  async batchDecide(leadIds: string[], decision: 'ACCEPT' | 'REJECT', reason?: string): Promise<{ count: number }> {
+    const res = await firstValueFrom(
+      this.http.patch<ApiSuccess<{ count: number }>>(`${BASE}/batch-decision`, { leadIds, decision, reason })
+    );
+    return res.data;
   }
 
   /** Reverts a mistaken PAID back to UNPAID. Marking a lead PAID only happens via batchMarkPaid,
@@ -303,6 +300,11 @@ export class LeadService {
     return res.data.leads;
   }
 
+  async clientEditLead(id: string, input: AdminLeadEditInput): Promise<Lead> {
+    const res = await firstValueFrom(this.http.patch<ApiSuccess<{ lead: Lead }>>(`${BASE}/${id}/client-edit`, input));
+    return res.data.lead;
+  }
+
   async acceptLead(id: string): Promise<Lead> {
     const res = await firstValueFrom(this.http.patch<ApiSuccess<{ lead: Lead }>>(`${BASE}/${id}/accept`, {}));
     return res.data.lead;
@@ -332,6 +334,14 @@ export class LeadService {
 
   // ─── Admin: Retention imports ─────────────────────────────────
   /** Form-submitted leads not yet handed to a Retention person. */
+  /** Admin: pull new leads from the Google Sheet right now (it also syncs on its own timer). */
+  async syncRetentionSheet(): Promise<{ imported: number; alreadyImported: number; invalid: { row: number; reason: string }[] }> {
+    const res = await firstValueFrom(
+      this.http.post<ApiSuccess<{ imported: number; alreadyImported: number; invalid: { row: number; reason: string }[] }>>(`${BASE}/retention/sync`, {})
+    );
+    return res.data;
+  }
+
   async retentionUnassigned(): Promise<Lead[]> {
     const res = await firstValueFrom(this.http.get<ApiSuccess<{ leads: Lead[] }>>(`${BASE}/retention/unassigned`));
     return res.data.leads;
@@ -343,6 +353,14 @@ export class LeadService {
       this.http.patch<ApiSuccess<{ lead: Lead }>>(`${BASE}/retention/${id}/assign`, { retentionId })
     );
     return res.data.lead;
+  }
+
+  /** Hands many unworked retention leads to one person; ineligible ids are skipped server-side. */
+  async batchAssignRetention(leadIds: string[], retentionId: string): Promise<{ count: number }> {
+    const res = await firstValueFrom(
+      this.http.patch<ApiSuccess<{ count: number }>>(`${BASE}/retention/batch-assign`, { leadIds, retentionId })
+    );
+    return res.data;
   }
 
   // ─── Retention ────────────────────────────────────────────────

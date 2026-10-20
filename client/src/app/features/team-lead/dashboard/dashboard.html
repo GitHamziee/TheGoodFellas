@@ -9,8 +9,12 @@
     </div>
   </div>
 
+  <div class="period-bar">
+    <app-period-filter [(period)]="period" [(anchor)]="anchor" />
+  </div>
+
   <div class="stats-row">
-    <app-stat-tile [value]="stats().total" label="Submitted total" tone="tone-gold">
+    <app-stat-tile [value]="stats().total" label="Submitted" tone="tone-gold">
       <svg lucideSend></svg>
     </app-stat-tile>
     <app-stat-tile [value]="stats().thisWeek" label="This week" tone="tone-c">
@@ -68,11 +72,16 @@
         <a class="feed-row feed-row--link" routerLink="/team-lead/analytics/junior-closers">
           <span class="who">
             <span class="nm">Junior Closers</span>
-            <span class="mt">Accepted / rejected outcomes per person</span>
+            <span class="mt">Approved / declined outcomes per person</span>
           </span>
           <span class="chip"><svg lucideChartColumn></svg>View</span>
         </a>
       </div>
     </div>
+  </div>
+  <div class="arena-grid">
+    @for (board of boards(); track board.title) {
+      <app-leaderboard [board]="board" tone="junior" />
+    }
   </div>
 </div>

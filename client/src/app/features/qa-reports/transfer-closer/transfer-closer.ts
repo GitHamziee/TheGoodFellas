@@ -6,11 +6,7 @@ import { QaTransferReport } from '../qa-transfer-report';
   selector: 'app-qa-transfer-closer',
   imports: [QaTransferReport],
   template: `
-    <app-qa-transfer-report
-      lane="closer"
-      peopleLabel="Closers"
-      subtitle="How QA scored each Closer's lead enrichment — who's failing, why, and whether it's improving."
-    />
+    <app-qa-transfer-report lane="closer" peopleLabel="Closers" />
   `,
 })
 export class QaTransferCloser {}

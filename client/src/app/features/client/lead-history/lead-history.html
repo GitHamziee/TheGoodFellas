@@ -1,33 +1,121 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <p class="sub">Every lead you've accepted, with full contact, policy and billing detail.</p>
-    </div>
+  <div class="period-bar">
+    <app-period-filter [(period)]="period" [(anchor)]="anchor" />
   </div>
 
   <div class="stats-row">
-    <app-stat-tile [value]="stats().total" label="Accepted leads" tone="tone-gold">
+    <app-stat-tile [value]="stats().total" [label]="isCpl ? 'Approved CPL leads' : 'Approved Deals'" tone="tone-gold">
       <svg lucideFileText></svg>
     </app-stat-tile>
-    <app-stat-tile [value]="stats().thisMonth" label="This month" tone="tone-c">
-      <svg lucideClock></svg>
-    </app-stat-tile>
-    <app-stat-tile [value]="stats().closed" label="Closed & paid" tone="tone-success">
+    <app-stat-tile [value]="stats().closed" [label]="'Paid'" tone="tone-success">
       <svg lucideCircleCheck></svg>
     </app-stat-tile>
-    <app-stat-tile [value]="formatMoney(stats().coverage)" label="Total coverage" tone="tone-a">
-      <svg lucideBanknote></svg>
-    </app-stat-tile>
+    @if (!isCpl) {
+      <app-stat-tile [value]="formatMoney(stats().annualPremium)" label="Total annual premium" tone="tone-a">
+        <svg lucideBanknote></svg>
+      </app-stat-tile>
+    }
   </div>
 
-  @if (error()) {
+  @if (error() && !rejecting()) {
     <div class="error">{{ error() }}</div>
   }
+  @if (notice()) {
+    <div class="success"><svg lucideCircleCheck></svg>{{ notice() }}</div>
+  }
+
+  <!-- New leads awaiting a decision -->
+  <div class="inline-head">
+    <h2>New {{ isCpl ? 'CPL' : 'CPA' }} leads</h2>
+    <span class="count">{{ newLeads().length }} awaiting your decision</span>
+  </div>
+  <div class="card card--flush">
+    @if (loading()) {
+      <app-skeleton-rows [count]="3" />
+    } @else if (newLeads().length === 0) {
+      <app-empty-state title="No new leads right now" hint="When the admin team assigns you a lead, it will show up here for you to approve or decline.">
+        <svg lucideInbox></svg>
+      </app-empty-state>
+    } @else {
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Customer</th>
+              <th class="hide-sm">Need</th>
+              @if (!isCpl) {
+                <th class="hide-md">Closer</th>
+              }
+              <th class="hide-md">Received</th>
+              <th class="right">Decision</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (lead of newLeads(); track lead.id) {
+              <tr class="clickable" (click)="selectedNew.set(lead)">
+                <td>
+                  <div class="cell-main">{{ lead.customerName }}</div>
+                  <div class="cell-sub">
+                    {{ lead.state }}@if (lead.zipcode) {, {{ lead.zipcode }}}
+                    @if (lead.maritalStatus) { · {{ humanizeEnum(lead.maritalStatus) }} }
+                  </div>
+                </td>
+                <td class="hide-sm">
+                  @if (lead.need) {
+                    <span class="chip">{{ humanizeEnum(lead.need) }}</span>
+                  } @else {
+                    <span class="empty">—</span>
+                  }
+                </td>
+                @if (!isCpl) {
+                  <td class="hide-md">
+                    @if (lead.closer) {
+                      <div class="person">
+                        <span class="avatar-sm" [class]="getAvatarTone(lead.closer.id)">{{ getInitials(lead.closer.name) }}</span>
+                        <span class="nm">{{ lead.closer.name }}</span>
+                      </div>
+                    } @else {
+                      <span class="empty">—</span>
+                    }
+                  </td>
+                }
+                <td class="hide-md">
+                  <span class="chip"><svg lucideClock></svg>{{ timeAgo(lead.createdAt) }}</span>
+                </td>
+                <td>
+                  <div class="row-actions">
+                    <button type="button" class="btn btn--sm btn--edit" [disabled]="busyId() === lead.id" (click)="openEdit(lead, $event)">
+                      <svg lucidePencil></svg> Edit
+                    </button>
+                    <button type="button" class="btn btn--sm btn--danger" [disabled]="busyId() === lead.id" (click)="openReject(lead, $event)">
+                      <svg lucideThumbsDown></svg> Decline
+                    </button>
+                    <button type="button" class="btn btn--sm btn--success" [disabled]="busyId() === lead.id" (click)="accept(lead, $event)">
+                      @if (busyId() === lead.id) {
+                        <span class="spinner"></span>
+                      } @else {
+                        <svg lucideThumbsUp></svg>
+                      }
+                      Approve
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+
+  <div class="inline-head">
+    <h2>{{ isCpl ? 'Approved CPL leads' : 'Approved Deals' }}</h2>
+  </div>
 
   <div class="toolbar">
     <app-search-box
       [value]="view.search()"
-      placeholder="Search name, phone, email, address, carrier…"
+      [placeholder]="isCpl ? 'Search name, phone, state, zipcode, D-code…' : 'Search name, phone, email, address, carrier…'"
       (valueChange)="view.setSearch($event)"
     />
     <div class="pills">
@@ -50,11 +138,11 @@
       <app-skeleton-rows [count]="5" />
     } @else if (view.total() === 0) {
       @if (view.isFiltered()) {
-        <app-empty-state title="No leads match" hint="Try a different search term or clear the filters.">
+        <app-empty-state title="No leads match" hint="Try a different search term, clear the filters, or pick another period.">
           <svg lucideFileText></svg>
         </app-empty-state>
       } @else {
-        <app-empty-state title="No accepted leads yet" hint="Leads you accept from the New Leads page appear here with their full details.">
+        <app-empty-state [title]="isCpl ? 'No approved CPL leads yet' : 'No approved deals yet'" hint="Leads you approve from the new leads above appear here with their full details.">
           <svg lucideFileText></svg>
         </app-empty-state>
       }
@@ -67,10 +155,15 @@
                 Customer <span class="arrow">{{ sortArrow('customerName') }}</span>
               </th>
               <th class="hide-sm">Contact</th>
-              <th class="hide-md">Carrier</th>
-              <th class="sortable right hide-md" (click)="view.toggleSort('coverageAmount')">
-                Coverage <span class="arrow">{{ sortArrow('coverageAmount') }}</span>
-              </th>
+              @if (isCpl) {
+                <th class="hide-md">Need</th>
+                <th class="hide-md">D-code</th>
+              } @else {
+                <th class="hide-md">Carrier</th>
+                <th class="sortable right hide-md" (click)="view.toggleSort('coverageAmount')">
+                  Coverage <span class="arrow">{{ sortArrow('coverageAmount') }}</span>
+                </th>
+              }
               <th>Status</th>
               <th class="sortable right hide-md" (click)="view.toggleSort('createdAt')">
                 Received <span class="arrow">{{ sortArrow('createdAt') }}</span>
@@ -92,8 +185,13 @@
                     <div class="cell-sub"><svg lucideMail class="mini"></svg> {{ lead.email }}</div>
                   }
                 </td>
-                <td class="hide-md">{{ lead.carrierName || '—' }}</td>
-                <td class="right num hide-md">{{ formatMoney(lead.coverageAmount) }}</td>
+                @if (isCpl) {
+                  <td class="hide-md">{{ lead.need ? humanizeEnum(lead.need) : '—' }}</td>
+                  <td class="hide-md">{{ lead.dCode || '—' }}</td>
+                } @else {
+                  <td class="hide-md">{{ lead.carrierName || '—' }}</td>
+                  <td class="right num hide-md">{{ formatMoney(lead.coverageAmount) }}</td>
+                }
                 <td><app-payment-badge [status]="lead.paymentStatus" /></td>
                 <td class="right hide-md">
                   <span class="chip"><svg lucideClock></svg>{{ timeAgo(lead.createdAt) }}</span>
@@ -117,5 +215,62 @@
 @if (selected(); as lead) {
   <app-modal title="Lead details" [subtitle]="lead.customerName" [wide]="true" (close)="selected.set(null)">
     <app-lead-detail [lead]="lead" />
+  </app-modal>
+}
+
+<!-- New lead preview with decision -->
+@if (selectedNew(); as lead) {
+  <app-modal title="Lead details" [subtitle]="lead.customerName" (close)="selectedNew.set(null)">
+    <app-lead-detail [lead]="lead" />
+
+    <div footer>
+      <button type="button" class="btn btn--edit" [disabled]="busyId() === lead.id" (click)="openEdit(lead)">
+        <svg lucidePencil></svg> Edit
+      </button>
+      <button type="button" class="btn btn--danger" [disabled]="busyId() === lead.id" (click)="openReject(lead)">
+        <svg lucideThumbsDown></svg> Decline
+      </button>
+      <button type="button" class="btn btn--success" [disabled]="busyId() === lead.id" (click)="accept(lead)">
+        @if (busyId() === lead.id) {
+          <span class="spinner"></span> Approving…
+        } @else {
+          <svg lucideThumbsUp></svg> Approve lead
+        }
+      </button>
+    </div>
+  </app-modal>
+}
+
+<!-- Edit before deciding -->
+@if (editing(); as lead) {
+  <app-lead-full-edit [lead]="lead" (saved)="onEdited($event)" (closed)="editing.set(null)" />
+}
+
+<!-- Reject with reason -->
+@if (rejecting(); as lead) {
+  <app-modal title="Decline lead" [subtitle]="lead.customerName + ' goes back to the admin team'" (close)="rejecting.set(null)">
+    @if (error()) {
+      <div class="error">{{ error() }}</div>
+    }
+
+    <label>
+      Reason for declining <span class="hint">Optional, but it helps the team fix and resend</span>
+      <textarea
+        rows="4"
+        [(ngModel)]="rejectReason"
+        name="rejectReason"
+        placeholder="e.g. Outside my licensed states, or coverage amount too low"
+      ></textarea>
+    </label>
+
+    <div footer>
+      <button type="button" class="btn btn--danger" [disabled]="busyId() === lead.id" (click)="confirmReject()">
+        @if (busyId() === lead.id) {
+          <span class="spinner"></span> Declining…
+        } @else {
+          <svg lucideCircleX></svg> Confirm decline
+        }
+      </button>
+    </div>
   </app-modal>
 }

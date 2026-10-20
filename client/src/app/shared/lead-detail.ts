@@ -32,6 +32,65 @@ interface Row {
   sensitive?: boolean;
 }
 
+/** Carrier-submission cheat-sheet text for a lead; `show` reveals SSN/routing/account in full. */
+export function leadCopyText(l: Lead, show: boolean): string {
+    const s = (v: unknown): string => (v === null || v === undefined || v === '' ? '' : String(v));
+    const date = (v: string | null | undefined): string => (v ? formatDate(v) : '');
+    const money = (v: number | null | undefined): string => (v === null || v === undefined ? '' : formatMoney(v));
+
+    const yesNo = (v: boolean | null | undefined): string => (v === null || v === undefined ? '' : formatBool(v));
+
+    // CPL leads only carry the short Junior Closer intake — copy just those fields.
+    const lines =
+      l.leadType === 'CPL'
+        ? [
+            `Customer's Name :${s(l.customerName)}`,
+            `Phone Number :${l.phone ? formatPhone(l.phone) : ''}`,
+            `State :${s(l.state)}`,
+            `Zipcode :${s(l.zipcode)}`,
+            `DOB :${date(l.dob)}`,
+            `Smoker :${yesNo(l.smoker)}`,
+            `Need :${s(l.need) ? humanizeEnum(l.need) : ''}`,
+            `Decision Maker :${yesNo(l.decisionMaker)}`,
+            `Bank Account :${yesNo(l.bankAccount)}`,
+          ]
+        : [
+      `Customer's Name :${s(l.customerName)}`,
+      `Phone Number :${l.phone ? formatPhone(l.phone) : ''}`,
+      `Email:${s(l.email)}`,
+      `Marital Status :${s(l.maritalStatus)}`,
+      `Mailing Address:${s(l.mailingAddress)}`,
+      `Birth State :${s(l.birthState)}`,
+      `Gender :${s(l.gender)}`,
+      `Smoker :${l.smoker === null || l.smoker === undefined ? '' : formatBool(l.smoker)}`,
+      `DOB :${date(l.dob)}`,
+      `Age :${s(l.age)}`,
+      `Height :${s(l.height)}`,
+      `Weight :${s(l.weight)}`,
+      `Social :${s(l.ssn) ? (show ? l.ssn! : maskSsn(l.ssn)) : ''}`,
+      `Driving license :${s(l.dlStateId)}`,
+      '____________',
+      `Beneficiary Relation :${s(l.beneficiaryRelation)}`,
+      `Beneficiary Name :${s(l.beneficiaryName)}`,
+      `Beneficiary DOB :${date(l.beneficiaryDob)}`,
+      '____________',
+      `Health Conditions :${s(l.healthConditions)}`,
+      `Medications :${s(l.medications)}`,
+      '____________',
+      `Carrier Name :${s(l.carrierName)}`,
+      `Coverage Amount :${money(l.coverageAmount)}`,
+      `Monthly Premiums :${money(l.monthlyPremiums)}`,
+      '____________',
+      `Initial Draft Date :${date(l.initialDraftDate)}`,
+      `Future Draft Date :${date(l.futureDraftDate)}`,
+      `Bank Name:${s(l.bankName)}`,
+      `Account Type:${s(l.accountType) ? humanizeEnum(l.accountType) : ''}`,
+      `Routing Number:${s(l.routingNumber) ? (show ? l.routingNumber! : maskAccount(l.routingNumber)) : ''}`,
+      `Account Number:${s(l.accountNumber) ? (show ? l.accountNumber! : maskAccount(l.accountNumber)) : ''}`,
+    ];
+  return lines.join('\n');
+}
+
 /**
  * Full read-only view of a lead, grouped the same way the intake and enrichment
  * forms are. Only renders a section when the lead actually carries data for it,
@@ -219,6 +278,62 @@ export class LeadDetail {
       return { k, v: formatted ?? (isEmpty ? '—' : String(v)), sensitive };
     };
 
+    /** The routing/admin tail shared by every lead type; CPL drops the Closer rows
+     * because CPL never has a Closer step. */
+    const routingRows = (cpl: boolean): Row[] =>
+      keep([
+        row(cpl ? 'Notes' : 'Junior closer notes', l.juniorNotes),
+        cpl ? null : row('Closer notes', l.closerNotes),
+        row('Decline reason', l.rejectionReason),
+        row('Junior closer', l.juniorCloser?.name),
+        cpl ? null : row('Closer', l.closer?.name),
+        row('Client', l.client?.name),
+        row(
+          'External client',
+          l.externalClient?.name,
+          l.externalClient
+            ? l.externalClient.name + (l.externalClient.company ? ' · ' + l.externalClient.company : '')
+            : undefined,
+        ),
+        row(
+          'Charge-backs',
+          l.chargeBacks.length || null,
+          l.chargeBacks.length
+            ? `${l.chargeBacks.length} · ${formatMoney(l.chargeBacks.reduce((sum, c) => sum + c.pkrAmount, 0))} total`
+            : undefined,
+        ),
+        row('Last updated', l.updatedAt, formatDateTime(l.updatedAt)),
+        row('Closed at', l.closedAt, formatDateTime(l.closedAt)),
+      ]);
+
+    // A CPL lead only ever carries the short Junior Closer CPL intake — show just those fields.
+    if (l.leadType === 'CPL') {
+      return [
+        {
+          title: 'Personal & contact',
+          icon: 'user',
+          rows: keep([
+            row('Phone', l.phone, formatPhone(l.phone)),
+            row('State', l.state),
+            row('Zipcode', l.zipcode),
+            row('Date of birth', l.dob, formatDate(l.dob)),
+            row('Smoker', l.smoker, formatBool(l.smoker)),
+          ]),
+        },
+        {
+          title: 'Need & CPL detail',
+          icon: 'health',
+          rows: keep([
+            row('Need', l.need, humanizeEnum(l.need)),
+            row('Decision maker', l.decisionMaker, formatBool(l.decisionMaker)),
+            row('Bank account', l.bankAccount, formatBool(l.bankAccount)),
+            row('D-code', l.dCode),
+          ]),
+        },
+        { title: 'Notes & routing', icon: 'notes', rows: routingRows(true) },
+      ];
+    }
+
     return [
       {
         title: 'Personal & contact',
@@ -308,30 +423,7 @@ export class LeadDetail {
       {
         title: 'Notes & routing',
         icon: 'notes',
-        rows: keep([
-          row('Junior closer notes', l.juniorNotes),
-          row('Closer notes', l.closerNotes),
-          row('Rejection reason', l.rejectionReason),
-          row('Junior closer', l.juniorCloser?.name),
-          row('Closer', l.closer?.name),
-          row('Client', l.client?.name),
-          row(
-            'External client',
-            l.externalClient?.name,
-            l.externalClient
-              ? l.externalClient.name + (l.externalClient.company ? ' · ' + l.externalClient.company : '')
-              : undefined,
-          ),
-          row(
-            'Charge-backs',
-            l.chargeBacks.length || null,
-            l.chargeBacks.length
-              ? `${l.chargeBacks.length} · ${formatMoney(l.chargeBacks.reduce((sum, c) => sum + c.pkrAmount, 0))} total`
-              : undefined,
-          ),
-          row('Last updated', l.updatedAt, formatDateTime(l.updatedAt)),
-          row('Closed at', l.closedAt, formatDateTime(l.closedAt)),
-        ]),
+        rows: routingRows(false),
       },
     ];
   });
@@ -344,48 +436,8 @@ export class LeadDetail {
    * `row()` helper which omits anything unset.
    */
   copyDetails(): void {
-    const l = this.lead();
-    const show = this.unmasked() || this.revealed();
-    const s = (v: unknown): string => (v === null || v === undefined || v === '' ? '' : String(v));
-    const date = (v: string | null | undefined): string => (v ? formatDate(v) : '');
-    const money = (v: number | null | undefined): string => (v === null || v === undefined ? '' : formatMoney(v));
-
-    const lines = [
-      `Customer's Name :${s(l.customerName)}`,
-      `Phone Number :${l.phone ? formatPhone(l.phone) : ''}`,
-      `Email:${s(l.email)}`,
-      `Marital Status :${s(l.maritalStatus)}`,
-      `Mailing Address:${s(l.mailingAddress)}`,
-      `Birth State :${s(l.birthState)}`,
-      `Gender :${s(l.gender)}`,
-      `Smoker :${l.smoker === null || l.smoker === undefined ? '' : formatBool(l.smoker)}`,
-      `DOB :${date(l.dob)}`,
-      `Age :${s(l.age)}`,
-      `Height :${s(l.height)}`,
-      `Weight :${s(l.weight)}`,
-      `Social :${s(l.ssn) ? (show ? l.ssn! : maskSsn(l.ssn)) : ''}`,
-      `Driving license :${s(l.dlStateId)}`,
-      '____________',
-      `Beneficiary Relation :${s(l.beneficiaryRelation)}`,
-      `Beneficiary Name :${s(l.beneficiaryName)}`,
-      `Beneficiary DOB :${date(l.beneficiaryDob)}`,
-      '____________',
-      `Health Conditions :${s(l.healthConditions)}`,
-      `Medications :${s(l.medications)}`,
-      '____________',
-      `Carrier Name :${s(l.carrierName)}`,
-      `Coverage Amount :${money(l.coverageAmount)}`,
-      `Monthly Premiums :${money(l.monthlyPremiums)}`,
-      '____________',
-      `Initial Draft Date :${date(l.initialDraftDate)}`,
-      `Future Draft Date :${date(l.futureDraftDate)}`,
-      `Bank Name:${s(l.bankName)}`,
-      `Account Type:${s(l.accountType) ? humanizeEnum(l.accountType) : ''}`,
-      `Routing Number:${s(l.routingNumber) ? (show ? l.routingNumber! : maskAccount(l.routingNumber)) : ''}`,
-      `Account Number:${s(l.accountNumber) ? (show ? l.accountNumber! : maskAccount(l.accountNumber)) : ''}`,
-    ];
-
-    void navigator.clipboard.writeText(lines.join('\n')).then(() => {
+    const text = leadCopyText(this.lead(), this.unmasked() || this.revealed());
+    void navigator.clipboard.writeText(text).then(() => {
       this.copied.set(true);
       setTimeout(() => this.copied.set(false), 1500);
     });

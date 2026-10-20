@@ -11,7 +11,7 @@ export type LeadStatus =
   | 'RETURNED_TO_CLOSER'
   // A RETENTION lead's only valid return target — it never has a junior closer or closer.
   | 'RETURNED_TO_RETENTION'
-  // Handed to a non-login ExternalClient — terminal, no accept/reject step.
+  // Handed to a non-login ExternalClient — terminal, no approve/decline step.
   | 'ASSIGNED_EXTERNAL'
   // Closer parked a half-baked enrichment instead of submitting; resumable by them only.
   | 'DRAFT'
@@ -187,6 +187,8 @@ export interface LeadHistoryRow {
   leadType?: LeadType;
   closer?: LeadParty;
   client?: LeadParty | null;
+  /** Junior view only: the QA intake verdict, if QA has reviewed this lead yet. */
+  qaReviews?: { outcome: 'PASS' | 'FAIL' }[];
 }
 
 /**
@@ -244,7 +246,7 @@ export interface TeamLeadLeadRow {
   closer?: LeadParty;
 }
 
-/** Masked preview for a Client's not-yet-accepted ("New Leads") lead — no PII/financial fields. */
+/** Masked preview for a Client's not-yet-approved ("New Leads") lead — no PII/financial fields. */
 export interface LeadPreview {
   id: string;
   customerName: string;
@@ -252,6 +254,7 @@ export interface LeadPreview {
   zipcode?: string | null;
   need?: LeadNeed | null;
   maritalStatus?: string | null;
+  leadType?: LeadType;
   status: LeadStatus;
   createdAt: string;
   updatedAt: string;

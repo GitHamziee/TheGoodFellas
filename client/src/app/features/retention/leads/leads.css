@@ -1,0 +1,42 @@
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 1rem 0.875rem;
+}
+
+.section-head h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.section-head app-select {
+  min-width: 200px;
+}
+
+.toolbar {
+  margin-bottom: 1.25rem;
+}
+
+.card + .card {
+  margin-top: 1.25rem;
+}
+
+/* Why a pending lead is parked (draft reason) or was sent back (admin's comment). */
+.row-reason {
+  margin-top: 0.3rem;
+  max-width: 32rem;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--gray-500);
+}
+
+.row-reason--returned {
+  padding: 0.4rem 0.65rem;
+  border-radius: var(--radius-sm);
+  background: var(--danger-50);
+  color: #7f1d1d;
+}

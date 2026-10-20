@@ -30,10 +30,15 @@ import {
   PLAN_TYPE_OPTIONS,
   RETIRED_INCOME_OPTIONS,
   SMOKER_OPTIONS,
+  US_STATE_OPTIONS,
 } from '../../../core/lead-options';
 import { Select } from '../../../shared/ui/select';
 import { Modal } from '../../../shared/ui/modal';
 import { NoCopy } from '../../../shared/no-copy.directive';
+import { PhoneInput } from '../../../shared/ui/phone-input';
+import { ZipInput } from '../../../shared/ui/zip-input';
+import { DateInput } from '../../../shared/ui/date-input';
+import { apiErrorMessage } from '../../../core/api';
 
 interface LookupUser {
   id: string;
@@ -82,7 +87,7 @@ const TRACKED: (keyof RetentionSubmitInput)[] = [
  */
 @Component({
   selector: 'app-retention-new-lead',
-  imports: [
+  imports: [DateInput, PhoneInput, ZipInput, 
     FormsModule,
     RouterLink,
     Select,
@@ -118,6 +123,7 @@ export class RetentionNewLead implements OnInit {
 
   readonly draftReasonOptions = DRAFT_REASON_OPTIONS;
   readonly maritalStatusOptions = MARITAL_STATUS_OPTIONS;
+  readonly stateOptions = US_STATE_OPTIONS;
   readonly genderOptions = GENDER_OPTIONS;
   readonly smokerOptions = SMOKER_OPTIONS;
   readonly needOptions = NEED_OPTIONS;
@@ -236,9 +242,9 @@ export class RetentionNewLead implements OnInit {
         Object.entries(this.form).filter(([, v]) => v !== '' && v !== null && v !== undefined),
       ) as RetentionSubmitInput;
       await this.leadService.createLeadAsRetention(payload);
-      this.router.navigateByUrl('/retention/history');
-    } catch (err: any) {
-      this.error.set(err?.error?.error ?? 'Could not submit the lead.');
+      this.router.navigateByUrl('/retention/leads');
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not submit the lead.'));
     } finally {
       this.submitting.set(false);
     }
@@ -269,9 +275,9 @@ export class RetentionNewLead implements OnInit {
       ) as RetentionSubmitInput;
       await this.leadService.createLeadAsRetentionDraft(payload);
       this.draftModalOpen.set(false);
-      this.router.navigateByUrl('/retention/queue');
-    } catch (err: any) {
-      this.error.set(err?.error?.error ?? 'Could not save this as a draft.');
+      this.router.navigateByUrl('/retention/leads');
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not save this as a draft.'));
     } finally {
       this.savingDraft.set(false);
     }

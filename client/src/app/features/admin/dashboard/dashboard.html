@@ -2,6 +2,10 @@
   @if (loading()) {
     <div class="card"><app-skeleton-rows [count]="6" /></div>
   } @else {
+    <div class="period-bar">
+      <app-period-filter [(period)]="period" [(anchor)]="anchor" />
+    </div>
+
     <!-- ---------- Command bar: the only three things an admin can clear ---------- -->
     <section class="command" [class.command--clear]="actions().total === 0">
       <div class="command__glow"></div>
@@ -13,27 +17,19 @@
             <svg lucideCircleCheck></svg>
             You're all caught up
           </h1>
-          <p class="command__sub">Nothing is waiting on you. New submissions will land in the queue.</p>
+          <p class="command__sub">Nothing is waiting on you. New submissions will land at the top of CPA & Retention Leads.</p>
         } @else {
           <h1 class="command__headline">
             <span class="command__count">{{ actions().total }}</span>
             {{ actions().total === 1 ? 'lead needs you' : 'leads need you' }}
           </h1>
-          @if (actions().stalled > 0) {
-            <p class="command__sub command__sub--warn">
-              <svg lucideTriangleAlert></svg>
-              {{ actions().stalled }} waiting more than {{ staleAfterDays }} days — assign these first
-            </p>
-          } @else {
-            <p class="command__sub">Clear these and the pipeline keeps moving.</p>
-          }
         }
       </div>
 
       @if (actions().total > 0) {
         <div class="command__actions">
           @if (actions().toAssign > 0) {
-            <a class="act act--primary" routerLink="/admin/queue">
+            <a class="act act--primary" routerLink="/admin/leads">
               <span class="act__n">{{ actions().toAssign }}</span>
               <span class="act__body">
                 <span class="act__t">To assign</span>
@@ -43,11 +39,11 @@
             </a>
           }
           @if (actions().toFix > 0) {
-            <a class="act act--danger" routerLink="/admin/queue">
+            <a class="act act--danger" routerLink="/admin/leads">
               <span class="act__n">{{ actions().toFix }}</span>
               <span class="act__body">
                 <span class="act__t">To fix</span>
-                <span class="act__h">Rejected — edit and reassign</span>
+                <span class="act__h">Declined — edit and reassign</span>
               </span>
               <svg lucideArrowRight></svg>
             </a>
@@ -57,7 +53,7 @@
               <span class="act__n">{{ actions().toCollectCpa }}</span>
               <span class="act__body">
                 <span class="act__t">To collect — CPA</span>
-                <span class="act__h">Accepted — not yet marked paid</span>
+                <span class="act__h">Approved — not yet marked paid</span>
               </span>
               <svg lucideArrowRight></svg>
             </a>
@@ -67,7 +63,7 @@
               <span class="act__n">{{ actions().toCollectCpl }}</span>
               <span class="act__body">
                 <span class="act__t">To collect — CPL</span>
-                <span class="act__h">Accepted — not yet marked paid</span>
+                <span class="act__h">Approved — not yet marked paid</span>
               </span>
               <svg lucideArrowRight></svg>
             </a>
@@ -79,8 +75,8 @@
     @if (conversion().total === 0) {
       <div class="card">
         <app-empty-state
-          title="No leads in the pipeline yet"
-          hint="Once junior closers start submitting, everything you need to act on shows up here."
+          title="No leads in this period"
+          hint="Pick another day, week or month, or wait for junior closers to submit."
         >
           <svg lucideInbox></svg>
         </app-empty-state>
@@ -107,9 +103,9 @@
         </div>
 
         @if (rejectedCount() > 0) {
-          <a class="flow-branch" routerLink="/admin/queue">
+          <a class="flow-branch" routerLink="/admin/leads">
             <svg lucideCircleX></svg>
-            <span><strong>{{ rejectedCount() }}</strong> rejected and sent back to you</span>
+            <span><strong>{{ rejectedCount() }}</strong> declined and sent back to you</span>
             <svg class="flow-branch__go" lucideArrowRight></svg>
           </a>
         }
@@ -150,26 +146,26 @@
         <section class="card">
           <div class="inline-head">
             <h2>Conversion</h2>
-            <span class="count">{{ conversion().thisMonth }} new this month</span>
+            <span class="count">{{ conversion().total }} in period</span>
           </div>
 
           <div class="headline">
             <span class="headline__v">
               {{ conversion().acceptRate === null ? '—' : conversion().acceptRate + '%' }}
             </span>
-            <span class="headline__l">of decided leads accepted</span>
+            <span class="headline__l">of decided leads approved</span>
           </div>
 
           <div class="chart">
-            <div class="chart-row" [title]="conversion().accepted + ' accepted'">
-              <span class="chart-key">Accepted</span>
+            <div class="chart-row" [title]="conversion().accepted + ' approved'">
+              <span class="chart-key">Approved</span>
               <span class="chart-track">
                 <span class="chart-bar chart-bar--good" [style.width.%]="conversion().acceptedPct"></span>
               </span>
               <span class="chart-val">{{ conversion().accepted }}</span>
             </div>
-            <div class="chart-row" [title]="conversion().rejected + ' rejected'">
-              <span class="chart-key">Rejected</span>
+            <div class="chart-row" [title]="conversion().rejected + ' declined'">
+              <span class="chart-key">Declined</span>
               <span class="chart-track">
                 <span class="chart-bar chart-bar--bad" [style.width.%]="conversion().rejectedPct"></span>
               </span>
@@ -209,64 +205,43 @@
           </div>
         </section>
 
-        <!-- ---------- Who's converting ---------- -->
+        <!-- ---------- Latest movement ---------- -->
         <section class="card">
           <div class="inline-head">
-            <h2>Top closers</h2>
-            <a class="count" routerLink="/admin/analytics/closers">Full breakdown</a>
+            <h2>Latest movement</h2>
+            <a class="count" routerLink="/admin/leads">View all</a>
           </div>
 
-          @if (leaderboard().length === 0) {
-            <app-empty-state title="No closer activity yet">
-              <svg lucideUserCheck></svg>
-            </app-empty-state>
-          } @else {
-            <div class="board">
-              @for (row of leaderboard(); track row.id; let i = $index) {
-                <div class="board-row">
-                  <span class="board-rank" [class.board-rank--top]="i === 0">{{ i + 1 }}</span>
-                  <span class="avatar-sm" [class]="getAvatarTone(row.id)">{{ getInitials(row.name) }}</span>
-                  <span class="board-who">
-                    <span class="nm">{{ row.name }}</span>
-                    <span class="mt">{{ row.accepted }} of {{ row.total }} accepted</span>
+          <div class="feed">
+            @for (lead of recent(); track lead.id) {
+              <div class="feed-row">
+                <span class="avatar-sm" [class]="getAvatarTone(lead.id)">
+                  {{ getInitials(lead.customerName) }}
+                </span>
+                <span class="who">
+                  <span class="nm">{{ lead.customerName }}</span>
+                  <span class="mt">
+                    @if (lead.closer) { {{ lead.closer.name }} } @else if (lead.retention) { {{ lead.retention.name }} } @else { CPL }
+                    @if (lead.client) { → {{ lead.client.name }} }
+                    · {{ timeAgo(lead.updatedAt) }}
                   </span>
-                  <span class="board-rate">{{ row.rate }}%</span>
-                </div>
-              }
-            </div>
-          }
+                </span>
+                @if (lead.status === 'ACCEPTED' && lead.paymentStatus === 'UNPAID') {
+                  <span class="badge badge--unpaid">Unpaid</span>
+                }
+                <app-status-badge [status]="lead.status" />
+              </div>
+            }
+          </div>
         </section>
       </div>
 
-      <!-- ---------- Latest movement ---------- -->
-      <section class="card">
-        <div class="inline-head">
-          <h2>Latest movement</h2>
-          <a class="count" routerLink="/admin/leads">View all</a>
-        </div>
-
-        <div class="feed">
-          @for (lead of recent(); track lead.id) {
-            <div class="feed-row">
-              <span class="avatar-sm" [class]="getAvatarTone(lead.id)">
-                {{ getInitials(lead.customerName) }}
-              </span>
-              <span class="who">
-                <span class="nm">{{ lead.customerName }}</span>
-                <span class="mt">
-                  @if (lead.closer) { {{ lead.closer.name }} } @else if (lead.retention) { {{ lead.retention.name }} } @else { CPL }
-                  @if (lead.client) { → {{ lead.client.name }} }
-                  · {{ timeAgo(lead.updatedAt) }}
-                </span>
-              </span>
-              @if (lead.status === 'ACCEPTED' && lead.paymentStatus === 'UNPAID') {
-                <span class="badge badge--unpaid">Unpaid</span>
-              }
-              <app-status-badge [status]="lead.status" />
-            </div>
-          }
-        </div>
-      </section>
+      <!-- ---------- Leaderboards: top three per board ---------- -->
+      <div class="arena-grid">
+        @for (board of boards(); track board.title; let i = $index) {
+          <app-leaderboard [board]="board" [tone]="i < 2 ? 'closer' : 'junior'" />
+        }
+      </div>
     }
   }
 </div>

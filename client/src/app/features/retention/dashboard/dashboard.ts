@@ -10,8 +10,9 @@ import {
 import { LeadService } from '../../../core/services/lead.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { Lead } from '../../../core/models/lead.model';
-import { getAvatarTone, getInitials, humanizeEnum, isThisMonth, timeAgo } from '../../../core/format-utils';
+import { getAvatarTone, getInitials, humanizeEnum, pacificIsoDate, pacificToday, timeAgo } from '../../../core/format-utils';
 import { EmptyState, SkeletonRows, StatTile, StatusBadge } from '../../../shared/ui/ui';
+import { Period, PeriodFilter, inPeriod } from '../../../shared/ui/period-filter';
 import { reloadOnChange } from '../../../core/live-reload';
 
 /**
@@ -23,6 +24,7 @@ import { reloadOnChange } from '../../../core/live-reload';
   selector: 'app-retention-dashboard',
   imports: [
     RouterLink,
+    PeriodFilter,
     StatTile,
     StatusBadge,
     EmptyState,
@@ -41,7 +43,11 @@ export class RetentionDashboard implements OnInit {
   private readonly auth = inject(AuthService);
 
   readonly queue = signal<Lead[]>([]);
-  readonly history = signal<Lead[]>([]);
+  readonly allHistory = signal<Lead[]>([]);
+  readonly period = signal<Period>('day');
+  readonly anchor = signal(pacificIsoDate(pacificToday()));
+  /** Past leads submitted inside the selected period; the queue backlog is never filtered. */
+  readonly history = computed(() => inPeriod(this.allHistory(), this.period(), this.anchor()));
   readonly loading = signal(true);
 
   readonly firstName = computed(() => this.auth.user()?.name?.split(' ')[0] ?? '');
@@ -63,7 +69,6 @@ export class RetentionDashboard implements OnInit {
       queueTotal: queue.length,
       mine: queue.filter((l) => l.retention?.id === mine).length,
       submitted: past.length,
-      thisMonth: past.filter((l) => isThisMonth(l.createdAt)).length,
       accepted,
       acceptRate: decided ? Math.round((accepted / decided) * 100) : null,
     };
@@ -92,7 +97,7 @@ export class RetentionDashboard implements OnInit {
         this.leadService.retentionHistory(),
       ]);
       this.queue.set(queue);
-      this.history.set(history);
+      this.allHistory.set(history);
     } finally {
       this.loading.set(false);
     }

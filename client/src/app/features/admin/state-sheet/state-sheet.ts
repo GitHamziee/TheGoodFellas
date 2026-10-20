@@ -14,7 +14,7 @@ import { PlanType } from '../../../core/models/lead.model';
 import { US_STATES } from '../../../core/us-states';
 import { PLAN_TYPE_OPTIONS } from '../../../core/lead-options';
 import { formatMoney } from '../../../core/format-utils';
-import { EmptyState, SearchBox, SkeletonRows, StatTile } from '../../../shared/ui/ui';
+import { PageHero, EmptyState, SearchBox, SkeletonRows, StatTile } from '../../../shared/ui/ui';
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 
 interface ClientBreakdown {
@@ -46,7 +46,7 @@ interface StateRow {
  * on the admin Users page. */
 @Component({
   selector: 'app-state-sheet',
-  imports: [
+  imports: [PageHero, 
     SearchBox,
     StatTile,
     EmptyState,

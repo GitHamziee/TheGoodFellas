@@ -10,6 +10,10 @@
     </div>
   </div>
 
+  <div class="period-bar">
+    <app-period-filter [(period)]="period" [(anchor)]="anchor" />
+  </div>
+
   <div class="stats-row">
     <app-stat-tile [value]="stats().waiting" label="Waiting for you" tone="tone-gold">
       <svg lucideHourglass></svg>
@@ -17,18 +21,15 @@
     <app-stat-tile [value]="stats().stale" label="Ageing (3+ days)" tone="tone-warning">
       <svg lucideTriangleAlert></svg>
     </app-stat-tile>
-    <app-stat-tile [value]="stats().submitted" label="Submitted total" tone="tone-c">
+    <app-stat-tile [value]="stats().submitted" label="Submitted" tone="tone-c">
       <svg lucideSend></svg>
     </app-stat-tile>
-    <app-stat-tile [value]="stats().thisMonth" label="This month" tone="tone-d">
-      <svg lucideClock></svg>
-    </app-stat-tile>
-    <app-stat-tile [value]="stats().accepted" label="Accepted" tone="tone-success">
+    <app-stat-tile [value]="stats().accepted" label="Approved" tone="tone-success">
       <svg lucideCircleCheck></svg>
     </app-stat-tile>
     <app-stat-tile
       [value]="stats().acceptRate === null ? '—' : stats().acceptRate + '%'"
-      label="Accept rate"
+      label="Approval rate"
       tone="tone-a"
     >
       <svg lucideTarget></svg>
@@ -87,7 +88,7 @@
       @if (loading()) {
         <app-skeleton-rows [count]="4" />
       } @else if (recentOutcomes().length === 0) {
-        <app-empty-state title="Nothing submitted yet" hint="Leads you send onward will show their outcome here.">
+        <app-empty-state title="Nothing in this period" hint="Leads you send onward in the selected period will show their outcome here.">
           <svg lucideSend></svg>
         </app-empty-state>
       } @else {

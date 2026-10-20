@@ -22,10 +22,15 @@ import {
   NEED_OPTIONS,
   RETIRED_INCOME_OPTIONS,
   SMOKER_OPTIONS,
+  US_STATE_OPTIONS,
 } from '../../../core/lead-options';
 import { calculateAge, getAvatarTone, getInitials, toDateInput, todayDateInput } from '../../../core/format-utils';
 import { Select } from '../../../shared/ui/select';
 import { NoCopy } from '../../../shared/no-copy.directive';
+import { PhoneInput } from '../../../shared/ui/phone-input';
+import { ZipInput } from '../../../shared/ui/zip-input';
+import { DateInput } from '../../../shared/ui/date-input';
+import { apiErrorMessage } from '../../../core/api';
 
 /** Backs both the CPA and CPL forms — whichever fields matter for the picked leadType
  * get read on submit. Keeps one template-driven form object instead of two near-duplicates. */
@@ -65,7 +70,7 @@ interface LookupUser {
 
 @Component({
   selector: 'app-submit-lead',
-  imports: [
+  imports: [DateInput, PhoneInput, ZipInput, 
     FormsModule,
     RouterLink,
     Select,
@@ -107,6 +112,7 @@ export class SubmitLead implements OnInit {
   readonly incomeSourceOptions = INCOME_SOURCE_OPTIONS;
   readonly retiredIncomeOptions = RETIRED_INCOME_OPTIONS;
   readonly maritalStatusOptions = MARITAL_STATUS_OPTIONS;
+  readonly stateOptions = US_STATE_OPTIONS;
   readonly genderOptions = GENDER_OPTIONS;
   readonly smokerOptions = SMOKER_OPTIONS;
   readonly dCodeOptions = D_CODE_OPTIONS;
@@ -175,8 +181,8 @@ export class SubmitLead implements OnInit {
           bankAccount: lead.bankAccount ?? undefined,
           dCode: lead.dCode ?? undefined,
         };
-      } catch (err: any) {
-        this.error.set(err?.error?.error ?? 'Could not load this lead.');
+      } catch (err) {
+        this.error.set(apiErrorMessage(err, 'Could not load this lead.'));
       }
       return;
     }
@@ -231,8 +237,8 @@ export class SubmitLead implements OnInit {
         await this.leadService.submitLead(payload);
         this.router.navigateByUrl('/junior/my-leads');
       }
-    } catch (err: any) {
-      this.error.set(err?.error?.error ?? 'Could not submit the lead.');
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not submit the lead.'));
     } finally {
       this.submitting.set(false);
     }

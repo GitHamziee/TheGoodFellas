@@ -1,20 +1,18 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <p class="sub">Outside parties who receive leads for record-keeping only — no login.</p>
-    </div>
-    <div class="page-head-actions">
+  <app-page-hero
+    eyebrow="People"
+    title="External Clients"
+    sub="Outside parties who receive leads for record-keeping only — no login."
+    tone="steel"
+    [count]="loading() ? '–' : stats().total"
+    countLabel="external clients"
+  >
+    <svg lucideBuilding2></svg>
       <button type="button" class="btn" (click)="openCreate()">
         <svg lucideUserPlus></svg> New External Client
       </button>
-    </div>
-  </div>
+  </app-page-hero>
 
-  <div class="stats-row">
-    <app-stat-tile [value]="stats().total" label="Total external clients" tone="tone-gold">
-      <svg lucideBuilding2></svg>
-    </app-stat-tile>
-  </div>
 
   @if (error() && !showCreate() && !selected()) {
     <div class="error">{{ error() }}</div>
@@ -109,19 +107,19 @@
         <input type="text" [(ngModel)]="name" name="name" placeholder="Jane Doe" />
       </label>
       <label>
-        Company <span class="hint">Optional</span>
+        <span>Company <span class="hint">Optional</span></span>
         <input type="text" [(ngModel)]="company" name="company" />
       </label>
       <label>
-        Email <span class="hint">Optional</span>
+        <span>Email <span class="hint">Optional</span></span>
         <input type="email" [(ngModel)]="email" name="email" />
       </label>
       <label>
-        Phone <span class="hint">Optional</span>
-        <input type="tel" [(ngModel)]="phone" name="phone" />
+        <span>Phone <span class="hint">Optional</span></span>
+        <input appPhone [(ngModel)]="phone" name="phone" />
       </label>
       <label class="full">
-        Notes <span class="hint">Optional</span>
+        <span>Notes <span class="hint">Optional</span></span>
         <textarea rows="3" [(ngModel)]="notes" name="notes"></textarea>
       </label>
     </div>
@@ -320,7 +318,7 @@
         </label>
         <label>
           Phone
-          <input type="tel" [ngModel]="d.phone" (ngModelChange)="updateDraft('phone', $event)" name="phone" />
+          <input appPhone [ngModel]="d.phone" (ngModelChange)="updateDraft('phone', $event)" name="phone" />
         </label>
         <label class="full">
           Notes

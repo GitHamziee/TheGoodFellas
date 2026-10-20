@@ -1,5 +1,6 @@
 import { LowerCasePipe } from '@angular/common';
-import { Component, computed, input, signal } from '@angular/core';
+import { Component, computed, inject, input, signal } from '@angular/core';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
   LucideCircleCheck,
   LucideCircleX,
@@ -9,12 +10,12 @@ import {
 } from '@lucide/angular';
 import { UserOutcomeRow } from '../../core/services/analytics.service';
 import { getAvatarTone, getInitials } from '../../core/format-utils';
-import { EmptyState, SearchBox, SkeletonRows, StatTile } from '../../shared/ui/ui';
+import { PageHero, EmptyState, SearchBox, SkeletonRows, StatTile } from '../../shared/ui/ui';
 
 type SortKey = 'name' | 'total' | 'accepted' | 'rejected' | 'rate';
 
 interface Row extends UserOutcomeRow {
-  /** Accepted as a share of decided leads; null when nothing is decided yet. */
+  /** Approved as a share of decided leads; null when nothing is decided yet. */
   rate: number | null;
   decided: number;
   pending: number;
@@ -26,7 +27,7 @@ interface Row extends UserOutcomeRow {
  */
 @Component({
   selector: 'app-outcome-analytics',
-  imports: [
+  imports: [PageHero, RouterLink,
     LowerCasePipe,
     StatTile,
     SearchBox,
@@ -40,11 +41,16 @@ interface Row extends UserOutcomeRow {
   ],
   template: `
     <div class="page">
-      <div class="page-head">
-        <div>
-          <p class="sub">{{ subtitle() }}</p>
-        </div>
-      </div>
+      <app-page-hero
+        eyebrow="Analytics"
+        [title]="peopleLabel() + ' performance'"
+        [sub]="subtitle()"
+        tone="steel"
+        [count]="loading() ? '–' : totals().rate === null ? '—' : totals().rate + '%'"
+        [countLabel]="rateLabel()"
+      >
+        <svg lucideTarget></svg>
+      </app-page-hero>
 
       <div class="stats-row">
         <app-stat-tile [value]="totals().people" [label]="peopleLabel()" tone="tone-gold">
@@ -58,13 +64,6 @@ interface Row extends UserOutcomeRow {
         </app-stat-tile>
         <app-stat-tile [value]="totals().rejected" [label]="badLabel()" tone="tone-danger">
           <svg lucideCircleX></svg>
-        </app-stat-tile>
-        <app-stat-tile
-          [value]="totals().rate === null ? '—' : totals().rate + '%'"
-          [label]="rateLabel()"
-          tone="tone-a"
-        >
-          <svg lucideTarget></svg>
         </app-stat-tile>
       </div>
 
@@ -142,14 +141,18 @@ interface Row extends UserOutcomeRow {
               </thead>
               <tbody>
                 @for (row of visible(); track row.id) {
-                  <tr>
+                  <tr [class.clickable]="detailLinks()" (click)="open(row.id)">
                     <td>
                       <div class="person">
                         <span class="avatar-sm" [class]="getAvatarTone(row.id)">
                           {{ getInitials(row.name) }}
                         </span>
                         <span class="who">
-                          <span class="cell-main">{{ row.name }}</span>
+                          @if (detailLinks()) {
+                            <a class="cell-main" [routerLink]="[row.id]" (click)="$event.stopPropagation()">{{ row.name }}</a>
+                          } @else {
+                            <span class="cell-main">{{ row.name }}</span>
+                          }
                           <span class="cell-sub">{{ row.email }}</span>
                         </span>
                       </div>
@@ -191,13 +194,18 @@ export class OutcomeAnalytics {
   readonly emptyHint = input('');
   readonly source = input<UserOutcomeRow[]>([]);
   readonly loading = input(false);
+  /** Rows open a per-person detail page at ./<id> (relative to the hosting route). */
+  readonly detailLinks = input(false);
+
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   // Text for what `accepted`/`rejected` mean in this instance — defaults match the
   // original accepted/rejected lead-outcome usage; QA Reports pass PASS/FAIL wording.
   readonly totalLabel = input('Leads handled');
-  readonly goodLabel = input('Accepted');
-  readonly badLabel = input('Rejected');
-  readonly rateLabel = input('Accept rate');
+  readonly goodLabel = input('Approved');
+  readonly badLabel = input('Declined');
+  readonly rateLabel = input('Approval rate');
   readonly noneLabel = input('No decisions yet');
   readonly unitLabel = input('leads');
 
@@ -273,6 +281,10 @@ export class OutcomeAnalytics {
       rejectedPct: (r.rejected / max) * 100,
     }));
   });
+
+  open(id: string): void {
+    if (this.detailLinks()) void this.router.navigate([id], { relativeTo: this.route });
+  }
 
   toggleSort(key: SortKey): void {
     if (this.sortKey() === key) {

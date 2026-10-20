@@ -56,7 +56,7 @@ import { reloadOnChange } from '../../../core/live-reload';
       @if (planLoading()) {
         <app-skeleton-rows [count]="5" />
       } @else if (planRows().length === 0) {
-        <app-empty-state title="Nothing sold yet" hint="Once leads are accepted or handed to an external client, their plan breakdown shows up here.">
+        <app-empty-state title="Nothing sold yet" hint="Once leads are approved or handed to an external client, their plan breakdown shows up here.">
           <svg lucideLayers></svg>
         </app-empty-state>
       } @else {

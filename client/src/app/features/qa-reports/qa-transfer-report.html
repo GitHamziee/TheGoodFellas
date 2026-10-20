@@ -1,10 +1,4 @@
-<div class="page">
-  <div class="page-head">
-    <div>
-      <p class="sub">{{ subtitle() }}</p>
-    </div>
-  </div>
-
+<div class="page qa">
   @if (error()) {
     <div class="error">{{ error() }}</div>
   }
@@ -16,47 +10,73 @@
       (ngModelChange)="personId.set($event)"
       ariaLabel="Filter by person"
     />
-    <div class="pills">
-      @for (pill of rangePills; track pill.value) {
-        <button
-          type="button"
-          class="pill"
-          [class.active]="!from() && !to() && range() === pill.value"
-          (click)="setRange(pill.value)"
-        >
-          {{ pill.label }}
+    <div class="pills" role="group" aria-label="Period">
+      @for (p of periods; track p.value) {
+        <button type="button" class="pill" [class.active]="!showCustom() && range() === p.value" (click)="setRange(p.value)">
+          {{ p.label }}
         </button>
       }
+      <button type="button" class="pill" [class.active]="showCustom()" (click)="toggleCustom()">Custom</button>
     </div>
-    <input type="date" min="2000-01-01" max="2100-12-31" [ngModel]="from()" (ngModelChange)="setFrom($event)" aria-label="From date" />
-    <input type="date" min="2000-01-01" max="2100-12-31" [ngModel]="to()" (ngModelChange)="setTo($event)" aria-label="To date" />
+    @if (showCustom()) {
+      <app-date-input min="2000-01-01" max="2100-12-31" [ngModel]="from()" (ngModelChange)="setFrom($event)" aria-label="From date"></app-date-input>
+      <app-date-input min="2000-01-01" max="2100-12-31" [ngModel]="to()" (ngModelChange)="setTo($event)" aria-label="To date"></app-date-input>
+    }
   </div>
 
-  <div class="stats-row">
-    <app-stat-tile [value]="tiles().reviewed" label="Leads reviewed" tone="tone-gold">
-      <svg lucideLayers></svg>
-    </app-stat-tile>
-    <app-stat-tile [value]="tiles().rate === null ? '—' : tiles().rate + '%'" label="Pass rate" tone="tone-success">
-      <svg lucideTarget></svg>
-    </app-stat-tile>
-    <app-stat-tile [value]="tiles().fail" label="Failed" tone="tone-danger">
-      <svg lucideCircleX></svg>
-    </app-stat-tile>
-    <app-stat-tile [value]="tiles().pending" label="Awaiting QA" tone="tone-a">
-      <svg lucideClock></svg>
-    </app-stat-tile>
-    <app-stat-tile [value]="tiles().coverage === null ? '—' : tiles().coverage + '%'" label="QA coverage" tone="tone-c">
-      <svg lucideCircleCheck></svg>
-    </app-stat-tile>
-    <app-stat-tile [value]="tiles().lag === null ? '—' : tiles().lag + 'd'" label="Median days to review" tone="tone-d">
-      <svg lucideClock></svg>
-    </app-stat-tile>
+  <div class="qa-kpis">
+    <div class="qa-kpi">
+      <span class="qa-kpi-l">Pass rate</span>
+      <span class="qa-kpi-v qa-kpi-v--{{ tiles().rateTone }}">{{ tiles().rate === null ? '—' : tiles().rate + '%' }}</span>
+      <span class="qa-kpi-sub">
+        @if (tiles().rateDelta; as d) {
+          <span [class]="d.cls">{{ d.text }}</span> {{ priorLabel() }}
+        } @else {
+          {{ tiles().reviewed }} reviewed
+        }
+      </span>
+    </div>
+    <div class="qa-kpi">
+      <span class="qa-kpi-l">Failed</span>
+      <span class="qa-kpi-v" [class.qa-kpi-v--bad]="tiles().fail > 0">{{ tiles().fail }}</span>
+      <span class="qa-kpi-sub">
+        of {{ tiles().reviewed }} reviewed
+        @if (tiles().failDelta; as d) {
+          · <span [class]="d.cls">{{ d.text }}</span>
+        }
+      </span>
+    </div>
+    <div class="qa-kpi">
+      <span class="qa-kpi-l">Awaiting QA</span>
+      <span class="qa-kpi-v">{{ tiles().pending }}</span>
+      <span class="qa-kpi-sub">
+        @if (tiles().staleCount > 0) {
+          <span class="delta delta--down">{{ tiles().staleCount }} waiting 7d+</span>
+        } @else {
+          none older than 7d
+        }
+      </span>
+    </div>
+    <div class="qa-kpi">
+      <span class="qa-kpi-l">QA coverage</span>
+      <span class="qa-kpi-v">{{ tiles().coverage === null ? '—' : tiles().coverage + '%' }}</span>
+      <span class="qa-kpi-sub">{{ tiles().coverageOf }}</span>
+    </div>
+    <div class="qa-kpi">
+      <span class="qa-kpi-l">Median review time</span>
+      <span class="qa-kpi-v">{{ tiles().lag === null ? '—' : tiles().lag + 'd' }}</span>
+      <span class="qa-kpi-sub">
+        @if (tiles().lagDelta; as d) {
+          <span [class]="d.cls">{{ d.text }}</span> {{ priorLabel() }}
+        } @else {
+          submit → verdict
+        }
+      </span>
+    </div>
   </div>
 
-  <div class="pills tabs">
-    <button type="button" class="pill" [class.active]="tab() === 'overview'" (click)="tab.set('overview')">
-      {{ peopleLabel() }}
-    </button>
+  <div class="pills tabs qa-subtabs">
+    <button type="button" class="pill" [class.active]="tab() === 'overview'" (click)="tab.set('overview')">Overview</button>
     <button type="button" class="pill" [class.active]="tab() === 'failures'" (click)="tab.set('failures')">
       Failure log <span class="n">{{ failures().length }}</span>
     </button>
@@ -73,73 +93,226 @@
   } @else {
     @switch (tab()) {
       @case ('overview') {
-        <div class="card">
-          <div class="inline-head">
-            <h2>Weekly QA results</h2>
-            <span class="count">Last 8 weeks · reviews per week</span>
-          </div>
-          <div class="trend">
-            @for (b of trend(); track b.label) {
-              <div class="trend-col" [title]="b.label + ' — ' + b.pass + ' pass, ' + b.fail + ' fail'">
-                <span class="trend-val">{{ b.total || '' }}</span>
-                <div class="trend-plot">
-                  <div class="trend-stack" [style.height.%]="b.heightPct">
-                    <span class="trend-seg trend-seg--bad" [style.height.%]="100 - b.passPct"></span>
-                    <span class="trend-seg trend-seg--good" [style.height.%]="b.passPct"></span>
+        <div class="qa-grid">
+          <section class="card qa-span2">
+            <div class="inline-head">
+              <h2>Needs coaching</h2>
+              <span class="count">Under 75% or down 5+ pts</span>
+            </div>
+            @if (coaching().length === 0) {
+              <p class="muted">Nobody below the bar this period.</p>
+            } @else {
+              <div class="coach-list">
+                @for (c of coaching(); track c.id) {
+                  <div class="coach-row">
+                    <div class="person">
+                      <span class="avatar-sm" [class]="getAvatarTone(c.id)">{{ getInitials(c.name) }}</span>
+                      <span class="who">
+                        <span class="cell-main">{{ c.name }}</span>
+                        <span class="cell-sub">{{ c.fail }} fails{{ c.lastFail ? ' · last ' + timeAgo(c.lastFail) : '' }}</span>
+                      </span>
+                    </div>
+                    <div class="coach-rate rate--{{ rateTone(c.rate!) }}">
+                      <div class="coach-rate-top">
+                        <strong>{{ c.rate }}%</strong>
+                        @if (c.delta !== null) {
+                          <span [class]="deltaClass(c.delta)">{{ deltaText(c.delta) }}</span>
+                        }
+                      </div>
+                      <span class="rate-bar rate-bar--wide"><i [style.width.%]="c.rate"></i></span>
+                    </div>
+                    <svg class="spark" [class.spark--down]="(c.delta ?? 0) < 0" viewBox="0 0 64 20" aria-hidden="true">
+                      <polyline [attr.points]="sparkPoints(c.spark)" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    <div class="coach-issue">
+                      @if (c.topIssue) {
+                        <span class="issue-chip" [title]="c.topIssue.text">{{ c.topIssue.text }}<b>{{ c.topIssue.count }}</b></span>
+                      } @else {
+                        <span class="muted">No comments left</span>
+                      }
+                    </div>
+                    <button type="button" class="btn btn--ghost btn--sm" (click)="selectedPerson.set(c)">Review fails</button>
                   </div>
-                </div>
-                <span class="trend-rate">{{ b.rate === null ? '' : b.rate + '%' }}</span>
-                <span class="trend-lbl">{{ b.label }}</span>
+                }
               </div>
             }
-          </div>
-          <div class="chart-legend">
-            <span><i class="sw--good"></i> Pass</span>
-            <span><i class="sw--bad"></i> Fail</span>
-            <span class="muted">% = pass rate that week</span>
-          </div>
+          </section>
+
+          <section class="card">
+            <div class="inline-head">
+              <h2>QA backlog</h2>
+              <button type="button" class="link-btn" (click)="tab.set('pending')">Open queue</button>
+            </div>
+            <div class="backlog-head">
+              <span class="qa-kpi-v">{{ backlog().total }}</span>
+              <span class="muted">waiting{{ backlog().total ? ' · oldest ' + backlog().oldest + 'd' : '' }}</span>
+            </div>
+            <div class="age-list">
+              @for (b of backlog().buckets; track b.label) {
+                <div class="age-row">
+                  <span class="age-lbl">{{ b.label }}</span>
+                  <span class="age-track"><i class="age-fill age-fill--{{ b.cls || 'base' }}" [style.width.%]="b.pct"></i></span>
+                  <span class="num age-n">{{ b.n }}</span>
+                </div>
+              }
+            </div>
+            @if (reviewers().length > 0) {
+              <div class="rev-list">
+                <div class="rev-head"><span>Reviewers</span><span>Done · Fail %</span></div>
+                @for (r of reviewers().slice(0, 4); track r.id) {
+                  <div class="rev-row">
+                    <span class="person">
+                      <span class="avatar-xs" [class]="getAvatarTone(r.id)">{{ getInitials(r.name) }}</span>
+                      <span class="cell-main">{{ r.name }}</span>
+                    </span>
+                    <span class="num"><strong>{{ r.reviewed }}</strong><span class="muted">&nbsp;· {{ pct(r.fail, r.reviewed) }}%</span></span>
+                  </div>
+                }
+              </div>
+            }
+          </section>
         </div>
 
-        <div class="toolbar">
-          <app-search-box
-            [value]="peopleView.search()"
-            placeholder="Search by name or email…"
-            (valueChange)="peopleView.setSearch($event)"
-          />
+        <div class="qa-grid">
+          <section class="card qa-span2">
+            <div class="inline-head">
+              <h2>Weekly results</h2>
+              <div class="chart-legend chart-legend--inline">
+                <span><i class="sw--good"></i> Pass</span>
+                <span><i class="sw--bad"></i> Fail</span>
+              </div>
+            </div>
+            <div class="trend trend--tight">
+              @for (b of trend(); track b.label; let i = $index) {
+                <button
+                  type="button"
+                  class="trend-col trend-col--btn"
+                  [disabled]="b.total === 0"
+                  [title]="b.label + ' — ' + b.pass + ' pass, ' + b.fail + ' fail'"
+                  (click)="openWeek(i)"
+                >
+                  <div class="trend-plot">
+                    @if (b.total === 0) {
+                      <span class="trend-none">No reviews</span>
+                    } @else {
+                      <div class="trend-stack" [style.height.%]="b.heightPct">
+                        <span class="trend-val trend-val--top">{{ b.total }}</span>
+                        <span class="trend-seg trend-seg--bad" [style.height.%]="100 - b.passPct"></span>
+                        <span class="trend-seg trend-seg--good" [style.height.%]="b.passPct"></span>
+                      </div>
+                    }
+                  </div>
+                  <span class="trend-rate rate--{{ b.rate === null ? 'none' : rateTone(b.rate) }}">{{ b.rate === null ? '' : b.rate + '%' }}</span>
+                  <span class="trend-lbl">{{ b.label }}</span>
+                </button>
+              }
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="inline-head">
+              <h2>Why leads fail</h2>
+              <button type="button" class="link-btn" (click)="tab.set('failures')">{{ failures().length }} fails</button>
+            </div>
+            @if (reasonBars().length === 0) {
+              <p class="muted">No fails this period.</p>
+            } @else {
+              <div class="reason-bars">
+                @for (r of reasonBars(); track r.text) {
+                  <div class="reason-bar">
+                    <div class="reason-bar-top">
+                      <span class="reason-text">{{ r.text }}</span>
+                      <strong class="num">{{ r.count }}</strong>
+                    </div>
+                    <span class="age-track"><i class="age-fill age-fill--reason" [style.width.%]="r.pct"></i></span>
+                  </div>
+                }
+              </div>
+            }
+          </section>
         </div>
+
+        @if (outcomes().length > 0) {
+          <section class="card">
+            <div class="inline-head">
+              <h2>Client outcome by QA verdict</h2>
+              <div class="chart-legend chart-legend--inline">
+                <span><i class="sw--good"></i> Accepted</span>
+                <span><i class="sw--bad"></i> Rejected</span>
+                <span><i class="sw--cb"></i> Charged back</span>
+                <span><i class="sw--idle"></i> In pipeline</span>
+              </div>
+            </div>
+            <div class="outcome-list">
+              @for (o of outcomes(); track o.outcome) {
+                <div class="outcome-row">
+                  <div>
+                    <div class="cell-main">{{ o.label }}</div>
+                    <div class="cell-sub">{{ o.n }} leads</div>
+                  </div>
+                  <div class="outcome-bar">
+                    @if (o.acc) {
+                      <span class="ob ob--acc" [style.width.%]="o.acc">{{ o.acc >= 8 ? o.acc + '%' : '' }}</span>
+                    }
+                    @if (o.rej) {
+                      <span class="ob ob--rej" [style.width.%]="o.rej">{{ o.rej >= 8 ? o.rej + '%' : '' }}</span>
+                    }
+                    @if (o.cb) {
+                      <span class="ob ob--cb" [style.width.%]="o.cb"></span>
+                    }
+                    <span class="ob ob--idle"></span>
+                  </div>
+                  <div class="outcome-lost">
+                    <strong class="num" [class.lost--bad]="o.outcome === 'FAIL'">{{ o.lost }}%</strong>
+                    <span class="cell-sub">rejected or charged back</span>
+                  </div>
+                </div>
+              }
+            </div>
+          </section>
+        }
 
         <div class="card card--flush">
+          <div class="qa-table-head">
+            <h2>All {{ peopleLabel() }}</h2>
+            <app-search-box
+              [value]="peopleView.search()"
+              placeholder="Search by name or email…"
+              (valueChange)="peopleView.setSearch($event)"
+            />
+          </div>
           @if (peopleView.rows().length === 0) {
             <app-empty-state title="Nobody to show" hint="No one matches the current filters.">
               <svg lucideUsers></svg>
             </app-empty-state>
           } @else {
             <div class="table-wrap">
-              <table>
+              <table class="qa-table">
                 <thead>
                   <tr>
-                    <th class="sortable" (click)="peopleView.toggleSort('name')">
+                    <th class="sortable" [class.sorted]="peopleView.sortKey() === 'name'" (click)="peopleView.toggleSort('name')">
                       Name <span class="arrow">{{ sortArrow(peopleView, 'name') }}</span>
                     </th>
-                    <th class="sortable right" (click)="peopleView.toggleSort('reviewed')">
-                      Reviewed <span class="arrow">{{ sortArrow(peopleView, 'reviewed') }}</span>
+                    <th class="sortable right" [class.sorted]="peopleView.sortKey() === 'reviewed'" (click)="peopleView.toggleSort('reviewed')">
+                      <span class="arrow">{{ sortArrow(peopleView, 'reviewed') }}</span> Reviewed
                     </th>
-                    <th class="sortable right" (click)="peopleView.toggleSort('fail')">
-                      Failed <span class="arrow">{{ sortArrow(peopleView, 'fail') }}</span>
+                    <th class="sortable right" [class.sorted]="peopleView.sortKey() === 'fail'" (click)="peopleView.toggleSort('fail')">
+                      <span class="arrow">{{ sortArrow(peopleView, 'fail') }}</span> Failed
                     </th>
-                    <th class="sortable right" (click)="peopleView.toggleSort('rate')">
+                    <th class="sortable" [class.sorted]="peopleView.sortKey() === 'rate'" (click)="peopleView.toggleSort('rate')">
                       Pass rate <span class="arrow">{{ sortArrow(peopleView, 'rate') }}</span>
                     </th>
-                    <th class="right hide-md">vs prior 30d</th>
-                    <th class="hide-md">Last fail</th>
-                    <th class="sortable right hide-sm" (click)="peopleView.toggleSort('pending')">
-                      Awaiting QA <span class="arrow">{{ sortArrow(peopleView, 'pending') }}</span>
+                    <th class="hide-md">8 weeks</th>
+                    <th class="right hide-md">{{ priorLabel() }}</th>
+                    <th class="hide-md">Top issue</th>
+                    <th class="sortable right hide-sm" [class.sorted]="peopleView.sortKey() === 'pending'" (click)="peopleView.toggleSort('pending')">
+                      <span class="arrow">{{ sortArrow(peopleView, 'pending') }}</span> Awaiting QA
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   @for (row of peopleView.rows(); track row.id) {
-                    <tr class="clickable" (click)="selectedPerson.set(row)">
+                    <tr class="clickable" [class.row-idle]="row.reviewed === 0" (click)="selectedPerson.set(row)">
                       <td>
                         <div class="person">
                           <span class="avatar-sm" [class]="getAvatarTone(row.id)">{{ getInitials(row.name) }}</span>
@@ -150,19 +323,37 @@
                         </div>
                       </td>
                       <td class="right num">{{ row.reviewed }}</td>
-                      <td class="right num">{{ row.fail }}</td>
-                      <td class="right num">
+                      <td class="right num"><strong>{{ row.fail }}</strong></td>
+                      <td>
                         @if (row.rate === null) {
                           <span class="empty">—</span>
                         } @else {
-                          <strong>{{ row.rate }}%</strong>
+                          <span class="rate rate--{{ rateTone(row.rate) }}">
+                            <span class="rate-bar"><i [style.width.%]="row.rate"></i></span>
+                            <strong>{{ row.rate }}%</strong>
+                          </span>
+                        }
+                      </td>
+                      <td class="hide-md">
+                        @if (sparkPoints(row.spark); as pts) {
+                          <svg class="spark" [class.spark--down]="(row.delta ?? 0) < 0" [class.spark--up]="(row.delta ?? 0) > 0" viewBox="0 0 64 20" aria-hidden="true">
+                            <polyline [attr.points]="pts" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+                          </svg>
+                        } @else {
+                          <span class="empty">—</span>
                         }
                       </td>
                       <td class="right num hide-md">
                         <span [class]="deltaClass(row.delta)">{{ deltaText(row.delta) }}</span>
                       </td>
-                      <td class="hide-md">{{ row.lastFail ? timeAgo(row.lastFail) : '—' }}</td>
-                      <td class="right num hide-sm">{{ row.pending || '—' }}</td>
+                      <td class="hide-md">
+                        @if (row.topIssue) {
+                          <span class="top-issue" [title]="row.topIssue.text">{{ row.topIssue.text }}</span>
+                        } @else {
+                          <span class="empty">—</span>
+                        }
+                      </td>
+                      <td class="right num hide-sm" [class.hot]="row.pending >= 10">{{ row.pending || '—' }}</td>
                     </tr>
                   }
                 </tbody>
@@ -394,6 +585,36 @@
         }
       </div>
     }
+  </app-modal>
+}
+
+@if (selectedWeek() !== null) {
+  <app-modal
+    [title]="'Week of ' + trend()[selectedWeek()!].label"
+    [subtitle]="trend()[selectedWeek()!].pass + ' pass · ' + trend()[selectedWeek()!].fail + ' fail' + (trend()[selectedWeek()!].rate === null ? '' : ' · ' + trend()[selectedWeek()!].rate + '% pass rate')"
+    [wide]="true"
+    (close)="selectedWeek.set(null)"
+  >
+    <div class="issue-feed">
+      @for (r of weekReviews(); track r.id) {
+        <button type="button" class="issue-row issue-row--btn" (click)="selectedWeek.set(null); openReview(r)">
+          <span [class]="r.outcome === 'PASS' ? 'badge badge--accepted' : 'badge badge--rejected'">
+            {{ r.outcome === 'PASS' ? 'Pass' : 'Fail' }}
+          </span>
+          <div class="issue-body">
+            <div class="issue-head">
+              <strong>{{ r.lead.customerName }}</strong>
+              <span class="issue-meta" [title]="formatDateTime(r.createdAt)">{{ timeAgo(r.createdAt) }}</span>
+            </div>
+            <div class="issue-meta">{{ peopleLabel() === 'Closers' ? 'Closer' : 'Junior Closer' }}: {{ personOf(r.lead)?.name || '—' }}</div>
+            @if (r.comment) {
+              <p class="issue-comment">{{ r.comment }}</p>
+            }
+            <span class="issue-meta">Reviewed by {{ r.reviewer.name }}</span>
+          </div>
+        </button>
+      }
+    </div>
   </app-modal>
 }
 

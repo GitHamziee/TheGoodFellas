@@ -1,15 +1,16 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1>State Sheet</h1>
-      <p class="sub">Which clients cover each state, and the carriers each of them supports there.</p>
-    </div>
-  </div>
+  <app-page-hero
+    eyebrow="Resources"
+    title="State Sheet"
+    sub="Which clients cover each state, and the carriers each of them supports there."
+    tone="teal"
+    [count]="loading() ? '–' : stats().statesCovered + ' / ' + stats().totalStates"
+    countLabel="states covered"
+  >
+    <svg lucideMapPin></svg>
+  </app-page-hero>
 
   <div class="stats-row">
-    <app-stat-tile [value]="stats().statesCovered + ' / ' + stats().totalStates" label="States covered" tone="tone-gold">
-      <svg lucideMapPin></svg>
-    </app-stat-tile>
     <app-stat-tile [value]="stats().clients" label="Clients" tone="tone-f">
       <svg lucideUsers></svg>
     </app-stat-tile>

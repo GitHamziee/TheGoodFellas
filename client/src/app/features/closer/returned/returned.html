@@ -1,7 +1,7 @@
 <div class="page">
   <div class="page-head">
     <div>
-      <p class="sub">Leads the admin returned for correction. Fix what they flagged and send each one back.</p>
+      <p class="sub">Leads the admin or client rejected, or the admin returned for correction. Fix what they flagged and send each one back.</p>
     </div>
   </div>
 
@@ -22,11 +22,11 @@
       <app-skeleton-rows [count]="4" />
     } @else if (view.total() === 0) {
       @if (view.isFiltered()) {
-        <app-empty-state title="Nothing matches that search" hint="Clear the search to see everything sent back to you.">
+        <app-empty-state title="Nothing matches that search" hint="Clear the search to see everything sent back for a re-write.">
           <svg lucideUndo2></svg>
         </app-empty-state>
       } @else {
-        <app-empty-state title="Nothing to correct" hint="When an admin sends a lead back to you, it shows up here.">
+        <app-empty-state title="Nothing to correct" hint="When an admin or client rejects one of your leads, it shows up here.">
           <svg lucideCircleCheck></svg>
         </app-empty-state>
       }
@@ -50,7 +50,7 @@
               <tr>
                 <td>
                   <div class="cell-main">{{ lead.customerName }}</div>
-                  <div class="cell-sub">{{ formatPhone(lead.phone) }} · {{ lead.state }}</div>
+                  <div class="cell-sub"><app-copy-phone [phone]="lead.phone" /> · {{ lead.state }}</div>
                 </td>
                 <td>
                   @if (lead.returnReason) {

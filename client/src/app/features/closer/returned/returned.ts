@@ -7,6 +7,7 @@ import { createListView } from '../../../core/list-view';
 import { formatPhone, timeAgo } from '../../../core/format-utils';
 import { EmptyState, Pagination, SearchBox, SkeletonRows } from '../../../shared/ui/ui';
 import { reloadOnChange } from '../../../core/live-reload';
+import { CopyPhone } from '../../../shared/ui/copy-phone';
 
 /**
  * Leads the admin sent back to this closer to correct. The editing itself reuses the
@@ -17,6 +18,7 @@ import { reloadOnChange } from '../../../core/live-reload';
   selector: 'app-closer-returned',
   imports: [
     RouterLink,
+    CopyPhone,
     SearchBox,
     Pagination,
     EmptyState,

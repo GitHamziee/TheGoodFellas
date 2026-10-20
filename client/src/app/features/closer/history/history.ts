@@ -67,8 +67,8 @@ export class CloserHistory implements OnInit {
     { label: 'All', value: '' },
     { label: 'Submitted', value: 'SUBMITTED' },
     { label: 'Assigned', value: 'ASSIGNED' },
-    { label: 'Accepted', value: 'ACCEPTED' },
-    { label: 'Rejected', value: 'REJECTED' },
+    { label: 'Approved', value: 'ACCEPTED' },
+    { label: 'Declined', value: 'REJECTED' },
   ];
 
   readonly view = createListView<LeadHistoryRow>({

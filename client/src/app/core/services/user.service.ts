@@ -3,11 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { API_BASE_URL } from '../config';
 import { AppUser, ClientCoverage, Role } from '../models/user.model';
-
-interface ApiSuccess<T> {
-  data: T;
-  message?: string;
-}
+import type { ApiSuccess } from '../api';
 
 type LookupUser = Pick<AppUser, 'id' | 'name' | 'email'>;
 

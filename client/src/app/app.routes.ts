@@ -102,6 +102,10 @@ export const routes: Routes = [
         loadComponent: () => import('./features/admin/state-sheet/state-sheet').then((m) => m.StateSheet),
       },
       {
+        path: 'toolkit',
+        loadComponent: () => import('./features/toolkit/toolkit').then((m) => m.Toolkit),
+      },
+      {
         path: 'returned',
         loadComponent: () => import('./features/closer/returned/returned').then((m) => m.CloserReturned),
       },
@@ -125,10 +129,7 @@ export const routes: Routes = [
         path: 'dashboard',
         loadComponent: () => import('./features/admin/dashboard/dashboard').then((m) => m.AdminDashboard),
       },
-      {
-        path: 'queue',
-        loadComponent: () => import('./features/admin/queue/queue').then((m) => m.AdminQueue),
-      },
+      { path: 'queue', redirectTo: 'leads', pathMatch: 'full' },
       {
         path: 'leads',
         loadComponent: () => import('./features/admin/leads/leads').then((m) => m.AdminLeads),
@@ -168,6 +169,10 @@ export const routes: Routes = [
         loadComponent: () => import('./features/admin/state-sheet/state-sheet').then((m) => m.StateSheet),
       },
       {
+        path: 'toolkit',
+        loadComponent: () => import('./features/toolkit/toolkit').then((m) => m.Toolkit),
+      },
+      {
         path: 'expenses',
         loadComponent: () => import('./features/admin/expenses/expenses').then((m) => m.AdminExpenses),
       },
@@ -178,6 +183,10 @@ export const routes: Routes = [
       {
         path: 'analytics/junior-closers',
         loadComponent: () => import('./features/admin/analytics-junior/analytics-junior').then((m) => m.AnalyticsJunior),
+      },
+      {
+        path: 'analytics/junior-closers/:id',
+        loadComponent: () => import('./features/admin/analytics-junior/junior-detail').then((m) => m.JuniorDetail),
       },
       {
         path: 'analytics/closers',
@@ -196,15 +205,9 @@ export const routes: Routes = [
         path: 'analytics/overall',
         loadComponent: () => import('./features/admin/analytics-overall/analytics-overall').then((m) => m.AnalyticsOverall),
       },
-      {
-        path: 'analytics/drafts',
-        loadComponent: () => import('./features/admin/analytics-drafts/analytics-drafts').then((m) => m.AnalyticsDrafts),
-      },
-      {
-        path: 'analytics/charge-backs',
-        loadComponent: () =>
-          import('./features/admin/analytics-charge-backs/analytics-charge-backs').then((m) => m.AnalyticsChargeBacks),
-      },
+      // These two moved out of Analytics onto their own pages — keep old links working.
+      { path: 'analytics/drafts', redirectTo: 'drafts', pathMatch: 'full' },
+      { path: 'analytics/charge-backs', redirectTo: 'charge-backs', pathMatch: 'full' },
       {
         path: 'qa-reports/transfer-junior-closers',
         loadComponent: () =>
@@ -248,10 +251,7 @@ export const routes: Routes = [
         path: 'dashboard',
         loadComponent: () => import('./features/admin/dashboard/dashboard').then((m) => m.AdminDashboard),
       },
-      {
-        path: 'queue',
-        loadComponent: () => import('./features/admin/queue/queue').then((m) => m.AdminQueue),
-      },
+      { path: 'queue', redirectTo: 'leads', pathMatch: 'full' },
       {
         path: 'leads',
         loadComponent: () => import('./features/admin/leads/leads').then((m) => m.AdminLeads),
@@ -278,8 +278,16 @@ export const routes: Routes = [
         loadComponent: () => import('./features/admin/state-sheet/state-sheet').then((m) => m.StateSheet),
       },
       {
+        path: 'toolkit',
+        loadComponent: () => import('./features/toolkit/toolkit').then((m) => m.Toolkit),
+      },
+      {
         path: 'analytics/junior-closers',
         loadComponent: () => import('./features/admin/analytics-junior/analytics-junior').then((m) => m.AnalyticsJunior),
+      },
+      {
+        path: 'analytics/junior-closers/:id',
+        loadComponent: () => import('./features/admin/analytics-junior/junior-detail').then((m) => m.JuniorDetail),
       },
       {
         path: 'analytics/closers',
@@ -298,15 +306,9 @@ export const routes: Routes = [
         path: 'analytics/overall',
         loadComponent: () => import('./features/admin/analytics-overall/analytics-overall').then((m) => m.AnalyticsOverall),
       },
-      {
-        path: 'analytics/drafts',
-        loadComponent: () => import('./features/admin/analytics-drafts/analytics-drafts').then((m) => m.AnalyticsDrafts),
-      },
-      {
-        path: 'analytics/charge-backs',
-        loadComponent: () =>
-          import('./features/admin/analytics-charge-backs/analytics-charge-backs').then((m) => m.AnalyticsChargeBacks),
-      },
+      // These two moved out of Analytics onto their own pages — keep old links working.
+      { path: 'analytics/drafts', redirectTo: 'drafts', pathMatch: 'full' },
+      { path: 'analytics/charge-backs', redirectTo: 'charge-backs', pathMatch: 'full' },
       {
         path: 'qa-reports/transfer-junior-closers',
         loadComponent: () =>
@@ -351,15 +353,25 @@ export const routes: Routes = [
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
       {
+        path: 'chat',
+        loadComponent: () => import('./features/chat/chat').then((m) => m.Chat),
+      },
+      {
         path: 'dashboard',
         loadComponent: () => import('./features/client/dashboard/dashboard').then((m) => m.ClientDashboard),
       },
+      // Old URLs (bookmarks, dashboard links) land on the renamed pages.
+      { path: 'new-leads', redirectTo: 'cpa-leads' },
+      { path: 'lead-history', redirectTo: 'cpa-leads' },
+      { path: 'cpl-history', redirectTo: 'cpl-leads' },
       {
-        path: 'new-leads',
-        loadComponent: () => import('./features/client/assigned-leads/assigned-leads').then((m) => m.AssignedLeads),
+        path: 'cpa-leads',
+        data: { kind: 'CPA' },
+        loadComponent: () => import('./features/client/lead-history/lead-history').then((m) => m.ClientLeadHistory),
       },
       {
-        path: 'lead-history',
+        path: 'cpl-leads',
+        data: { kind: 'CPL' },
         loadComponent: () => import('./features/client/lead-history/lead-history').then((m) => m.ClientLeadHistory),
       },
       // Settings removed from this portal's nav — redirect stray bookmarks/links rather
@@ -386,6 +398,10 @@ export const routes: Routes = [
       {
         path: 'analytics/junior-closers',
         loadComponent: () => import('./features/admin/analytics-junior/analytics-junior').then((m) => m.AnalyticsJunior),
+      },
+      {
+        path: 'analytics/junior-closers/:id',
+        loadComponent: () => import('./features/admin/analytics-junior/junior-detail').then((m) => m.JuniorDetail),
       },
       {
         path: 'qa-reports/transfer-junior-closers',
@@ -419,6 +435,10 @@ export const routes: Routes = [
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'review-queue' },
       {
+        path: 'chat',
+        loadComponent: () => import('./features/chat/chat').then((m) => m.Chat),
+      },
+      {
         path: 'review-queue',
         loadComponent: () => import('./features/qa/review-queue/review-queue').then((m) => m.QaReviewQueue),
       },
@@ -443,6 +463,10 @@ export const routes: Routes = [
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'review-queue' },
       {
+        path: 'chat',
+        loadComponent: () => import('./features/chat/chat').then((m) => m.Chat),
+      },
+      {
         path: 'review-queue',
         loadComponent: () => import('./features/qa/review-queue/review-queue').then((m) => m.QaReviewQueue),
       },
@@ -453,6 +477,10 @@ export const routes: Routes = [
       {
         path: 'write-review',
         loadComponent: () => import('./features/qa/write-review/write-review').then((m) => m.QaWriteReview),
+      },
+      {
+        path: 'toolkit',
+        loadComponent: () => import('./features/toolkit/toolkit').then((m) => m.Toolkit),
       },
       // Settings removed from this portal's nav — redirect stray bookmarks/links rather
       // than letting them 404 all the way out to the public marketing site.
@@ -475,17 +503,15 @@ export const routes: Routes = [
         loadComponent: () => import('./features/retention/new-lead/new-lead').then((m) => m.RetentionNewLead),
       },
       {
-        path: 'queue',
-        loadComponent: () => import('./features/retention/queue/queue').then((m) => m.RetentionQueue),
+        path: 'leads',
+        loadComponent: () => import('./features/retention/leads/leads').then((m) => m.RetentionLeads),
       },
       {
         path: 'leads/:id',
         loadComponent: () => import('./features/retention/lead-edit/lead-edit').then((m) => m.RetentionLeadEdit),
       },
-      {
-        path: 'history',
-        loadComponent: () => import('./features/retention/history/history').then((m) => m.RetentionHistory),
-      },
+      { path: 'queue', redirectTo: 'leads', pathMatch: 'full' },
+      { path: 'history', redirectTo: 'leads', pathMatch: 'full' },
       {
         path: 'state-sheet',
         loadComponent: () => import('./features/admin/state-sheet/state-sheet').then((m) => m.StateSheet),

@@ -1,37 +1,78 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1>Welcome back{{ firstName() ? ', ' + firstName() : '' }}</h1>
-      <p class="sub">Leads waiting on your decision, and the book you've built so far.</p>
-    </div>
-    <div class="page-head-actions">
-      <a class="btn" routerLink="/client/new-leads"><svg lucideInbox></svg> Review new leads</a>
-    </div>
+  <div class="period-bar">
+    <app-period-filter [(period)]="period" [(anchor)]="anchor" />
   </div>
 
-  <div class="stats-row">
-    <app-stat-tile [value]="stats().pending" label="Awaiting your decision" tone="tone-gold">
-      <svg lucideInbox></svg>
-    </app-stat-tile>
-    <app-stat-tile [value]="stats().accepted" label="Accepted leads" tone="tone-success">
-      <svg lucideCircleCheck></svg>
-    </app-stat-tile>
-    <app-stat-tile [value]="stats().thisMonth" label="This month" tone="tone-c">
-      <svg lucideClock></svg>
-    </app-stat-tile>
-    <app-stat-tile [value]="stats().closed" label="Closed & paid" tone="tone-f">
-      <svg lucideCircleCheck></svg>
-    </app-stat-tile>
-    <app-stat-tile [value]="formatMoney(stats().coverage)" label="Total coverage" tone="tone-a">
-      <svg lucideBanknote></svg>
-    </app-stat-tile>
+  <section class="hero">
+    <div class="hero-copy">
+      <span class="hero-eyebrow"><svg lucideSparkles></svg> Your lead desk</span>
+      <h1>{{ greeting() }}{{ firstName() ? ', ' + firstName() : '' }}</h1>
+      <p>{{ headline() }}</p>
+      <div class="hero-actions">
+        @for (p of pipelines(); track p.kind) {
+          <a class="hero-btn" [class.hero-btn--hot]="p.pending > 0" [routerLink]="p.path">
+            {{ p.kind }} leads
+            @if (p.pending > 0) {
+              <span class="hero-badge">{{ p.pending }} new</span>
+            }
+            <svg lucideArrowRight></svg>
+          </a>
+        }
+      </div>
+    </div>
+    <div class="hero-count" aria-hidden="true">
+      <span class="n">{{ loading() ? '–' : waiting() }}</span>
+      <span class="l">awaiting<br />your decision</span>
+    </div>
+  </section>
+
+  <div class="pipes">
+    @for (p of pipelines(); track p.kind) {
+      <a class="card pipe" [routerLink]="p.path">
+        <div class="pipe-head">
+          <span class="pipe-kind">{{ p.kind }}</span>
+          <span class="pipe-go">Open <svg lucideArrowRight></svg></span>
+        </div>
+        <div class="pipe-main">
+          <span class="pipe-num">{{ loading() ? '–' : p.accepted }}</span>
+          <span class="pipe-cap">approved</span>
+        </div>
+        <div class="pipe-grid">
+          <div><b>{{ p.pending }}</b><span>Waiting</span></div>
+          <div><b>{{ p.thisMonth }}</b><span>This month</span></div>
+          <div><b>{{ p.closed }}</b><span>{{ p.kind === 'CPL' ? 'Paid' : 'Closed &amp; paid' }}</span></div>
+          @if (p.kind === 'CPA') {
+            <div><b>{{ formatMoney(p.annualPremium) }}</b><span>Total annual premium</span></div>
+          }
+        </div>
+        <div class="pipe-bar" [attr.aria-label]="p.closedPct + (p.kind === 'CPL' ? '% paid' : '% closed and paid')">
+          <i [style.width.%]="p.closedPct"></i>
+        </div>
+        <div class="pipe-foot">{{ p.closedPct }}% of approved leads {{ p.kind === 'CPL' ? 'paid' : 'closed &amp; paid' }}</div>
+      </a>
+    }
+
+    <div class="card months">
+      <div class="pipe-head">
+        <span class="pipe-kind">Last 6 months</span>
+        <span class="pipe-go">{{ totalAccepted() }} approved all-time</span>
+      </div>
+      <div class="bars">
+        @for (m of months(); track m.key) {
+          <div class="bar-col" [class.bar-col--now]="m.current">
+            <span class="bar-n">{{ m.count }}</span>
+            <span class="bar-fill"><i [style.height.%]="m.pct"></i></span>
+            <span class="bar-l">{{ m.label }}</span>
+          </div>
+        }
+      </div>
+    </div>
   </div>
 
   <div class="split">
     <div class="card">
       <div class="inline-head">
         <h2>Waiting on you</h2>
-        <a class="count" routerLink="/client/new-leads">Review all</a>
       </div>
 
       @if (loading()) {
@@ -43,7 +84,7 @@
       } @else {
         <div class="feed">
           @for (lead of awaiting(); track lead.id) {
-            <a class="feed-row feed-row--link" routerLink="/client/new-leads">
+            <a class="feed-row feed-row--link" [routerLink]="pageOf(lead)">
               <span class="avatar-sm" [class]="getAvatarTone(lead.id)">
                 {{ getInitials(lead.customerName) }}
               </span>
@@ -54,6 +95,7 @@
                   @if (lead.need) { · {{ humanizeEnum(lead.need) }} }
                 </span>
               </span>
+              <span class="kind-tag">{{ kindOf(lead) }}</span>
               <span class="chip"><svg lucideClock></svg>{{ timeAgo(lead.createdAt) }}</span>
             </a>
           }
@@ -63,20 +105,19 @@
 
     <div class="card">
       <div class="inline-head">
-        <h2>Recently accepted</h2>
-        <a class="count" routerLink="/client/lead-history">View history</a>
+        <h2>Recently approved</h2>
       </div>
 
       @if (loading()) {
         <app-skeleton-rows [count]="4" />
       } @else if (recentAccepted().length === 0) {
-        <app-empty-state title="No accepted leads yet" hint="Leads you accept will be listed here with full detail.">
+        <app-empty-state title="No approved leads yet" hint="Leads you approve will be listed here with full detail.">
           <svg lucideFileText></svg>
         </app-empty-state>
       } @else {
         <div class="feed">
           @for (lead of recentAccepted(); track lead.id) {
-            <div class="feed-row">
+            <a class="feed-row feed-row--link" [routerLink]="pageOf(lead)">
               <span class="avatar-sm" [class]="getAvatarTone(lead.id)">
                 {{ getInitials(lead.customerName) }}
               </span>
@@ -86,12 +127,12 @@
                   @if (lead.coverageAmount) { {{ formatMoney(lead.coverageAmount) }} · }{{ timeAgo(lead.createdAt) }}
                 </span>
               </span>
+              <span class="kind-tag">{{ kindOf(lead) }}</span>
               <app-payment-badge [status]="lead.paymentStatus" />
-            </div>
+            </a>
           }
         </div>
       }
     </div>
   </div>
-
 </div>

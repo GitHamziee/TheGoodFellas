@@ -1,20 +1,19 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1>Team</h1>
-      <p class="sub">Internal staff accounts — Junior Closers, Closers, Team Leads, Managers, and Admins.</p>
-    </div>
-    <div class="page-head-actions">
+  <app-page-hero
+    eyebrow="People"
+    title="Team"
+    sub="Internal staff accounts — Junior Closers, Closers, Team Leads, Managers, and Admins."
+    tone="moss"
+    [count]="loading() ? '–' : stats().total"
+    countLabel="team members"
+  >
+    <svg lucideUsers></svg>
       <button type="button" class="btn" (click)="openCreate()">
         <svg lucideUserPlus></svg> New account
       </button>
-    </div>
-  </div>
+  </app-page-hero>
 
   <div class="stats-row">
-    <app-stat-tile [value]="stats().total" label="Total team members" tone="tone-gold">
-      <svg lucideUsers></svg>
-    </app-stat-tile>
     <app-stat-tile [value]="stats().closers" label="Closers" tone="tone-c">
       <svg lucideUsers></svg>
     </app-stat-tile>
@@ -148,8 +147,8 @@
         <span class="hint">Minimum 8 characters.</span>
       </label>
       <label>
-        Phone <span class="hint">Optional</span>
-        <input type="tel" [(ngModel)]="phone" name="phone" />
+        <span>Phone <span class="hint">Optional</span></span>
+        <input appPhone [(ngModel)]="phone" name="phone" />
       </label>
       <label class="full">
         Role

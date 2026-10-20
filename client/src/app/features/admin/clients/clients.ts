@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal, OnDestroy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
   LucideBanknote,
@@ -19,8 +19,10 @@ import { US_STATES } from '../../../core/us-states';
 import { createListView } from '../../../core/list-view';
 import { getAvatarTone, getInitials } from '../../../core/format-utils';
 import { Modal } from '../../../shared/ui/modal';
-import { EmptyState, Pagination, SearchBox, SkeletonRows, StatTile } from '../../../shared/ui/ui';
+import { PageHero, EmptyState, Pagination, SearchBox, SkeletonRows, StatTile } from '../../../shared/ui/ui';
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
+import { PhoneInput } from '../../../shared/ui/phone-input';
+import { apiErrorMessage } from '../../../core/api';
 
 const ROLE_TONE: Record<Role, string> = {
   ADMIN: 'tone-b',
@@ -39,7 +41,7 @@ const ROLE_TONE: Record<Role, string> = {
  * (Junior Closer/Closer/Admin/Team Lead) live on the separate Team page instead. */
 @Component({
   selector: 'app-admin-clients',
-  imports: [
+  imports: [PageHero, PhoneInput, 
     FormsModule,
     Modal,
     StatTile,
@@ -59,7 +61,7 @@ const ROLE_TONE: Record<Role, string> = {
   ],
   templateUrl: './clients.html',
 })
-export class AdminClients implements OnInit {
+export class AdminClients implements OnInit, OnDestroy {
   private readonly liveReload = reloadOnChange(() => this.refresh());
   private readonly userService = inject(UserService);
   private readonly auth = inject(AuthService);
@@ -339,8 +341,8 @@ export class AdminClients implements OnInit {
       setTimeout(() => {
         if (this.coverageStatus() === 'saved') this.coverageStatus.set('idle');
       }, 2500);
-    } catch (err: any) {
-      this.error.set(err?.error?.error ?? 'Could not update carrier availability.');
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not update carrier availability.'));
       this.coverageStatus.set('idle');
     }
   }
@@ -378,8 +380,8 @@ export class AdminClients implements OnInit {
       this.clients.update((rows) => [...rows, created]);
       this.showCreate.set(false);
       this.notice.set(`Created ${created.name} as a client.`);
-    } catch (err: any) {
-      this.error.set(err?.error?.error ?? 'Could not create the client.');
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not create the client.'));
     } finally {
       this.creating.set(false);
     }
@@ -428,8 +430,8 @@ export class AdminClients implements OnInit {
       this.clients.update((rows) => rows.map((u) => (u.id === user.id ? updated : u)));
       this.selected.set(updated);
       this.notice.set(`Updated details for ${updated.name}.`);
-    } catch (err: any) {
-      this.error.set(err?.error?.error ?? 'Could not update account details.');
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not update account details.'));
     } finally {
       this.savingProfile.set(false);
     }
@@ -453,8 +455,8 @@ export class AdminClients implements OnInit {
       this.clients.update((rows) => rows.map((u) => (u.id === user.id ? updated : u)));
       this.selected.set(updated);
       this.notice.set(`Updated plan pricing for ${updated.name}.`);
-    } catch (err: any) {
-      this.error.set(err?.error?.error ?? 'Could not update plan pricing.');
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not update plan pricing.'));
     } finally {
       this.savingPricing.set(false);
     }
@@ -481,8 +483,8 @@ export class AdminClients implements OnInit {
       setTimeout(() => {
         if (this.coverageStatus() === 'saved') this.coverageStatus.set('idle');
       }, 2500);
-    } catch (err: any) {
-      this.error.set(err?.error?.error ?? 'Could not update coverage.');
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not update coverage.'));
       this.coverageStatus.set('idle');
     }
   }
@@ -504,6 +506,12 @@ export class AdminClients implements OnInit {
     this.selected.set(null);
   }
 
+  /** Leaving the page mid-debounce sends the pending save now instead of letting the
+   * timer fire against a destroyed component — the edit is still saved, just immediately. */
+  ngOnDestroy(): void {
+    if (this.selected()) void this.closeDetail();
+  }
+
   /** Determines whether Settings (not this modal) owns the "change password" affordance. */
   isSelf(user: AppUser): boolean {
     return user.id === this.currentUserId();
@@ -521,8 +529,8 @@ export class AdminClients implements OnInit {
       this.showResetPassword.set(false);
       this.newPassword = '';
       this.notice.set(`Password reset for ${updated.name}. They'll need to sign in again.`);
-    } catch (err: any) {
-      this.error.set(err?.error?.error ?? 'Could not reset the password.');
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not reset the password.'));
     } finally {
       this.resettingPassword.set(false);
     }

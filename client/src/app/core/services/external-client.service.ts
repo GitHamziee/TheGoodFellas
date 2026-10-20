@@ -3,11 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { API_BASE_URL } from '../config';
 import { ExternalClient } from '../models/external-client.model';
-
-interface ApiSuccess<T> {
-  data: T;
-  message?: string;
-}
+import type { ApiSuccess } from '../api';
 
 const BASE = `${API_BASE_URL}/external-clients`;
 

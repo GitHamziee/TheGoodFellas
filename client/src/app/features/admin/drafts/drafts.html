@@ -1,108 +1,183 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1>Drafts</h1>
-      <p class="sub">Leads every closer has parked instead of submitting — who's holding them, and for how long.</p>
-    </div>
-  </div>
-
-  <div class="stats-row">
-    <app-stat-tile [value]="stats().total" label="Parked" tone="tone-gold">
-      <svg lucideFileText></svg>
-    </app-stat-tile>
-    <app-stat-tile [value]="stats().closers" label="Closers holding drafts" tone="tone-f">
-      <svg lucideUsers></svg>
-    </app-stat-tile>
-    <app-stat-tile [value]="stats().oldest + ' d'" label="Oldest draft" tone="tone-warning">
-      <svg lucideTriangleAlert></svg>
-    </app-stat-tile>
-  </div>
-
   @if (error()) {
     <div class="error">{{ error() }}</div>
   }
 
-  <div class="toolbar">
-    <app-search-box
-      [value]="view.search()"
-      placeholder="Search by name, state, closer, or reason…"
-      (valueChange)="view.setSearch($event)"
-    />
-  </div>
-
-  <div class="card card--flush">
-    @if (loading()) {
-      <app-skeleton-rows [count]="4" />
-    } @else if (view.total() === 0) {
-      @if (view.isFiltered()) {
-        <app-empty-state title="No drafts match" hint="Try a different search term.">
-          <svg lucideFileText></svg>
-        </app-empty-state>
-      } @else {
-        <app-empty-state title="No drafts parked" hint="Leads a closer saves as a draft while enriching them will show up here.">
-          <svg lucideFileText></svg>
-        </app-empty-state>
+  @if (loading()) {
+    <div class="card"><app-skeleton-rows [count]="6" /></div>
+  } @else {
+    <div class="filters">
+      <app-select [options]="closerOptions()" [searchable]="true" [ngModel]="closerFilter()" (ngModelChange)="closerFilter.set($event)" name="fCloser" ariaLabel="Closer" />
+      <app-select [options]="juniorOptions()" [ngModel]="juniorFilter()" (ngModelChange)="juniorFilter.set($event)" name="fJunior" ariaLabel="Junior closer" />
+      <app-select [options]="reasonOptions()" [ngModel]="reasonFilter()" (ngModelChange)="reasonFilter.set($event)" name="fReason" ariaLabel="Reason" />
+      <app-select [options]="ageOptions" [ngModel]="ageFilter()" (ngModelChange)="ageFilter.set($event)" name="fAge" ariaLabel="How long it's been waiting" />
+      @if (hasFilters()) {
+        <button type="button" class="btn btn--sm btn--ghost" (click)="clearFilters()">
+          <svg lucideX></svg> Clear filters
+        </button>
       }
+    </div>
+
+    <div class="stats-row">
+      <app-stat-tile
+        [value]="stats().stale"
+        [label]="'Waiting ' + staleDays + '+ days'"
+        [tone]="stats().stale ? 'tone-danger' : 'tone-gold'"
+      >
+        <svg lucideTriangleAlert></svg>
+      </app-stat-tile>
+      <app-stat-tile [value]="stats().oldest + ' d'" label="Longest wait" tone="tone-warning">
+        <svg lucideClock></svg>
+      </app-stat-tile>
+      <app-stat-tile [value]="stats().avg + ' d'" label="Average wait" tone="tone-c">
+        <svg lucideClock></svg>
+      </app-stat-tile>
+      <app-stat-tile [value]="stats().closers" label="Closers holding drafts" tone="tone-f">
+        <svg lucideUsers></svg>
+      </app-stat-tile>
+    </div>
+
+    @if (leads().length === 0) {
+      <div class="card">
+        <app-empty-state title="No drafts" hint="When a closer saves a lead to finish later, it will show up here.">
+          <svg lucideFileText></svg>
+        </app-empty-state>
+      </div>
+    } @else if (stats().total === 0) {
+      <div class="card">
+        <app-empty-state title="No drafts match these filters" hint="Try clearing a filter.">
+          <svg lucideFileText></svg>
+        </app-empty-state>
+      </div>
     } @else {
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th class="sortable" (click)="view.toggleSort('customerName')">
-                Customer <span class="arrow">{{ sortArrow('customerName') }}</span>
-              </th>
-              <th class="hide-md">Closer</th>
-              <th class="hide-sm">Reason</th>
-              <th class="sortable hide-sm" (click)="view.toggleSort('updatedAt')">
-                Last touched <span class="arrow">{{ sortArrow('updatedAt') }}</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (lead of view.rows(); track lead.id) {
-              <tr class="clickable" (click)="selected.set(lead)">
-                <td>
-                  <div class="cell-main">{{ lead.customerName }}</div>
-                  <div class="cell-sub">
-                    {{ formatPhone(lead.phone) }} · {{ lead.state }}
-                  </div>
-                </td>
-                <td class="hide-md">
-                  @if (lead.closer; as closer) {
-                    <div class="person">
-                      <span class="avatar-sm" [class]="getAvatarTone(closer.id)">
-                        {{ getInitials(closer.name) }}
-                      </span>
-                      <span class="nm">{{ closer.name }}</span>
-                    </div>
-                  } @else {
-                    <span class="empty">—</span>
-                  }
-                </td>
-                <td class="hide-sm">
-                  @if (lead.draftReason) {
-                    <span class="chip">{{ lead.draftReason === 'OTHER' && lead.draftReasonNote ? lead.draftReasonNote : draftReasonLabel[lead.draftReason] }}</span>
-                  } @else {
-                    <span class="empty">—</span>
-                  }
-                </td>
-                <td class="hide-sm">
-                  <span class="chip"><svg lucideClock></svg>{{ timeAgo(lead.updatedAt) }}</span>
-                </td>
-              </tr>
+      <div class="dash-grid">
+        <div class="card">
+          <div class="inline-head">
+            <h2>Why they were saved</h2>
+            <span class="count">Click to filter</span>
+          </div>
+          <div class="chart">
+            @for (r of byReason(); track r.key) {
+              <div class="chart-row pickable" [class.on]="reasonFilter() === r.key" (click)="pick('reason', r.key)">
+                <span class="chart-key">{{ r.label }}</span>
+                <span class="chart-track"><span class="chart-bar" [style.width.%]="r.pct"></span></span>
+                <span class="chart-val">{{ r.count }}</span>
+              </div>
             }
-          </tbody>
-        </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="inline-head">
+            <h2>Who's holding them</h2>
+            <span class="count">Click to filter</span>
+          </div>
+          <div class="chart">
+            @for (c of byCloser(); track c.key) {
+              <div class="chart-row pickable" [class.on]="closerFilter() === c.key" (click)="pick('closer', c.key)">
+                <span class="chart-key">{{ c.label }}</span>
+                <span class="chart-track"><span class="chart-bar" [style.width.%]="c.pct"></span></span>
+                <span class="chart-val">{{ c.count }}</span>
+              </div>
+            }
+          </div>
+        </div>
       </div>
 
-      <app-pagination
-        [page]="view.page()"
-        [totalPages]="view.totalPages()"
-        [total]="view.total()"
-        (pageChange)="view.page.set($event)"
-      />
+      <div class="toolbar">
+        <app-search-box
+          [value]="view.search()"
+          placeholder="Search by customer, phone, state, closer, or reason…"
+          (valueChange)="view.setSearch($event)"
+        />
+      </div>
+
+      <div class="card card--flush">
+        @if (view.total() === 0) {
+          <app-empty-state title="No drafts match that search" hint="Try a different search term.">
+            <svg lucideFileText></svg>
+          </app-empty-state>
+        } @else {
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th class="sortable" (click)="view.toggleSort('customerName')">
+                    Customer <span class="arrow">{{ sortArrow('customerName') }}</span>
+                  </th>
+                  <th class="hide-md">Junior closer</th>
+                  <th class="hide-sm">Closer</th>
+                  <th class="hide-sm">Why it was saved</th>
+                  <th class="sortable hide-md" (click)="view.toggleSort('createdAt')">
+                    Started <span class="arrow">{{ sortArrow('createdAt') }}</span>
+                  </th>
+                  <th class="sortable right" (click)="view.toggleSort('updatedAt')">
+                    Last worked on <span class="arrow">{{ sortArrow('updatedAt') }}</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (lead of view.rows(); track lead.id) {
+                  <tr class="clickable" [class.row--stale]="ageOf(lead) >= staleDays" (click)="selected.set(lead)">
+                    <td>
+                      <div class="cell-main">{{ lead.customerName }}</div>
+                      <div class="cell-sub">{{ formatPhone(lead.phone) }} · {{ lead.state }}</div>
+                    </td>
+                    <td class="hide-md">
+                      @if (lead.juniorCloser; as jc) {
+                        <div class="person">
+                          <span class="avatar-sm" [class]="getAvatarTone(jc.id)">{{ getInitials(jc.name) }}</span>
+                          <span class="nm">{{ jc.name }}</span>
+                        </div>
+                      } @else {
+                        <span class="empty">None</span>
+                      }
+                    </td>
+                    <td class="hide-sm">
+                      @if (lead.closer; as closer) {
+                        <div class="person">
+                          <span class="avatar-sm" [class]="getAvatarTone(closer.id)">{{ getInitials(closer.name) }}</span>
+                          <span class="nm">{{ closer.name }}</span>
+                        </div>
+                      } @else {
+                        <span class="empty">—</span>
+                      }
+                    </td>
+                    <td class="hide-sm">
+                      @if (reasonText(lead)) {
+                        <span class="chip">{{ reasonText(lead) }}</span>
+                      } @else {
+                        <span class="empty">—</span>
+                      }
+                    </td>
+                    <td class="hide-md">
+                      <div class="cell-main">{{ formatDate(lead.createdAt) }}</div>
+                    </td>
+                    <td class="right">
+                      <span
+                        class="chip"
+                        [class.age--stale]="ageOf(lead) >= 7"
+                        [class.age--aging]="ageOf(lead) >= staleDays && ageOf(lead) < 7"
+                      >
+                        <svg lucideClock></svg>{{ timeAgo(lead.updatedAt) }}
+                      </span>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          <app-pagination
+            [page]="view.page()"
+            [totalPages]="view.totalPages()"
+            [total]="view.total()"
+            (pageChange)="view.page.set($event)"
+          />
+        }
+      </div>
     }
-  </div>
+  }
 </div>
 
 @if (selected(); as lead) {
@@ -112,12 +187,17 @@
     [wide]="true"
     (close)="selected.set(null)"
   >
-    @if (lead.draftReason) {
-      <div class="locked" style="border-style: solid;">
-        <svg lucideNotebookPen></svg>
-        <span><strong>Draft reason:</strong> {{ lead.draftReason === 'OTHER' && lead.draftReasonNote ? lead.draftReasonNote : draftReasonLabel[lead.draftReason] }}</span>
-      </div>
-    }
+    <div class="locked" style="border-style: solid;">
+      <svg lucideNotebookPen></svg>
+      <span>
+        @if (reasonText(lead)) {
+          <strong>Why it was saved:</strong> {{ reasonText(lead) }} ·
+        }
+        <strong>Held by:</strong> {{ lead.closer?.name ?? '—' }} ·
+        <strong>Started:</strong> {{ formatDate(lead.createdAt) }} ·
+        <strong>Last worked on:</strong> {{ timeAgo(lead.updatedAt) }}
+      </span>
+    </div>
 
     <app-lead-detail [lead]="lead" [unmasked]="true" />
   </app-modal>

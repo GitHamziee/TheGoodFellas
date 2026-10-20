@@ -1,210 +1,205 @@
-<div class="page page--narrow">
-  <div class="page-head">
-    <div>
-      <h1>Retention Lead Intake</h1>
-      <p class="sub">Log the details from a finished call — this goes straight into the Retention team's import queue.</p>
+@if (submitted()) {
+  <div class="done">
+    <div class="card done-card">
+      <span class="done-icon"><svg lucideCircleCheck></svg></span>
+      <h2>Lead submitted</h2>
+      @if (lastSubmitted(); as last) {
+        <p class="done-who">{{ last.name }}@if (last.state) { <span> · {{ last.state }}</span> }</p>
+      }
+      <button #again type="button" class="btn btn-lg" (click)="logAnother()">Log another lead</button>
     </div>
   </div>
+} @else {
+  <div class="shell">
+    <header class="top">
+      <img class="logo" src="logo.png" alt="The Good Fellas" />
+      <h1>Lead <span class="grad">Intake</span></h1>
+      <span class="pill">Retention</span>
+    </header>
 
-  @if (submitted()) {
-    <div class="card">
-      <div class="success"><svg lucideCircleCheck></svg> Lead submitted. It's in the Retention import queue now.</div>
-      <div class="form-actions">
-        <button type="button" class="btn" (click)="logAnother()">Log another lead</button>
-      </div>
-    </div>
-  } @else {
-    @if (error()) {
-      <div class="error">{{ error() }}</div>
-    }
-
-    <form appNoCopy (ngSubmit)="submit()">
-      <div class="card">
-        <div class="section">
-          <h2 class="section-title">Customer</h2>
-          <div class="form-grid">
-            <label>
-              Full name <span class="req">Required</span>
-              <input
-                type="text"
-                name="customerName"
-                [(ngModel)]="form.customerName"
-                [class.invalid]="showErrors() && !form.customerName"
-              />
-              @if (showErrors() && !form.customerName) {
-                <span class="field-error">Enter the customer's full name.</span>
-              }
-            </label>
-
-            <label>
-              Phone number <span class="req">Required</span>
-              <input
-                type="tel"
-                name="phone"
-                [(ngModel)]="form.phone"
-                [class.invalid]="showErrors() && !form.phone"
-              />
-              @if (showErrors() && !form.phone) {
-                <span class="field-error">Enter a contact number.</span>
-              }
-            </label>
-
-            <label>
-              Address
-              <input type="text" name="mailingAddress" [(ngModel)]="form.mailingAddress" />
-            </label>
-
-            <label>
-              State <span class="req">Required</span>
-              <input
-                type="text"
-                name="state"
-                [(ngModel)]="form.state"
-                [class.invalid]="showErrors() && !form.state"
-              />
-              @if (showErrors() && !form.state) {
-                <span class="field-error">Enter the customer's state.</span>
-              }
-            </label>
-
-            <label>
-              Date of birth
-              <input type="date" name="dob" [min]="minDob" [max]="todayIso" [(ngModel)]="form.dob" />
-            </label>
-
-            <label>
-              Social Security Number
-              <input type="text" name="ssn" inputmode="numeric" maxlength="9" placeholder="123456789"
-                [ngModel]="form.ssn" (ngModelChange)="onSsnChange($event)" />
-              <span class="hint">Exactly 9 digits.</span>
-            </label>
-          </div>
-        </div>
-
-        <div class="section">
-          <h2 class="section-title">Policy</h2>
-          <div class="form-grid">
-            <label>
-              Carrier's name
-              <input type="text" name="carrierName" [(ngModel)]="form.carrierName" />
-            </label>
-
-            <label>
-              Coverage type
-              <app-select [options]="planTypeOptions" [ngModel]="form.planType" name="planType"
-                (ngModelChange)="form.planType = $event" placeholder="Select a coverage type…" />
-            </label>
-
-            <label>
-              Coverage amount <span class="hint">Whole dollars</span>
-              <input type="number" name="coverageAmount" min="0" [(ngModel)]="form.coverageAmount" />
-            </label>
-
-            <label>
-              Monthly premium <span class="hint">Whole dollars</span>
-              <input type="number" name="monthlyPremiums" min="0" [(ngModel)]="form.monthlyPremiums" />
-            </label>
-
-            <label class="full">
-              Beneficiary name(s)
-              <input type="text" name="beneficiaryName" [(ngModel)]="form.beneficiaryName" />
-            </label>
-          </div>
-        </div>
-
-        <div class="section">
-          <h2 class="section-title">Banking</h2>
-          <div class="form-grid">
-            <label class="full">
-              Payment method
-              <app-select [options]="paymentMethodOptions" [ngModel]="form.paymentMethod" name="paymentMethod"
-                (ngModelChange)="form.paymentMethod = $event" placeholder="Select a payment method…" />
-            </label>
-          </div>
-
-          @if (form.paymentMethod === 'BANK_ACCOUNT') {
-            <div class="form-grid">
-              <label>
-                Bank name
-                <input type="text" name="bankName" [(ngModel)]="form.bankName" />
-              </label>
-
-              <label>
-                Account type
-                <app-select [options]="accountTypeOptions" [ngModel]="form.accountType" name="accountType"
-                  (ngModelChange)="form.accountType = $event" placeholder="Select an account type…" />
-              </label>
-
-              <label>
-                Joint or single account
-                <app-select [options]="accountOwnershipOptions" [ngModel]="form.accountOwnership" name="accountOwnership"
-                  (ngModelChange)="form.accountOwnership = $event" placeholder="Select…" />
-              </label>
-
-              <label>
-                Account opening state
-                <input type="text" name="accountOpeningState" [(ngModel)]="form.accountOpeningState" />
-              </label>
-
-              <label>
-                Routing number
-                <input type="text" name="routingNumber" inputmode="numeric" maxlength="9" placeholder="123456789"
-                  [ngModel]="form.routingNumber" (ngModelChange)="onRoutingNumberChange($event)"
-                [class.invalid]="routingInvalid()" />
-                @if (routingInvalid()) {
-                  <span class="field-error">Routing number must be exactly 9 digits.</span>
-                }
-                <span class="hint">Exactly 9 digits.</span>
-              </label>
-
-              <label>
-                Account number
-                <input type="text" name="accountNumber" inputmode="numeric" maxlength="17"
-                  [ngModel]="form.accountNumber" (ngModelChange)="onAccountNumberChange($event)" />
-                <span class="hint">3 to 17 digits.</span>
-              </label>
-            </div>
-          }
-
-          @if (form.paymentMethod === 'CARD') {
-            <div class="form-grid">
-              <label>
-                Card type
-                <app-select [options]="cardTypeOptions" [ngModel]="form.cardType" name="cardType"
-                  (ngModelChange)="form.cardType = $event" placeholder="Select a card type…" />
-              </label>
-
-              <label>
-                Card number
-                <input type="text" name="cardNumber" inputmode="numeric" maxlength="19"
-                  [ngModel]="form.cardNumber" (ngModelChange)="onCardNumberChange($event)" />
-                <span class="hint">13 to 19 digits.</span>
-              </label>
-
-              <label>
-                Expiry
-                <input type="text" name="cardExpiry" inputmode="numeric" maxlength="5" placeholder="MM/YY"
-                  [ngModel]="form.cardExpiry" (ngModelChange)="onCardExpiryChange($event)" />
-              </label>
-            </div>
-          }
-        </div>
-      </div>
-
-      <div class="form-actions">
-        @if (missing().length > 0) {
-          <span class="pending-note">Still needed: {{ missing().join(', ') }}</span>
-        } @else {
-          <span class="pending-note ok">Ready to submit</span>
+    <section class="panel paste-panel">
+      <div class="paste-box">
+        <textarea name="paste" aria-label="Paste Lead" spellcheck="false" [ngModel]="pasteText()"
+          (ngModelChange)="onPaste($event)" (paste)="onPasteEvent($event)" (focus)="$any($event.target).select()"></textarea>
+        @if (!pasteText()) {
+          <span class="paste-hint">Paste Lead</span>
         }
-        <button class="btn" type="submit" [disabled]="!canSubmit()">
-          @if (submitting()) {
-            <span class="spinner"></span> Submitting…
-          } @else {
-            <svg lucideSend></svg> Submit lead
-          }
-        </button>
       </div>
-    </form>
-  }
-</div>
+      @if (pasteError()) {
+        <div class="paste-msg">{{ pasteError() }}</div>
+      }
+      @for (w of pasteWarnings(); track w) {
+        <div class="paste-msg">{{ w }}</div>
+      }
+    </section>
+
+    <main class="panel sheet">
+      @if (error()) {
+        <div class="error">{{ error() }}</div>
+      }
+
+      <form appNoCopy (ngSubmit)="submit()">
+        <div class="fields">
+          <section class="group">
+            <h2 class="group-title">Customer</h2>
+            <div class="form-grid">
+              <label class="span2">
+                <span>Full name<b class="star">*</b></span>
+                <input type="text" name="customerName" [(ngModel)]="form.customerName"
+                  [class.invalid]="showErrors() && !form.customerName" />
+                @if (showErrors() && !form.customerName) {
+                  <span class="field-error">Enter the customer's full name.</span>
+                }
+              </label>
+
+              <label>
+                <span>Phone<b class="star">*</b></span>
+                <input appPhone [maxDigits]="10" name="phone" [(ngModel)]="form.phone"
+                  [class.invalid]="showErrors() && !form.phone" />
+                @if (showErrors() && !form.phone) {
+                  <span class="field-error">Enter a contact number.</span>
+                }
+              </label>
+
+              <label>
+                <span>State<b class="star">*</b></span>
+                <app-select [options]="stateOptions" [searchable]="true" name="state" [(ngModel)]="form.state" [invalid]="showErrors() && !form.state" />
+                @if (showErrors() && !form.state) {
+                  <span class="field-error">Enter the customer's state.</span>
+                }
+              </label>
+
+              <label class="span2">
+                Address
+                <input type="text" name="mailingAddress" [(ngModel)]="form.mailingAddress" />
+              </label>
+
+              <label>
+                Date of birth
+                <app-date-input name="dob" [min]="minDob" [max]="todayIso" [(ngModel)]="form.dob"></app-date-input>
+              </label>
+
+              <label>
+                SSN
+                <input type="text" name="ssn" inputmode="numeric" maxlength="9"
+                  [ngModel]="form.ssn" (ngModelChange)="onSsnChange($event)" />
+              </label>
+            </div>
+          </section>
+
+          <section class="group">
+            <h2 class="group-title">Policy</h2>
+            <div class="form-grid">
+              <label>
+                Carrier
+                <input type="text" name="carrierName" [(ngModel)]="form.carrierName" />
+              </label>
+
+              <label>
+                Coverage type
+                <app-select [options]="planTypeOptions" [ngModel]="form.planType" name="planType"
+                  (ngModelChange)="form.planType = $event" />
+              </label>
+
+              <label>
+                Coverage amount
+                <input type="number" name="coverageAmount" min="0" [(ngModel)]="form.coverageAmount" />
+              </label>
+
+              <label>
+                Monthly premium
+                <input type="number" name="monthlyPremiums" min="0" [(ngModel)]="form.monthlyPremiums" />
+              </label>
+
+              <label class="full">
+                Beneficiary
+                <input type="text" name="beneficiaryName" [(ngModel)]="form.beneficiaryName" />
+              </label>
+            </div>
+          </section>
+
+          <section class="group">
+            <h2 class="group-title">Banking</h2>
+            <div class="form-grid">
+              <label>
+                Payment method
+                <app-select [options]="paymentMethodOptions" [ngModel]="form.paymentMethod" name="paymentMethod"
+                  (ngModelChange)="form.paymentMethod = $event" />
+              </label>
+
+              @if (form.paymentMethod === 'BANK_ACCOUNT') {
+                <label>
+                  Bank name
+                  <input type="text" name="bankName" [(ngModel)]="form.bankName" />
+                </label>
+
+                <label>
+                  Account type
+                  <app-select [options]="accountTypeOptions" [ngModel]="form.accountType" name="accountType"
+                    (ngModelChange)="form.accountType = $event" />
+                </label>
+
+                <label>
+                  Joint or single
+                  <app-select [options]="accountOwnershipOptions" [ngModel]="form.accountOwnership" name="accountOwnership"
+                    (ngModelChange)="form.accountOwnership = $event" />
+                </label>
+
+                <label>
+                  Opening state
+                  <app-select [options]="stateOptions" [searchable]="true" name="accountOpeningState" [(ngModel)]="form.accountOpeningState" />
+                </label>
+
+                <label>
+                  Routing
+                  <input type="text" name="routingNumber" inputmode="numeric" maxlength="9"
+                    [ngModel]="form.routingNumber" (ngModelChange)="onRoutingNumberChange($event)"
+                    [class.invalid]="routingInvalid()" />
+                  @if (routingInvalid()) {
+                    <span class="field-error">Must be exactly 9 digits.</span>
+                  }
+                </label>
+
+                <label>
+                  Account
+                  <input type="text" name="accountNumber" inputmode="numeric" maxlength="17"
+                    [ngModel]="form.accountNumber" (ngModelChange)="onAccountNumberChange($event)" />
+                </label>
+              }
+
+              @if (form.paymentMethod === 'CARD') {
+                <label>
+                  Card type
+                  <app-select [options]="cardTypeOptions" [ngModel]="form.cardType" name="cardType"
+                    (ngModelChange)="form.cardType = $event" />
+                </label>
+
+                <label>
+                  Card number
+                  <input type="text" name="cardNumber" inputmode="numeric" maxlength="19"
+                    [ngModel]="form.cardNumber" (ngModelChange)="onCardNumberChange($event)" />
+                </label>
+
+                <label>
+                  Expiry
+                  <input type="text" name="cardExpiry" inputmode="numeric" maxlength="5" placeholder="MM/YY"
+                    [ngModel]="form.cardExpiry" (ngModelChange)="onCardExpiryChange($event)" />
+                </label>
+              }
+            </div>
+          </section>
+        </div>
+
+        <div class="bar">
+          <button class="btn btn-lg" type="submit" [disabled]="submitting()">
+            @if (submitting()) {
+              <span class="spinner"></span> Submitting…
+            } @else {
+              <svg lucideSend></svg> Submit lead
+            }
+          </button>
+        </div>
+      </form>
+    </main>
+  </div>
+}

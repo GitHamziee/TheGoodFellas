@@ -1,3 +1,5 @@
+import { APP_TIME_ZONE, pacificParts, pacificStartOfDay, pacificToday, pacificWeekStart } from '../../core/format-utils';
+
 /** Pure helpers shared by the Transfer and Live Call reports — date ranges, weekly buckets, tallies. */
 
 export type RangeKey = '' | 'day' | 'week' | 'month';
@@ -11,41 +13,44 @@ export const RANGE_PILLS: { label: string; value: RangeKey }[] = [
 
 const DAY = 86400000;
 
-/** Local midnight of the Monday that starts the week containing `d`. */
-export function weekStart(d: Date): Date {
-  const start = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
-  return start;
+/** Start of a Pacific calendar day, from a yyyy-MM-dd string. */
+function pacificDayStart(iso: string): number {
+  const [y, m, d] = iso.split('-').map(Number);
+  return pacificStartOfDay(y, m, d);
 }
 
-/** True when `dateStr` falls in the quick-pill range, or in [from, to] when custom dates are set. */
+/** True when `dateStr` falls in the quick-pill range, or in [from, to] when custom dates are set.
+ * All day boundaries are Pacific time. */
 export function inRange(dateStr: string, range: RangeKey, from: string, to: string): boolean {
   const t = new Date(dateStr).getTime();
   if (from || to) {
-    if (from && t < new Date(from + 'T00:00:00').getTime()) return false;
-    if (to && t >= new Date(to + 'T00:00:00').getTime() + DAY) return false;
+    if (from && t < pacificDayStart(from)) return false;
+    if (to) {
+      const [y, m, d] = to.split('-').map(Number);
+      if (t >= pacificStartOfDay(y, m, d + 1)) return false;
+    }
     return true;
   }
   if (!range) return true;
-  const now = new Date();
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  if (range === 'day') return t >= startOfToday;
-  if (range === 'week') return t >= weekStart(now).getTime();
-  return t >= new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  if (range === 'day') return t >= pacificToday();
+  if (range === 'week') return t >= pacificWeekStart();
+  const now = pacificParts();
+  return t >= pacificStartOfDay(now.year, now.month, 1);
 }
 
 export interface WeekBucket {
-  start: Date;
+  /** Epoch ms of Monday 00:00 Pacific. */
+  start: number;
   label: string;
 }
 
-/** The last `n` Monday-start weeks, oldest first, ending with the current week. */
+/** The last `n` Monday-start weeks (Pacific), oldest first, ending with the current week. */
 export function lastWeeks(n: number): WeekBucket[] {
-  const current = weekStart(new Date());
+  const current = pacificParts(pacificWeekStart());
   return Array.from({ length: n }, (_, i) => {
-    const start = new Date(current);
-    start.setDate(start.getDate() - 7 * (n - 1 - i));
-    return { start, label: start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) };
+    const start = pacificStartOfDay(current.year, current.month, current.day - 7 * (n - 1 - i));
+    const label = new Date(start).toLocaleDateString('en-US', { timeZone: APP_TIME_ZONE, month: 'short', day: 'numeric' });
+    return { start, label };
   });
 }
 
@@ -53,7 +58,7 @@ export function lastWeeks(n: number): WeekBucket[] {
 export function bucketIndex(dateStr: string, weeks: WeekBucket[]): number {
   const t = new Date(dateStr).getTime();
   for (let i = weeks.length - 1; i >= 0; i--) {
-    if (t >= weeks[i].start.getTime()) return t < weeks[i].start.getTime() + 7 * DAY ? i : -1;
+    if (t >= weeks[i].start) return i === weeks.length - 1 || t < weeks[i + 1].start ? i : -1;
   }
   return -1;
 }

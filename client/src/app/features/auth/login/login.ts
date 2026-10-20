@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { LucideArrowLeft, LucideCheck, LucideEye, LucideEyeOff } from '@lucide/angular';
 import { AuthService } from '../../../core/services/auth.service';
+import { apiErrorMessage } from '../../../core/api';
 
 @Component({
   selector: 'app-login',
@@ -46,8 +47,8 @@ export class Login {
     try {
       const user = await this.auth.login(this.email, this.password);
       this.router.navigateByUrl(this.auth.homeFor(user.role));
-    } catch (err: any) {
-      this.error.set(err?.error?.error ?? 'Login failed');
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Login failed'));
     } finally {
       this.loading.set(false);
     }

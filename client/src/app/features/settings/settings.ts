@@ -11,6 +11,7 @@ import {
 import { AuthService } from '../../core/services/auth.service';
 import { ROLE_LABEL } from '../../core/nav-config';
 import { getAvatarTone, getInitials } from '../../core/format-utils';
+import { apiErrorMessage } from '../../core/api';
 
 const MIN_LENGTH = 8;
 
@@ -81,8 +82,8 @@ export class Settings {
       this.success.set(true);
       // Changing the password bumps tokenVersion, so the current session is already dead.
       setTimeout(() => this.auth.logout(), 1800);
-    } catch (err: any) {
-      this.error.set(err?.error?.error ?? 'Could not change your password.');
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not change your password.'));
     } finally {
       this.submitting.set(false);
     }

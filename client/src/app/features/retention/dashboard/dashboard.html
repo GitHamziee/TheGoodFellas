@@ -5,8 +5,12 @@
       <p class="sub">The team's queue at a glance, and how recently-worked leads are landing.</p>
     </div>
     <div class="page-head-actions">
-      <a class="btn" routerLink="/retention/queue"><svg lucideSend></svg> Go to queue</a>
+      <a class="btn" routerLink="/retention/leads"><svg lucideSend></svg> Leads</a>
     </div>
+  </div>
+
+  <div class="period-bar">
+    <app-period-filter [(period)]="period" [(anchor)]="anchor" />
   </div>
 
   <div class="stats-row">
@@ -16,15 +20,15 @@
     <app-stat-tile [value]="stats().mine" label="Assigned to me" tone="tone-c">
       <svg lucideClock></svg>
     </app-stat-tile>
-    <app-stat-tile [value]="stats().submitted" label="Submitted total" tone="tone-d">
+    <app-stat-tile [value]="stats().submitted" label="Submitted" tone="tone-d">
       <svg lucideUsers></svg>
     </app-stat-tile>
-    <app-stat-tile [value]="stats().accepted" label="Accepted" tone="tone-success">
+    <app-stat-tile [value]="stats().accepted" label="Approved" tone="tone-success">
       <svg lucideCircleCheck></svg>
     </app-stat-tile>
     <app-stat-tile
       [value]="stats().acceptRate === null ? '—' : stats().acceptRate + '%'"
-      label="Accept rate"
+      label="Approval rate"
       tone="tone-a"
     >
       <svg lucideTarget></svg>
@@ -35,7 +39,7 @@
     <div class="card">
       <div class="inline-head">
         <h2>Work these next</h2>
-        <a class="count" routerLink="/retention/queue">View queue</a>
+        <a class="count" routerLink="/retention/leads">View all</a>
       </div>
 
       @if (loading()) {
@@ -65,13 +69,13 @@
     <div class="card">
       <div class="inline-head">
         <h2>Recent outcomes</h2>
-        <a class="count" routerLink="/retention/history">View history</a>
+        <a class="count" routerLink="/retention/leads">View all</a>
       </div>
 
       @if (loading()) {
         <app-skeleton-rows [count]="4" />
       } @else if (recentOutcomes().length === 0) {
-        <app-empty-state title="Nothing submitted yet" hint="Leads the team sends onward will show their outcome here.">
+        <app-empty-state title="Nothing in this period" hint="Leads the team sends onward in the selected period will show their outcome here.">
           <svg lucideSend></svg>
         </app-empty-state>
       } @else {

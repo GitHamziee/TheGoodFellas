@@ -7,8 +7,10 @@ import { createListView } from '../../../core/list-view';
 import { formatDate, getAvatarTone, getInitials } from '../../../core/format-utils';
 import { US_STATES } from '../../../core/us-states';
 import { Modal } from '../../../shared/ui/modal';
-import { EmptyState, Pagination, SearchBox, SkeletonRows, StatTile } from '../../../shared/ui/ui';
+import { PageHero, EmptyState, Pagination, SearchBox, SkeletonRows } from '../../../shared/ui/ui';
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
+import { PhoneInput } from '../../../shared/ui/phone-input';
+import { apiErrorMessage } from '../../../core/api';
 
 interface Draft {
   name: string;
@@ -25,10 +27,9 @@ interface Draft {
  * page's existing simpler edit flow. */
 @Component({
   selector: 'app-admin-external-clients',
-  imports: [
+  imports: [PageHero, PhoneInput, 
     FormsModule,
     Modal,
-    StatTile,
     SearchBox,
     Pagination,
     EmptyState,
@@ -250,8 +251,8 @@ export class AdminExternalClients implements OnInit {
       this.externalClients.update((rows) => [...rows, created]);
       this.showCreate.set(false);
       this.notice.set(`Created ${created.name}.`);
-    } catch (err: any) {
-      this.error.set(err?.error?.error ?? 'Could not create the external client.');
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not create the external client.'));
     } finally {
       this.creating.set(false);
     }
@@ -310,8 +311,8 @@ export class AdminExternalClients implements OnInit {
       this.externalClients.update((rows) => rows.map((c) => (c.id === client.id ? updated : c)));
       this.selected.set(null);
       this.notice.set(`Saved changes to ${updated.name}.`);
-    } catch (err: any) {
-      this.error.set(err?.error?.error ?? 'Could not save changes.');
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not save changes.'));
     } finally {
       this.saving.set(false);
     }

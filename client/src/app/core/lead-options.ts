@@ -1,5 +1,7 @@
 import { AccountOwnership, AccountType, CardType, DCode, DraftReason, IncomeSource, LeadNeed, PayerType, PaymentMethod, PlanType, RetiredIncomeType } from './models/lead.model';
 
+import { US_STATES } from './us-states';
+
 /** Shared by Junior intake and Closer enrichment — same field, same options, both forms. */
 export const MARITAL_STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: 'Single', label: 'Single' },
@@ -14,6 +16,26 @@ export const GENDER_OPTIONS: { value: string; label: string }[] = [
   { value: 'Male', label: 'Male' },
   { value: 'Female', label: 'Female' },
 ];
+
+/** Every US state, as full names — same values the licensed-states picker stores. */
+const US_STATE_ABBREVIATIONS: Record<string, string> = {
+  Alabama: 'AL', Alaska: 'AK', Arizona: 'AZ', Arkansas: 'AR', California: 'CA', Colorado: 'CO',
+  Connecticut: 'CT', Delaware: 'DE', Florida: 'FL', Georgia: 'GA', Hawaii: 'HI', Idaho: 'ID',
+  Illinois: 'IL', Indiana: 'IN', Iowa: 'IA', Kansas: 'KS', Kentucky: 'KY', Louisiana: 'LA',
+  Maine: 'ME', Maryland: 'MD', Massachusetts: 'MA', Michigan: 'MI', Minnesota: 'MN',
+  Mississippi: 'MS', Missouri: 'MO', Montana: 'MT', Nebraska: 'NE', Nevada: 'NV',
+  'New Hampshire': 'NH', 'New Jersey': 'NJ', 'New Mexico': 'NM', 'New York': 'NY',
+  'North Carolina': 'NC', 'North Dakota': 'ND', Ohio: 'OH', Oklahoma: 'OK', Oregon: 'OR',
+  Pennsylvania: 'PA', 'Rhode Island': 'RI', 'South Carolina': 'SC', 'South Dakota': 'SD',
+  Tennessee: 'TN', Texas: 'TX', Utah: 'UT', Vermont: 'VT', Virginia: 'VA', Washington: 'WA',
+  'West Virginia': 'WV', Wisconsin: 'WI', Wyoming: 'WY',
+};
+
+export const US_STATE_OPTIONS: { value: string; label: string; keywords: string }[] = US_STATES.map((s) => ({
+  value: s,
+  label: s,
+  keywords: US_STATE_ABBREVIATIONS[s],
+}));
 
 export const NEED_OPTIONS: { value: LeadNeed; label: string }[] = [
   { value: 'BURIAL', label: 'Burial' },
@@ -110,3 +132,13 @@ export const DRAFT_REASON_OPTIONS: { value: DraftReason; label: string }[] = [
 export const DRAFT_REASON_LABEL: Record<DraftReason, string> = Object.fromEntries(
   DRAFT_REASON_OPTIONS.map((o) => [o.value, o.label]),
 ) as Record<DraftReason, string>;
+
+/** Preset reasons for an admin charging a lead back. The stored ChargeBack.reason is plain
+ * text: the preset label, or whatever the admin typed when they picked OTHER. */
+export const CHARGE_BACK_REASON_OPTIONS: { value: string; label: string }[] = [
+  { value: 'Invalid Account', label: 'Invalid Account' },
+  { value: 'Account Closed', label: 'Account Closed' },
+  { value: 'NSF', label: 'NSF' },
+  { value: 'Customer Cancelled', label: 'Customer Cancelled' },
+  { value: 'OTHER', label: 'Other' },
+];

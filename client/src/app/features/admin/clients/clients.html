@@ -1,20 +1,19 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1>Clients</h1>
-      <p class="sub">Accounts that receive leads — pricing, licensed states, and carriers.</p>
-    </div>
-    <div class="page-head-actions">
+  <app-page-hero
+    eyebrow="People"
+    title="Clients"
+    sub="Accounts that receive leads — pricing, licensed states, and carriers."
+    tone="steel"
+    [count]="loading() ? '–' : stats().total"
+    countLabel="client accounts"
+  >
+    <svg lucideBriefcase></svg>
       <button type="button" class="btn" (click)="openCreate()">
         <svg lucideUserPlus></svg> New client
       </button>
-    </div>
-  </div>
+  </app-page-hero>
 
   <div class="stats-row">
-    <app-stat-tile [value]="stats().total" label="Total clients" tone="tone-gold">
-      <svg lucideBriefcase></svg>
-    </app-stat-tile>
     <app-stat-tile [value]="stats().withPricing" label="With pricing set" tone="tone-f">
       <svg lucideBanknote></svg>
     </app-stat-tile>
@@ -140,8 +139,8 @@
         <span class="hint">Minimum 8 characters.</span>
       </label>
       <label>
-        Phone <span class="hint">Optional</span>
-        <input type="tel" [(ngModel)]="phone" name="phone" />
+        <span>Phone <span class="hint">Optional</span></span>
+        <input appPhone [(ngModel)]="phone" name="phone" />
       </label>
     </div>
 
@@ -347,8 +346,8 @@
           <input type="email" [(ngModel)]="email" name="detailEmail" />
         </label>
         <label>
-          Phone <span class="hint">Optional</span>
-          <input type="tel" [(ngModel)]="phone" name="detailPhone" />
+          <span>Phone <span class="hint">Optional</span></span>
+          <input appPhone [(ngModel)]="phone" name="detailPhone" />
         </label>
       </div>
       <button type="button" class="btn btn--ghost" style="margin-top: 0.9rem;" [disabled]="savingProfile()" (click)="saveProfile()">

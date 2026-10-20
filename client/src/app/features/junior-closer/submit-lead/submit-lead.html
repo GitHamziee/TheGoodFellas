@@ -92,9 +92,7 @@
 
         <label>
           Phone number <span class="req">Required</span>
-          <input
-            type="tel"
-            name="phone"
+          <input appPhone name="phone"
             [(ngModel)]="form.phone"
             [class.invalid]="showErrors() && !form.phone"
           />
@@ -105,12 +103,7 @@
 
         <label>
           State <span class="req">Required</span>
-          <input
-            type="text"
-            name="state"
-            [(ngModel)]="form.state"
-            [class.invalid]="showErrors() && !form.state"
-          />
+          <app-select [options]="stateOptions" [searchable]="true" name="state" [(ngModel)]="form.state" [invalid]="showErrors() && !form.state" />
           @if (showErrors() && !form.state) {
             <span class="field-error">Enter the customer's state.</span>
           }
@@ -118,7 +111,7 @@
 
         <label>
           Zipcode
-          <input type="text" name="zipcode" [(ngModel)]="form.zipcode" />
+          <input appZip name="zipcode" [(ngModel)]="form.zipcode" />
         </label>
 
         @if (leadType() === 'CPA') {
@@ -129,7 +122,7 @@
 
           <label>
             Birth state
-            <input type="text" name="birthState" [(ngModel)]="form.birthState" />
+            <app-select [options]="stateOptions" [searchable]="true" name="birthState" [(ngModel)]="form.birthState" />
           </label>
 
           <label>
@@ -147,7 +140,7 @@
         @if (leadType() === 'CPA') {
           <label>
             Date of birth
-            <input type="date" name="dob" [min]="minDob" [max]="todayIso" [ngModel]="form.dob" (ngModelChange)="onDobChange($event)" />
+            <app-date-input name="dob" [min]="minDob" [max]="todayIso" [ngModel]="form.dob" (ngModelChange)="onDobChange($event)"></app-date-input>
           </label>
 
           <label>
@@ -161,7 +154,7 @@
           </label>
 
           <label>
-            Weight <span class="hint">Pounds</span>
+            <span>Weight <span class="hint">Pounds</span></span>
             <input type="number" name="weight" min="0" [(ngModel)]="form.weight" />
           </label>
 
@@ -177,7 +170,7 @@
         } @else {
           <label>
             Date of birth
-            <input type="date" name="dob" [min]="minDob" [max]="todayIso" [(ngModel)]="form.dob" />
+            <app-date-input name="dob" [min]="minDob" [max]="todayIso" [(ngModel)]="form.dob"></app-date-input>
           </label>
 
           <label>
@@ -218,7 +211,7 @@
           }
 
           <label>
-            Annual income <span class="hint">Whole dollars</span>
+            <span>Annual income <span class="hint">Whole dollars</span></span>
             <input type="number" name="annualIncome" min="0" [(ngModel)]="form.annualIncome" />
           </label>
         } @else {
@@ -245,7 +238,7 @@
       @if (leadType() === 'CPA') {
         <h2 class="section-title"><svg lucideNotebookPen></svg> Notes for the closer</h2>
         <label>
-          Anything the closer should know <span class="hint">Optional</span>
+          <span>Anything the closer should know <span class="hint">Optional</span></span>
           <textarea
             name="juniorNotes"
             rows="4"
@@ -256,7 +249,7 @@
       } @else {
         <h2 class="section-title"><svg lucideNotebookPen></svg> Notes for admin</h2>
         <label>
-          Anything admin should know <span class="hint">Optional</span>
+          <span>Anything admin should know <span class="hint">Optional</span></span>
           <textarea
             name="juniorNotes"
             rows="4"

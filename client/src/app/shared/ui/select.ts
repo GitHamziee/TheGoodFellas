@@ -18,6 +18,8 @@ export interface SelectOption {
   value: unknown;
   label: string;
   disabled?: boolean;
+  /** Extra text the search box also matches against, e.g. a state's abbreviation. */
+  keywords?: string;
 }
 
 /**
@@ -68,7 +70,25 @@ export interface SelectOption {
     </div>
     @if (open()) {
       <ul #menu class="dropdown-menu" role="listbox" [style]="menuStyle()" (click)="$event.stopPropagation()">
-        @for (opt of options(); track $index) {
+        @if (searchable()) {
+          <li class="dropdown-search" style="padding:6px;list-style:none" (click)="$event.stopPropagation()">
+            <input
+              #search
+              type="text"
+              placeholder="Type to search…"
+              autocomplete="off"
+              style="width:100%"
+              [value]="query()"
+              (input)="query.set($any($event.target).value)"
+              (keydown.enter)="$event.preventDefault(); pickFirst()"
+              (keydown.escape)="close()"
+            />
+          </li>
+          @if (filteredOptions().length === 0) {
+            <li class="dropdown-option disabled"><span>No matches</span></li>
+          }
+        }
+        @for (opt of filteredOptions(); track $index) {
           <li
             role="option"
             class="dropdown-option"
@@ -95,6 +115,13 @@ export class Select implements ControlValueAccessor, OnDestroy {
   readonly placeholder = input('Select…');
   readonly ariaLabel = input('');
   readonly invalid = input(false);
+  /** Shows a type-to-filter box at the top of the open menu. */
+  readonly searchable = input(false);
+  readonly query = signal('');
+  readonly filteredOptions = computed(() => {
+    const q = this.query().trim().toLowerCase();
+    return q ? this.options().filter((o) => o.label.toLowerCase().includes(q) || !!o.keywords?.toLowerCase().includes(q)) : this.options();
+  });
 
   readonly open = signal(false);
   readonly menuStyle = signal<Record<string, string>>({});
@@ -131,7 +158,10 @@ export class Select implements ControlValueAccessor, OnDestroy {
     window.addEventListener('scroll', this.onScroll, true);
     afterNextRender(
       () => {
-        if (this.menuRef) document.body.appendChild(this.menuRef.nativeElement);
+        if (this.menuRef) {
+          document.body.appendChild(this.menuRef.nativeElement);
+          this.menuRef.nativeElement.querySelector<HTMLInputElement>('.dropdown-search input')?.focus();
+        }
       },
       { injector: this.injector },
     );
@@ -142,6 +172,11 @@ export class Select implements ControlValueAccessor, OnDestroy {
     this.value.set(opt.value);
     this.onChange(opt.value);
     this.closeMenu();
+  }
+
+  pickFirst(): void {
+    const first = this.filteredOptions().find((o) => !o.disabled);
+    if (first) this.pick(first);
   }
 
   /** Closes on any click/resize outside the menu, or a scroll anywhere (see toggle). */
@@ -158,6 +193,7 @@ export class Select implements ControlValueAccessor, OnDestroy {
 
   private closeMenu(): void {
     this.open.set(false);
+    this.query.set('');
     this.onTouched();
     window.removeEventListener('scroll', this.onScroll, true);
   }

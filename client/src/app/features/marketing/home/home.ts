@@ -161,7 +161,7 @@ export class Home {
     },
     {
       title: 'Live status, not a monthly report',
-      desc: 'Every transfer and policy carries a status you can check any time — New through Accepted and Paid.',
+      desc: 'Every transfer and policy carries a status you can check any time — New through Approved and Paid.',
       icon: 'clock',
     },
   ] as const;

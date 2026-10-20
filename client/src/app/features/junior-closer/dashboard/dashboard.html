@@ -9,25 +9,33 @@
     </div>
   </div>
 
+  <div class="period-bar">
+    <app-period-filter [(period)]="period" [(anchor)]="anchor" />
+  </div>
+
   <div class="stats-row">
     <app-stat-tile [value]="stats().total" label="Leads submitted" tone="tone-gold">
       <svg lucideSend></svg>
     </app-stat-tile>
-    <app-stat-tile [value]="stats().today" label="Today" tone="tone-d">
-      <svg lucideClock></svg>
+    <app-stat-tile [value]="stats().accepted" label="Closed" tone="tone-success">
+      <svg lucideCircleCheck></svg>
     </app-stat-tile>
-    <app-stat-tile [value]="stats().thisMonth" label="This month" tone="tone-c">
-      <svg lucideClock></svg>
-    </app-stat-tile>
-    <app-stat-tile [value]="stats().accepted" label="Accepted" tone="tone-success">
+    <app-stat-tile [value]="stats().acceptedCpl" label="Approved CPL" tone="tone-success">
       <svg lucideCircleCheck></svg>
     </app-stat-tile>
     <app-stat-tile
       [value]="stats().acceptRate === null ? '—' : stats().acceptRate + '%'"
-      label="Accept rate"
+      label="Closing rate"
       tone="tone-a"
     >
       <svg lucideTarget></svg>
+    </app-stat-tile>
+    <app-stat-tile
+      [value]="stats().qaRate === null ? '—' : stats().qaRate + '%'"
+      label="QA approval rate"
+      tone="tone-a"
+    >
+      <svg lucideCircleCheck></svg>
     </app-stat-tile>
   </div>
 
@@ -40,7 +48,7 @@
     @if (loading()) {
       <app-skeleton-rows [count]="4" />
     } @else if (recent().length === 0) {
-      <app-empty-state title="Nothing yet" hint="Your most recent submissions will show up here.">
+      <app-empty-state title="Nothing in this period" hint="Submissions from the selected period will show up here.">
         <svg lucideFileText></svg>
       </app-empty-state>
     } @else {

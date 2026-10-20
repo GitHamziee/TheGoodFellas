@@ -61,7 +61,7 @@
                 <td>
                   <div class="cell-main">{{ lead.customerName }}</div>
                   <div class="cell-sub">
-                    {{ formatPhone(lead.phone) }} · {{ lead.state }}
+                    <app-copy-phone [phone]="lead.phone" /> · {{ lead.state }}
                   </div>
                 </td>
                 <td class="hide-sm">

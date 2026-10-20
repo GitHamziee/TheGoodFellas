@@ -13,10 +13,11 @@ import {
 } from '@lucide/angular';
 import { Reveal } from '../../../shared/reveal.directive';
 import { Select } from '../../../shared/ui/select';
+import { PhoneInput } from '../../../shared/ui/phone-input';
 
 @Component({
   selector: 'app-contact',
-  imports: [
+  imports: [PhoneInput, 
     FormsModule,
     RouterLink,
     Reveal,
@@ -96,7 +97,7 @@ export class Contact {
     },
     {
       q: 'What do we get besides the call?',
-      a: 'A client portal account. You review each lead we assign, accept or reject it, and track everything through to a written policy with a live status on each one.',
+      a: 'A client portal account. You review each lead we assign, approve or decline it, and track everything through to a written policy with a live status on each one.',
     },
     {
       q: 'How is our customer data handled?',

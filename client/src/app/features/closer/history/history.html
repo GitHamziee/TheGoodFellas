@@ -12,15 +12,15 @@
     <app-stat-tile [value]="stats().thisMonth" label="This month" tone="tone-c">
       <svg lucideClock></svg>
     </app-stat-tile>
-    <app-stat-tile [value]="stats().accepted" label="Accepted" tone="tone-success">
+    <app-stat-tile [value]="stats().accepted" label="Approved" tone="tone-success">
       <svg lucideCircleCheck></svg>
     </app-stat-tile>
-    <app-stat-tile [value]="stats().rejected" label="Rejected" tone="tone-danger">
+    <app-stat-tile [value]="stats().rejected" label="Declined" tone="tone-danger">
       <svg lucideCircleX></svg>
     </app-stat-tile>
     <app-stat-tile
       [value]="stats().acceptRate === null ? '—' : stats().acceptRate + '%'"
-      label="Accept rate"
+      label="Approval rate"
       tone="tone-a"
     >
       <svg lucideTarget></svg>
@@ -30,14 +30,6 @@
   @if (error()) {
     <div class="error">{{ error() }}</div>
   }
-
-  <div class="locked">
-    <svg lucideLock></svg>
-    <span>
-      Once a lead leaves your inbox, only the customer's name, status and date stay visible to you — the rest,
-      including the phone number, is restricted.
-    </span>
-  </div>
 
   <div class="toolbar">
     <app-search-box

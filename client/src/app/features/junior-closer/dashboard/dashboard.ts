@@ -2,7 +2,6 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
   LucideCircleCheck,
-  LucideClock,
   LucideFileText,
   LucideSend,
   LucideTarget,
@@ -14,23 +13,26 @@ import {
   formatPhone,
   getAvatarTone,
   getInitials,
-  isThisMonth,
-  isToday,
+  pacificIsoDate,
+  pacificToday,
   timeAgo,
+  juniorOutcome,
+  qaPassRate,
 } from '../../../core/format-utils';
 import { EmptyState, SkeletonRows, StatTile, StatusBadge } from '../../../shared/ui/ui';
+import { Period, PeriodFilter, inPeriod } from '../../../shared/ui/period-filter';
 import { reloadOnChange } from '../../../core/live-reload';
 
 @Component({
   selector: 'app-junior-dashboard',
   imports: [
     RouterLink,
+    PeriodFilter,
     StatTile,
     StatusBadge,
     EmptyState,
     SkeletonRows,
     LucideSend,
-    LucideClock,
     LucideCircleCheck,
     LucideTarget,
     LucideFileText,
@@ -42,7 +44,11 @@ export class JuniorDashboard implements OnInit {
   private readonly leadService = inject(LeadService);
   private readonly auth = inject(AuthService);
 
-  readonly leads = signal<LeadHistoryRow[]>([]);
+  readonly allLeads = signal<LeadHistoryRow[]>([]);
+  readonly period = signal<Period>('day');
+  readonly anchor = signal(pacificIsoDate(pacificToday()));
+  /** Leads submitted inside the selected day / week / month. */
+  readonly leads = computed(() => inPeriod(this.allLeads(), this.period(), this.anchor()));
   readonly loading = signal(true);
 
   readonly firstName = computed(() => this.auth.user()?.name?.split(' ')[0] ?? '');
@@ -53,14 +59,17 @@ export class JuniorDashboard implements OnInit {
 
   readonly stats = computed(() => {
     const rows = this.leads();
-    const accepted = rows.filter((l) => l.status === 'ACCEPTED').length;
-    const rejected = rows.filter((l) => l.status === 'REJECTED').length;
+    // Approved = CPA reached the admin / CPL accepted by a Client; rejected = admin sent it back.
+    const rejected = rows.filter((l) => juniorOutcome(l) === 'RETURNED_TO_JUNIOR').length;
+    const accepted = rows.filter((l) => juniorOutcome(l) === 'ACCEPTED').length;
+    const acceptedCpl = rows.filter((l) => l.leadType === 'CPL' && juniorOutcome(l) === 'ACCEPTED').length;
     const decided = accepted + rejected;
     return {
       total: rows.length,
-      thisMonth: rows.filter((l) => isThisMonth(l.createdAt)).length,
-      today: rows.filter((l) => isToday(l.createdAt)).length,
-      accepted,
+      // "Closed" is CPA only — an accepted CPL counts under "Approved CPL" instead.
+      accepted: accepted - acceptedCpl,
+      acceptedCpl,
+      qaRate: qaPassRate(rows),
       acceptRate: decided ? Math.round((accepted / decided) * 100) : null,
     };
   });
@@ -73,7 +82,7 @@ export class JuniorDashboard implements OnInit {
 
   async ngOnInit(): Promise<void> {
     try {
-      this.leads.set(await this.leadService.myLeads());
+      this.allLeads.set(await this.leadService.myLeads());
     } finally {
       this.loading.set(false);
     }

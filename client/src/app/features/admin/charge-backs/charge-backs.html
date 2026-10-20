@@ -1,18 +1,14 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <p class="sub">Leads clawed back after acceptance — reassign to a different client or hand off externally.</p>
-    </div>
-  </div>
-
-  <div class="stats-row">
-    <app-stat-tile [value]="stats().total" label="Awaiting reassignment" tone="tone-danger">
-      <svg lucideBanknoteX></svg>
-    </app-stat-tile>
-    <app-stat-tile [value]="formatPkr(stats().totalPkrAmount)" label="Total clawed back" tone="tone-danger">
-      <svg lucideBanknoteX></svg>
-    </app-stat-tile>
-  </div>
+  <app-page-hero
+    eyebrow="Money"
+    title="Charge Backs"
+    sub="Every lead a client's customer reversed after payment — which client, which closer, why it happened, and what's still waiting to be given to someone else."
+    tone="red"
+    [count]="loading() ? '–' : stats().total"
+    countLabel="charge-backs on record"
+  >
+    <svg lucideBanknoteX></svg>
+  </app-page-hero>
 
   @if (error()) {
     <div class="error">{{ error() }}</div>
@@ -21,101 +17,275 @@
     <div class="success"><svg lucideCircleCheck></svg>{{ notice() }}</div>
   }
 
-  <div class="toolbar">
-    <app-search-box
-      [value]="view.search()"
-      placeholder="Search name, phone, or previous client…"
-      (valueChange)="view.setSearch($event)"
-    />
-  </div>
-
-  <div class="card card--flush">
-    @if (loading()) {
-      <app-skeleton-rows [count]="5" />
-    } @else if (view.total() === 0) {
-      @if (view.isFiltered()) {
-        <app-empty-state title="No leads match that search" hint="Try a different search term.">
-          <svg lucideBanknoteX></svg>
-        </app-empty-state>
-      } @else {
-        <app-empty-state title="Nothing to reassign" hint="Leads land here once an accepted, paid lead is marked charged back.">
-          <svg lucideBanknoteX></svg>
-        </app-empty-state>
-      }
-    } @else {
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th class="sortable" (click)="view.toggleSort('customerName')">
-                Customer <span class="arrow">{{ sortArrow('customerName') }}</span>
-              </th>
-              <th class="hide-sm">Previous client</th>
-              <th class="hide-md">Reason</th>
-              <th class="right">PKR</th>
-              <th class="sortable hide-md" (click)="view.toggleSort('createdAt')">
-                Charged back <span class="arrow">{{ sortArrow('createdAt') }}</span>
-              </th>
-              <th class="right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (lead of view.rows(); track lead.id) {
-              <tr class="clickable" (click)="detailLead.set(lead)">
-                <td>
-                  <div class="cell-main">{{ lead.customerName }}</div>
-                  <div class="cell-sub">{{ formatPhone(lead.phone) }} · {{ lead.state }}</div>
-                </td>
-                <td class="hide-sm">
-                  @if (lead.chargeBacks[0]?.client; as client) {
-                    <div class="person">
-                      <span class="avatar-sm" [class]="getAvatarTone(client.id)">{{ getInitials(client.name) }}</span>
-                      <span class="nm">{{ client.name }}</span>
-                    </div>
-                  } @else {
-                    <span class="empty">—</span>
-                  }
-                </td>
-                <td class="hide-md">
-                  <span class="cell-sub">{{ lead.chargeBacks[0]?.reason || '—' }}</span>
-                </td>
-                <td class="right num">{{ formatPkr(lead.chargeBacks[0]?.pkrAmount ?? 0) }}</td>
-                <td class="hide-md">
-                  <span class="chip"><svg lucideClock></svg>{{ timeAgo(lead.updatedAt) }}</span>
-                </td>
-                <td>
-                  <div class="row-actions">
-                    <button
-                      type="button"
-                      class="btn btn--sm btn--icon btn--ghost"
-                      title="Edit"
-                      aria-label="Edit"
-                      (click)="openEdit(lead, $event)"
-                    >
-                      <svg lucideSquarePen></svg>
-                    </button>
-                    <button type="button" class="btn btn--sm btn--ghost" (click)="openAssignExternal(lead, $event)">
-                      <svg lucideBuilding2></svg> Assign External
-                    </button>
-                    <button type="button" class="btn btn--sm" (click)="openAssign(lead, $event)">
-                      <svg lucideUserCheck></svg> Assign
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            }
-          </tbody>
-        </table>
-      </div>
-
-      <app-pagination
-        [page]="view.page()"
-        [totalPages]="view.totalPages()"
-        [total]="view.total()"
-        (pageChange)="view.page.set($event)"
-      />
+  <!-- Filters -->
+  <div class="filters">
+    <app-select [options]="clientOptions()" [searchable]="true" [ngModel]="clientFilter()" (ngModelChange)="clientFilter.set($event)" name="fClient" ariaLabel="Client" />
+    <app-select [options]="monthOptions()" [ngModel]="monthFilter()" (ngModelChange)="monthFilter.set($event)" name="fMonth" ariaLabel="Month" />
+    <app-select [options]="planOptions" [ngModel]="planFilter()" (ngModelChange)="planFilter.set($event)" name="fPlan" ariaLabel="Plan" />
+    <app-select [options]="reasonOptions" [ngModel]="reasonFilter()" (ngModelChange)="reasonFilter.set($event)" name="fReason" ariaLabel="Reason" />
+    <app-select [options]="statusOptions" [ngModel]="statusFilter()" (ngModelChange)="statusFilter.set($event)" name="fStatus" ariaLabel="Status" />
+    @if (hasFilters()) {
+      <button type="button" class="btn btn--sm btn--ghost" (click)="clearFilters()">
+        <svg lucideX></svg> Clear filters
+      </button>
     }
   </div>
+
+  @if (loading()) {
+    <div class="card"><app-skeleton-rows [count]="6" /></div>
+  } @else {
+    <div class="stats-row">
+      <app-stat-tile [value]="formatPkr(stats().pkr)" label="Total charged back" tone="tone-danger">
+        <svg lucideBanknoteX></svg>
+      </app-stat-tile>
+      <app-stat-tile [value]="stats().total" [label]="pluralize(stats().total, 'charge-back')">
+        <svg lucideUsers></svg>
+      </app-stat-tile>
+      <app-stat-tile [value]="formatPkr(stats().avg)" label="Average per chargeback">
+        <svg lucideBanknoteX></svg>
+      </app-stat-tile>
+      <app-stat-tile
+        [value]="stats().awaiting"
+        label="Waiting for a new client"
+        [tone]="stats().awaiting ? 'tone-danger' : 'tone-gold'"
+      >
+        <svg lucideClock></svg>
+      </app-stat-tile>
+      <app-stat-tile [value]="stats().longestWait + ' d'" label="Longest wait for a new client" tone="tone-warning">
+        <svg lucideClock></svg>
+      </app-stat-tile>
+    </div>
+
+    @if (stats().total === 0) {
+      <div class="card">
+        <app-empty-state
+          [title]="hasFilters() ? 'No charge-backs match these filters' : 'No charge-backs yet'"
+          [hint]="hasFilters() ? 'Try clearing a filter.' : 'A lead shows up here when a paid lead is marked as charged back.'"
+        >
+          <svg lucideBanknoteX></svg>
+        </app-empty-state>
+      </div>
+    } @else {
+      <div class="dash-grid">
+        <!-- Trend -->
+        <div class="card wide">
+          <div class="inline-head">
+            <h2>Charged back by month</h2>
+            <span class="count">Click a bar to filter</span>
+          </div>
+          <div class="cols">
+            @for (m of trend(); track m.key) {
+              <button
+                type="button"
+                class="col"
+                [class.on]="monthFilter() === m.key"
+                [title]="m.label + ' — ' + pluralize(m.count, 'charge-back') + ', ' + formatPkr(m.pkr)"
+                (click)="pick('month', m.key)"
+              >
+                <span class="val">{{ formatPkr(m.pkr) }}</span>
+                <span class="bar" [style.height.%]="m.pct"></span>
+                <span class="lbl">{{ m.label }}</span>
+              </button>
+            }
+          </div>
+        </div>
+
+        <!-- By client -->
+        <div class="card">
+          <div class="inline-head">
+            <h2>Clients with the most chargebacks</h2>
+            <span class="count">By PKR</span>
+          </div>
+          <div class="rank">
+            @for (c of byClient(); track c.id) {
+              <button type="button" class="rank-row" [class.on]="clientFilter() === c.id" (click)="pick('client', c.id)"
+                [title]="c.name + ' — ' + pluralize(c.count, 'charge-back')">
+                <span class="nm">{{ c.name }}</span>
+                <span class="track"><span class="fill" [style.width.%]="c.pct"></span></span>
+                <span class="amt">{{ formatPkr(c.pkr) }}</span>
+              </button>
+            }
+          </div>
+        </div>
+
+        <!-- By reason -->
+        <div class="card">
+          <div class="inline-head">
+            <h2>Why it happened</h2>
+            <span class="count">Click to filter</span>
+          </div>
+          <div class="chart">
+            @for (r of byReason(); track r.key) {
+              <div class="chart-row pickable" [class.on]="reasonFilter() === r.key" (click)="pick('reason', r.key)">
+                <span class="chart-key">{{ r.label }}</span>
+                <span class="chart-track"><span class="chart-bar chart-bar--bad" [style.width.%]="r.pct"></span></span>
+                <span class="chart-val">{{ r.count }}</span>
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- By plan -->
+        <div class="card">
+          <div class="inline-head">
+            <h2>By plan type</h2>
+            <span class="count">Share of charge-backs</span>
+          </div>
+          <div class="donut-wrap">
+            <div class="donut" [style.background]="byPlan().gradient">
+              <span class="donut-mid">{{ stats().total }}</span>
+            </div>
+            <div class="legend">
+              @for (p of byPlan().rows; track p.label) {
+                <span><i [style.background]="p.color"></i>{{ p.label }} · {{ p.count }} ({{ p.pct }}%)</span>
+              }
+            </div>
+          </div>
+        </div>
+
+        <!-- By closer -->
+        @if (byCloser().length) {
+          <div class="card">
+            <div class="inline-head">
+              <h2>Closers</h2>
+              <span class="count">Whose sales were charged back</span>
+            </div>
+            <div class="rank">
+              @for (c of byCloser(); track c.id) {
+                <div class="rank-row" style="cursor: default" [title]="c.name + ' — ' + pluralize(c.count, 'charge-back')">
+                  <span class="nm">{{ c.name }}</span>
+                  <span class="track"><span class="fill" [style.width.%]="c.pct"></span></span>
+                  <span class="amt">{{ c.count }}</span>
+                </div>
+              }
+            </div>
+          </div>
+        }
+      </div>
+
+      <!-- Ledger -->
+      <div class="toolbar">
+        <app-search-box
+          [value]="view.search()"
+          placeholder="Search customer, client, closer, or reason…"
+          (valueChange)="view.setSearch($event)"
+        />
+      </div>
+
+      <div class="card card--flush">
+        @if (view.total() === 0) {
+          <app-empty-state title="No charge-backs match that search" hint="Try a different search term.">
+            <svg lucideBanknoteX></svg>
+          </app-empty-state>
+        } @else {
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th class="sortable" (click)="view.toggleSort('customerName')">
+                    Customer <span class="arrow">{{ sortArrow('customerName') }}</span>
+                  </th>
+                  <th class="hide-sm">Client</th>
+                  <th class="hide-md">Closer</th>
+                  <th class="hide-sm">Plan</th>
+                  <th>Where it is now</th>
+                  <th class="sortable hide-md" (click)="view.toggleSort('createdAt')">
+                    Date <span class="arrow">{{ sortArrow('createdAt') }}</span>
+                  </th>
+                  <th class="sortable right" (click)="view.toggleSort('pkrAmount')">
+                    PKR <span class="arrow">{{ sortArrow('pkrAmount') }}</span>
+                  </th>
+                  <th class="right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of view.rows(); track row.id) {
+                  @let lead = leadFor(row);
+                  <tr
+                    [class.clickable]="lead"
+                    [class.row--stale]="lead && urgency(row) === 'stale'"
+                    (click)="lead && detailLead.set(lead)"
+                  >
+                    <td>
+                      <div class="cell-main">{{ row.customerName }}</div>
+                      <div class="cell-sub">{{ formatPhone(row.phone) }} · {{ row.state }}</div>
+                      @if (row.reason) {
+                        <div class="cell-sub reason-quote">“{{ row.reason }}”</div>
+                      }
+                    </td>
+                    <td class="hide-sm">
+                      <div class="person">
+                        <span class="avatar-sm" [class]="getAvatarTone(row.client.id)">{{ getInitials(row.client.name) }}</span>
+                        <span class="nm">{{ row.client.name }}</span>
+                      </div>
+                    </td>
+                    <td class="hide-md">
+                      @if (row.closer; as closer) {
+                        <div class="person">
+                          <span class="avatar-sm" [class]="getAvatarTone(closer.id)">{{ getInitials(closer.name) }}</span>
+                          <span class="nm">{{ closer.name }}</span>
+                        </div>
+                        @if (row.juniorCloser; as jc) {
+                          <div class="cell-sub">Junior: {{ jc.name }}</div>
+                        }
+                      } @else {
+                        <span class="chip">CPL</span>
+                      }
+                    </td>
+                    <td class="hide-sm">
+                      @if (row.planType) {
+                        <span class="plan-pill">{{ planLabelOf(row.planType) }}</span>
+                      } @else {
+                        <span class="empty">—</span>
+                      }
+                    </td>
+                    <td class="hide-md">
+                      <div class="cell-main">{{ formatDate(row.createdAt) }}</div>
+                    </td>
+                    <td>
+                      @if (lead) {
+                        <span class="wait wait--{{ urgency(row) }}">
+                          <svg lucideClock></svg>Waiting {{ waitingDays(row) }} {{ waitingDays(row) === 1 ? 'day' : 'days' }}
+                        </span>
+                      } @else if (row.reassignedTo) {
+                        <span class="wait done">Given to {{ row.reassignedTo }}</span>
+                      } @else {
+                        <span class="wait done">Handled</span>
+                      }
+                    </td>
+                    <td class="right num amount-hit">−{{ formatPkr(row.pkrAmount) }}</td>
+                    <td>
+                      @if (lead) {
+                        <div class="row-actions">
+                          <button type="button" class="btn btn--sm btn--icon btn--ghost" title="Edit" aria-label="Edit"
+                            (click)="openEdit(lead, $event)">
+                            <svg lucideSquarePen></svg>
+                          </button>
+                          <button type="button" class="btn btn--sm btn--ghost" (click)="openAssignExternal(lead, $event)">
+                            <svg lucideBuilding2></svg> Assign External
+                          </button>
+                          <button type="button" class="btn btn--sm" (click)="openAssign(lead, $event)">
+                            <svg lucideUserCheck></svg> Assign
+                          </button>
+                        </div>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          <app-pagination
+            [page]="view.page()"
+            [totalPages]="view.totalPages()"
+            [total]="view.total()"
+            (pageChange)="view.page.set($event)"
+          />
+        }
+      </div>
+    }
+  }
 </div>
 
 <!-- Detail -->
@@ -275,15 +445,15 @@
         </label>
         <label>
           Phone
-          <input type="text" [ngModel]="d.phone" (ngModelChange)="updateDraft('phone', $event)" name="phone" />
+          <input appPhone [ngModel]="d.phone" (ngModelChange)="updateDraft('phone', $event)" name="phone" />
         </label>
         <label>
           State
-          <input type="text" [ngModel]="d.state" (ngModelChange)="updateDraft('state', $event)" name="state" />
+          <app-select [options]="stateOptions" [searchable]="true" [ngModel]="d.state" (ngModelChange)="updateDraft('state', $event)" name="state" />
         </label>
         <label>
           Zipcode
-          <input type="text" [ngModel]="d.zipcode" (ngModelChange)="updateDraft('zipcode', $event)" name="zipcode" />
+          <input appZip [ngModel]="d.zipcode" (ngModelChange)="updateDraft('zipcode', $event)" name="zipcode" />
         </label>
         <label>
           Marital status

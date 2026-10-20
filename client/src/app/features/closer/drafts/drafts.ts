@@ -16,11 +16,13 @@ import { DRAFT_REASON_LABEL } from '../../../core/lead-options';
 import { Modal } from '../../../shared/ui/modal';
 import { EmptyState, Pagination, SearchBox, SkeletonRows, StatTile } from '../../../shared/ui/ui';
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
+import { CopyPhone } from '../../../shared/ui/copy-phone';
 
 @Component({
   selector: 'app-closer-drafts',
   imports: [
     RouterLink,
+    CopyPhone,
     Modal,
     StatTile,
     SearchBox,

@@ -30,11 +30,16 @@ npm run build         # prisma generate && tsc
 npm run db:push        # push schema.prisma to DATABASE_URL, no migrations
 npm run db:seed         # seeds one user per role (password: Password1)
 npm run db:studio        # Prisma Studio GUI
+npm test                 # vitest — test/*.test.ts (field sanitizing, getLeadById masking, payment guards, Manager scope)
+npm run lint             # eslint src test
 
 # Client
 cd client
 npm start             # ng serve, localhost:4200
 npm run build          # ng build
+npm test               # ng test (vitest) — *.spec.ts next to the code
+npm run lint           # ng lint (angular-eslint)
+npm run format         # prettier
 ```
 
 Copy `server/.env.example` to `server/.env` and set a real `DATABASE_URL` before running the server against a real database.
@@ -95,6 +100,8 @@ Convention: **routes are thin** (parse request, call service, map result to HTTP
 | `services/analytics.service.ts` | Per-junior-closer and per-closer accepted/rejected counts, overall totals — all derived from *current* lead status, no audit log |
 | `routes/*.routes.ts` | HTTP layer only |
 | `lib/validation.ts` | `isNonEmptyString`, `isValidEmail`, `isValidPassword` |
+| `lib/service-result.ts` | The one `ServiceResult<T>` every service returns — don't redeclare it per service |
+| `lib/api-response.ts` | `apiSuccess` / `apiError`, plus `sendResult(res, result, message?, status?)` which maps a `ServiceResult` onto either — use it instead of hand-writing `if ('error' in result) return apiError(...)` |
 | `lib/chat-rooms.ts` | **The entire chat access model** — `roomsFor(role)` maps a role to its channels, `canAccessRoom` / `parseRoom` guard every read and write. Change who can see which channel here and nowhere else. |
 | `services/chat.service.ts` | Message CRUD, unread counts, read cursors. Re-checks `canAccessRoom` on every operation. |
 | `realtime/chat-gateway.ts` | Socket.IO server — JWT handshake auth, role-derived room join, typing relay, broadcast helpers |
@@ -105,7 +112,7 @@ Three different Prisma `select` fragments, chosen per role/status combination:
 - `FULL_INCLUDE` — everything. Used by ADMIN always; by CLOSER while a lead is still `NEW` (theirs to work); by CLIENT once `ACCEPTED`.
 - `JUNIOR_VIEW_SELECT` — `{ customerName, status, createdAt, closer }` only, phone deliberately excluded. Used for **every** JUNIOR_CLOSER read, list or single, regardless of lead status — the requirement was about the risk of a junior closer stealing customer data (phone number included), so it's a role-wide rule, not a "history page only" rule.
 - `CLOSER_HISTORY_SELECT` — same shape as the junior view (plus `client` instead of `closer`). Used for CLOSER reads once a lead has moved past `NEW`.
-- `CLIENT_PREVIEW_SELECT` — `{ customerName, state, zipcode, need, maritalStatus, status, createdAt, closer }`. Used for CLIENT reads while `status = ASSIGNED` (not yet accepted) — added beyond the original ask, because the field set now includes SSN and bank/routing numbers and sending that pre-acceptance seemed like the wrong default. Flag if unwanted.
+- CLIENT reads while `status = ASSIGNED` get the **full** lead (`FULL_INCLUDE`), not a masked preview — the client can correct an offered lead via `PATCH /:id/client-edit` before deciding, which needs every field. (An earlier `CLIENT_PREVIEW_SELECT` was never wired up and has been removed.)
 
 `getLeadById(id, requester)` is the single chokepoint that picks the right select based on `requester.role` + the lead's current status — this is the real access-control boundary, not the list endpoints (which use the same selects but don't need the branching since the route already pins the role).
 
@@ -137,8 +144,10 @@ Three different Prisma `select` fragments, chosen per role/status combination:
 | `/api/leads/:id/resubmit-intake` | PATCH | JUNIOR_CLOSER | RETURNED_TO_JUNIOR → SUBMITTED |
 | `/api/leads/returned/closer` | GET | CLOSER | Leads sent back to them, full detail |
 | `/api/leads/:id/resubmit-enrichment` | PATCH | CLOSER | RETURNED_TO_CLOSER → SUBMITTED |
-| `/api/leads/assigned` | GET | CLIENT | "New Leads" — ASSIGNED, masked preview |
+| `/api/leads/assigned` | GET | CLIENT | "New Leads" — ASSIGNED, full detail (see masking note above) |
 | `/api/leads/client-history` | GET | CLIENT | "Lead History" — ACCEPTED, full detail |
+| `/api/leads/batch-decision` | PATCH | ADMIN, MANAGER | `{ leadIds, decision: 'ACCEPT' \| 'REJECT', reason? }` — admin records the client's decision for many leads at once (select-then-act, like batch-payment). Covers `ASSIGNED` (CLIENT account) **and** `ASSIGNED_EXTERNAL` (no login, so admin is the only way to decide). ACCEPT → ACCEPTED keeping the client/externalClient; REJECT → REJECTED clearing both; ineligible ids silently skipped |
+| `/api/leads/retention/batch-assign` | PATCH | ADMIN, MANAGER | `{ leadIds, retentionId }` — hands many unworked (RETENTION + `NEW`) leads to one Retention person; ineligible ids silently skipped; one summary notification to that person |
 | `/api/leads/:id/accept` | PATCH | CLIENT | ASSIGNED → ACCEPTED |
 | `/api/leads/:id/reject` | PATCH | CLIENT | ASSIGNED → REJECTED, clears clientId |
 | `/api/external-clients` | GET/POST | ADMIN | List/create external clients (no login) |
@@ -212,10 +221,10 @@ layout/
   portal-shell/        ONE shared shell for all 4 roles — black/gold sidebar with @lucide/angular icons, slim topbar showing the active page title, off-canvas drawer below 880px
 features/
   auth/                 login only — no self-registration, see the no-self-registration note above
-  junior-closer/          dashboard, submit-lead (full intake form, conditional Retired/SSDI), my-leads (masked), returned ("Sent Back to Me")
-  closer/                  dashboard, inbox (list, links out per-lead), enrich-lead (full form at /closer/leads/:id, conditional Payer section), history (masked), returned ("Sent Back to Me")
-  admin/                    dashboard, queue (assign + edit-on-reject), leads (all, + Paid/Unpaid toggle), users (create + role switch), analytics-junior, analytics-closer, analytics-overall
-  client/                    dashboard, assigned-leads ("New Leads", masked preview, accept/reject), lead-history (full detail, accepted only)
+  junior-closer/          dashboard, submit-lead (full intake form, conditional Retired/SSDI), my-leads (masked), returned ("Re-Writes")
+  closer/                  dashboard, inbox (list, links out per-lead), enrich-lead (full form at /closer/leads/:id, conditional Payer section), history (masked), returned ("Re-Writes")
+  admin/                    dashboard, leads + cpl-leads (a "Needs your action" card on top — SUBMITTED/REJECTED, any day — then a day-by-day log driven by `shared/ui/day-bar.ts`, defaulting to today; the old Queue page is gone, `/admin/queue` redirects to `/admin/leads`), users (create + role switch), analytics-junior, analytics-closer, analytics-overall
+  client/                    dashboard, assigned-leads ("New Leads", full detail, accept/reject), lead-history (full detail, accepted only)
   settings/                 ONE shared component, password change only — mounted only at /admin/settings and /manager/settings; every other role's `settings` path redirects to its dashboard/landing page and the nav omits the link, since self-service password change is ADMIN/MANAGER only
   chat/                      ONE shared component, mounted at /{junior,closer,admin}/chat — NOT in the client tree
 ```
@@ -253,6 +262,9 @@ Per-page stat tiles are likewise `computed()` over the same loaded array, not a 
 - Adding a new Lead field: add it to `prisma/schema.prisma`, add its type to `FIELD_SCHEMA` in `server/src/lib/lead-fields.ts`, add the key to whichever of `SHARED_FIELDS`/`JUNIOR_ONLY_FIELDS`/`CLOSER_ONLY_FIELDS` it belongs to, then mirror the type on the client in `core/models/lead.model.ts`. Update whichever masked `*_SELECT` fragments in `lead.service.ts` should or shouldn't include it.
 - API responses: `{ data, message? }` on success, `{ error }` on failure — checked via `'error' in result` in routes
 - Every route handler wrapped in `asyncHandler`; global error middleware in `app.ts` is the last-resort net
+- Money-recording writes (`batchMarkPaid`, `markLeadChargedBack`, `batchChargeBack`) run the status-guarded `updateMany` **first** inside an interactive transaction (`runGuardedTransaction`) and abort with 409 if it moved fewer leads than expected — only then create the `IncomePayment` / `ChargeBack` rows. Keep that order for any new write that records money
+- Manager lead scope (`leads.routes.ts`) is enforced by `router.param('id')` for `:id` routes plus a body check for `leadIds` batches — `req.params` is empty inside a plain `router.use`, so don't move the check back there
+- Client: `core/api.ts` has the shared `ApiSuccess<T>` and `apiErrorMessage(err, fallback)` — use it in `catch` blocks instead of `err?.error?.error ?? ...`
 - Request body fields are untrusted (`unknown`) until passed through a validator — do not assume `req.body.x` is a string
 - Prisma lead transitions use `updateMany` with the expected current status in the `where` clause to prevent double-transition races, then a follow-up `findUnique` to return the full record with relations
 - No Stripe, no billing — do not reintroduce
@@ -262,5 +274,11 @@ Per-page stat tiles are likewise `computed()` over the same loaded array, not a 
 
 ---
 
+## Notifications
+Per-user inbox + live toasts for "something happened to you" (lead received, sent back, assigned, accepted/rejected). `Notification` table (`userId`, `kind` success/info/warning/danger, `title`, `message`, `link`, `readAt`). Server: `services/notification.service.ts` — `notifyUsers(ids, input)` / `notifyRoles(roles, input)` persist then push `notification:new` to the private socket room `user:<id>` (joined in `chat-gateway.ts`). They are **best-effort and fire-and-forget** (`void notifyX(...)`, errors swallowed) so a notification failure never fails a lead transition. `page` is a key into `PAGE_PATHS`, resolving the destination route per *recipient role* — add a new target there. Triggers live in `lead.service.ts` next to each transition. Routes: `GET /api/notifications`, `PATCH /api/notifications/read-all`, `PATCH /api/notifications/:id/read` (own rows only). Client: `NotificationService` (root, stateful like ChatService) rides `LiveUpdatesService.notifications$` — no extra socket; `shared/ui/notifications.ts` has `<app-toast-host>` (top-right stack, hover pauses) and `<app-notification-bell>` (topbar), both mounted in `PortalShell`. Messages carry only customer name, never other lead fields.
+
 ## Live Data Refresh
 Any successful non-GET `/api` write (except `/chat`, `/auth`) triggers a payload-free `data:changed` Socket.IO broadcast (middleware in `app.ts` → `emitDataChanged()` in `chat-gateway.ts`). It carries no data, so masking is unaffected. Client: `LiveUpdatesService` (own socket, debounced) exposes a `version` signal; list/dashboard/analytics components call `reloadOnChange(() => this.refresh())` as a field initializer and refetch **only their own data**. Loaders guard their skeleton with `if (!isSilentReload()) this.loading.set(true)` so updates land in place. Form pages (submit/enrich/edit) are deliberately excluded. A CLIENT socket now connects (no chat rooms) for this purpose.
+
+## Zoom Phone Dialer (Retention only)
+Zoom Phone **Smart Embed** iframe (`applications.zoom.us/integration/phone/embeddablephone/home`); each agent signs in with their own licensed Zoom account inside it, and nothing Zoom-side touches the server. `shared/ui/zoom-dialer.ts` is mounted in `PortalShell` for RETENTION only and is hidden, never destroyed, when minimized, so a live call survives navigation (that's why it isn't a routed page). `ZoomPhoneService` (root, stateful) sends `zp-make-call` via `postMessage` to the Zoom origin and queues a dial requested before the iframe loads. The iframe src **must** carry `?originDomain=<window.location.origin>`: Zoom only accepts `postMessage` from that origin (falling back to `document.referrer`, which turns into a Zoom URL after the in-frame sign-in, silently dropping every dial). The origin must be HTTPS and listed in the Smart Embed app's Approved Domains (Marketplace → app → Manage → Configure app); `http://localhost` is rejected, so local dev runs `ng serve --ssl` with `CLIENT_ORIGIN=https://localhost:4200`. "Dial lead" buttons are on the Retention lead page (dials the current phone field) and on pending queue rows (fetches the lead via `getLead` and sends the number straight to the dialer — the masked list never renders it). Numbers are converted to E.164 (`toE164`, US only).

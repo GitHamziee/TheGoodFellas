@@ -5,12 +5,13 @@ import { IpWhitelistService } from '../../../core/services/ip-whitelist.service'
 import { WhitelistedIp } from '../../../core/models/ip-whitelist.model';
 import { formatDate, pluralize } from '../../../core/format-utils';
 import { Modal } from '../../../shared/ui/modal';
-import { EmptyState, SkeletonRows } from '../../../shared/ui/ui';
+import { PageHero, EmptyState, SkeletonRows } from '../../../shared/ui/ui';
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
+import { apiErrorMessage } from '../../../core/api';
 
 @Component({
   selector: 'app-admin-ip-whitelist',
-  imports: [
+  imports: [PageHero, 
     FormsModule,
     Modal,
     EmptyState,
@@ -86,8 +87,8 @@ export class AdminIpWhitelist implements OnInit {
       this.label = '';
       this.detectedIp.set(ip);
       this.showCreate.set(true);
-    } catch (err: any) {
-      this.error.set(err?.error?.error ?? 'Could not detect this connection.');
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not detect this connection.'));
     } finally {
       this.detecting.set(false);
     }
@@ -106,8 +107,8 @@ export class AdminIpWhitelist implements OnInit {
       this.ips.update((rows) => [created, ...rows]);
       this.showCreate.set(false);
       this.notice.set(`Whitelisted ${created.ipAddress}.`);
-    } catch (err: any) {
-      this.error.set(err?.error?.error ?? 'Could not add this IP.');
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not add this IP.'));
     } finally {
       this.creating.set(false);
     }
@@ -120,8 +121,8 @@ export class AdminIpWhitelist implements OnInit {
       await this.ipWhitelistService.delete(ip.id);
       this.ips.update((rows) => rows.filter((r) => r.id !== ip.id));
       this.notice.set(`Removed ${ip.ipAddress}.`);
-    } catch (err: any) {
-      this.error.set(err?.error?.error ?? 'Could not remove this IP.');
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not remove this IP.'));
     } finally {
       this.deletingId.set(null);
     }

@@ -34,8 +34,8 @@
         </button>
       }
     </div>
-    <input type="date" min="2000-01-01" max="2100-12-31" [ngModel]="from()" (ngModelChange)="setFrom($event)" aria-label="From date" />
-    <input type="date" min="2000-01-01" max="2100-12-31" [ngModel]="to()" (ngModelChange)="setTo($event)" aria-label="To date" />
+    <app-date-input min="2000-01-01" max="2100-12-31" [ngModel]="from()" (ngModelChange)="setFrom($event)" aria-label="From date"></app-date-input>
+    <app-date-input min="2000-01-01" max="2100-12-31" [ngModel]="to()" (ngModelChange)="setTo($event)" aria-label="To date"></app-date-input>
   </div>
 
   <div class="stats-row">

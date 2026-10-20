@@ -7,6 +7,7 @@ import {
   LucideCircleAlert,
   LucideHeartPulse,
   LucideNotebookPen,
+  LucidePhoneCall,
   LucideSend,
   LucideShieldCheck,
   LucideUser,
@@ -15,6 +16,7 @@ import {
 import { RetentionSubmitInput, LeadService } from '../../../core/services/lead.service';
 import { UserService } from '../../../core/services/user.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { ZoomPhoneService } from '../../../core/services/zoom-phone.service';
 import { Lead } from '../../../core/models/lead.model';
 import {
   ACCOUNT_OWNERSHIP_OPTIONS,
@@ -30,12 +32,17 @@ import {
   PLAN_TYPE_OPTIONS,
   RETIRED_INCOME_OPTIONS,
   SMOKER_OPTIONS,
+  US_STATE_OPTIONS,
 } from '../../../core/lead-options';
 import { formatCardExpiry, getInitials, sanitizeDigits, toDateInput, todayDateInput } from '../../../core/format-utils';
 import { SkeletonRows } from '../../../shared/ui/ui';
 import { Modal } from '../../../shared/ui/modal';
 import { Select } from '../../../shared/ui/select';
 import { NoCopy } from '../../../shared/no-copy.directive';
+import { PhoneInput } from '../../../shared/ui/phone-input';
+import { ZipInput } from '../../../shared/ui/zip-input';
+import { DateInput } from '../../../shared/ui/date-input';
+import { apiErrorMessage } from '../../../core/api';
 
 /** Fields tracked for the completeness meter — same set the sheet import can fill plus
  * everything a Retention person can add on top of it. */
@@ -79,12 +86,12 @@ interface LookupUser {
 /**
  * Opens a sheet-imported RETENTION lead for editing — pre-filled with whatever the sheet
  * gave us, gaps left for the Retention person to fill in. Any Retention account may open any
- * teammate's lead here, not just their own (see RetentionQueue's teammate filter) — the
+ * teammate's lead here, not just their own (see the teammate filter on the Leads page) — the
  * server enforces this the same way, no ownership check on the submit endpoint.
  */
 @Component({
   selector: 'app-retention-lead-edit',
-  imports: [
+  imports: [DateInput, PhoneInput, ZipInput, 
     FormsModule,
     RouterLink,
     SkeletonRows,
@@ -100,6 +107,7 @@ interface LookupUser {
     LucideNotebookPen,
     LucideCircleAlert,
     LucideArrowLeft,
+    LucidePhoneCall,
   ],
   templateUrl: './lead-edit.html',
 })
@@ -109,6 +117,7 @@ export class RetentionLeadEdit implements OnInit {
   private readonly leadService = inject(LeadService);
   private readonly userService = inject(UserService);
   private readonly auth = inject(AuthService);
+  private readonly zoom = inject(ZoomPhoneService);
 
   readonly leadId = this.route.snapshot.paramMap.get('id')!;
   readonly loading = signal(true);
@@ -130,6 +139,7 @@ export class RetentionLeadEdit implements OnInit {
 
   readonly draftReasonOptions = DRAFT_REASON_OPTIONS;
   readonly maritalStatusOptions = MARITAL_STATUS_OPTIONS;
+  readonly stateOptions = US_STATE_OPTIONS;
   readonly genderOptions = GENDER_OPTIONS;
   readonly smokerOptions = SMOKER_OPTIONS;
   readonly needOptions = NEED_OPTIONS;
@@ -258,11 +268,16 @@ export class RetentionLeadEdit implements OnInit {
         draftReason: lead.draftReason ?? undefined,
         draftReasonNote: lead.draftReasonNote ?? undefined,
       };
-    } catch (err: any) {
-      this.error.set(err?.error?.error ?? 'Could not load this lead.');
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not load this lead.'));
     } finally {
       this.loading.set(false);
     }
+  }
+
+  /** Dials whatever is in the phone field now, so a corrected number is the one called. */
+  dialLead(): void {
+    if (!this.zoom.dial(this.form.phone)) this.error.set('This phone number cannot be dialed.');
   }
 
   touch(): void {
@@ -313,9 +328,9 @@ export class RetentionLeadEdit implements OnInit {
         Object.entries(this.form).filter(([, v]) => v !== '' && v !== null && v !== undefined),
       ) as RetentionSubmitInput;
       await this.leadService.retentionSubmit(this.leadId, payload);
-      this.router.navigateByUrl('/retention/queue');
-    } catch (err: any) {
-      this.error.set(err?.error?.error ?? 'Could not submit the lead.');
+      this.router.navigateByUrl('/retention/leads');
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not submit the lead.'));
     } finally {
       this.submitting.set(false);
     }
@@ -347,9 +362,9 @@ export class RetentionLeadEdit implements OnInit {
       ) as RetentionSubmitInput;
       await this.leadService.retentionSaveDraft(this.leadId, payload);
       this.draftModalOpen.set(false);
-      this.router.navigateByUrl('/retention/queue');
-    } catch (err: any) {
-      this.error.set(err?.error?.error ?? 'Could not save this as a draft.');
+      this.router.navigateByUrl('/retention/leads');
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not save this as a draft.'));
     } finally {
       this.savingDraft.set(false);
     }

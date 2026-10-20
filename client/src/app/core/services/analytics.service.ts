@@ -2,13 +2,9 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { API_BASE_URL } from '../config';
-import { DraftReason, LeadParty, LeadStatus, PlanType } from '../models/lead.model';
+import { LeadParty, LeadStatus, LeadType, PaymentStatus, PlanType } from '../models/lead.model';
 import { CallReviewDetail, QaLane, QaTransferDetail } from '../models/review.model';
-
-interface ApiSuccess<T> {
-  data: T;
-  message?: string;
-}
+import type { ApiSuccess } from '../api';
 
 export interface UserOutcomeRow {
   id: string;
@@ -19,12 +15,59 @@ export interface UserOutcomeRow {
   rejected: number;
 }
 
+/** One lead a Junior Closer submitted — masked summary, no phone/SSN/bank fields. */
+export interface JuniorLeadRow {
+  id: string;
+  customerName: string;
+  leadType: LeadType;
+  dCode: string | null;
+  state: string;
+  status: LeadStatus;
+  planType: PlanType | null;
+  paymentStatus: PaymentStatus;
+  returnReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+  closer: LeadParty | null;
+  client: LeadParty | null;
+  externalClient: LeadParty | null;
+}
+
+export interface JuniorQaVerdict {
+  id: string;
+  leadId: string;
+  outcome: 'PASS' | 'FAIL';
+  comment: string | null;
+  createdAt: string;
+  reviewer: LeadParty;
+  lead: { customerName: string };
+}
+
+export interface JuniorCallIssue {
+  id: string;
+  comment: string;
+  createdAt: string;
+  reviewer: LeadParty;
+  lead: { id: string; customerName: string } | null;
+}
+
+export interface JuniorCloserDetail {
+  person: { id: string; name: string; email: string; createdAt: string };
+  leads: JuniorLeadRow[];
+  reviews: JuniorQaVerdict[];
+  callIssues: JuniorCallIssue[];
+  team: { people: number; avgTotal: number; acceptRate: number | null; volumeRank: number };
+}
+
 export interface OverallAnalytics {
   totalLeads: number;
   statusCounts: Partial<Record<LeadStatus, number>>;
   closedCount: number;
   unpaidAcceptedCount: number;
   roleCounts: Record<string, number>;
+  /** One light row per lead (no customer fields) — sliced by period/source on the page. */
+  leads: { status: LeadStatus; leadType: LeadType; paymentStatus: PaymentStatus; createdAt: string }[];
+  chargeBacks: { createdAt: string; leadType: LeadType }[];
 }
 
 export interface ClosePlanBreakdown {
@@ -49,28 +92,6 @@ export interface ClosePlanRow {
   annualPremiumRevenue?: number;
 }
 
-export interface DraftRow {
-  id: string;
-  customerName: string;
-  draftReason: DraftReason | null;
-  draftReasonNote: string | null;
-  createdAt: string;
-  updatedAt: string;
-  ageDays: number;
-  closer: { id: string; name: string };
-  /** Null when the closer built the lead from scratch (self- or AI-sourced, no junior closer). */
-  juniorCloser: { id: string; name: string } | null;
-}
-
-export interface DraftsAnalytics {
-  total: number;
-  oldestDays: number;
-  avgAgeDays: number;
-  byCloser: { id: string; name: string; email: string; count: number }[];
-  byReason: Partial<Record<DraftReason, number>>;
-  drafts: DraftRow[];
-}
-
 export interface ChargeBackBucket {
   id: string;
   name: string;
@@ -83,6 +104,13 @@ export interface ChargeBackRecent {
   id: string;
   leadId: string;
   customerName: string;
+  phone: string;
+  state: string;
+  planType: PlanType | null;
+  awaitingReassignment: boolean;
+  /** Who the lead went to after the chargeback; null while it is still waiting for a new client. */
+  reassignedTo: string | null;
+  juniorCloser: LeadParty | null;
   client: LeadParty;
   /** Null for a charged-back CPL lead — CPL has no closer to attribute it to. */
   closer: LeadParty | null;
@@ -105,9 +133,20 @@ const BASE = `${API_BASE_URL}/admin/analytics`;
 export class AnalyticsService {
   private readonly http = inject(HttpClient);
 
-  async juniorClosers(): Promise<UserOutcomeRow[]> {
-    const res = await firstValueFrom(this.http.get<ApiSuccess<{ rows: UserOutcomeRow[] }>>(`${BASE}/junior-closers`));
+  /** `range` is [start, end) epoch-ms; omit for all time. */
+  async juniorClosers(range?: [number, number]): Promise<UserOutcomeRow[]> {
+    const params: Record<string, string> = range ? { from: new Date(range[0]).toISOString(), to: new Date(range[1]).toISOString() } : {};
+    const res = await firstValueFrom(
+      this.http.get<ApiSuccess<{ rows: UserOutcomeRow[] }>>(`${BASE}/junior-closers`, { params })
+    );
     return res.data.rows;
+  }
+
+  async juniorCloserDetail(id: string): Promise<JuniorCloserDetail> {
+    const res = await firstValueFrom(
+      this.http.get<ApiSuccess<{ detail: JuniorCloserDetail }>>(`${BASE}/junior-closers/${id}`)
+    );
+    return res.data.detail;
   }
 
   async closers(): Promise<UserOutcomeRow[]> {
@@ -133,11 +172,6 @@ export class AnalyticsService {
   async overall(): Promise<OverallAnalytics> {
     const res = await firstValueFrom(this.http.get<ApiSuccess<{ overall: OverallAnalytics }>>(`${BASE}/overall`));
     return res.data.overall;
-  }
-
-  async drafts(): Promise<DraftsAnalytics> {
-    const res = await firstValueFrom(this.http.get<ApiSuccess<{ drafts: DraftsAnalytics }>>(`${BASE}/drafts`));
-    return res.data.drafts;
   }
 
   async chargeBacks(): Promise<ChargeBackAnalytics> {

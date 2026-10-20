@@ -1,15 +1,13 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <p class="sub">Leads submitted through the public retention intake form, waiting to be handed to a Retention person.</p>
-    </div>
-  </div>
-
-  <div class="stats-row">
-    <app-stat-tile [value]="stats().total" label="Unassigned" tone="tone-gold">
-      <svg lucideInbox></svg>
-    </app-stat-tile>
-  </div>
+  <app-page-hero
+    eyebrow="Pipeline"
+    title="Retention Imports"
+    tone="moss"
+    [count]="loading() ? '–' : stats().total"
+    countLabel="unassigned leads"
+  >
+    <svg lucideInbox></svg>
+  </app-page-hero>
 
   @if (error()) {
     <div class="error">{{ error() }}</div>
@@ -18,11 +16,28 @@
     <div class="success"><svg lucideCircleCheck></svg>{{ notice() }}</div>
   }
 
-  <app-search-box
-    [value]="view.search()"
-    placeholder="Search by name, phone, state, or carrier…"
-    (valueChange)="view.setSearch($event)"
-  />
+  @if (selectedCount() > 0) {
+    <div class="batch-bar">
+      <span><strong>{{ selectedCount() }}</strong> lead{{ selectedCount() === 1 ? '' : 's' }} selected</span>
+      <div class="row-actions">
+        <button type="button" class="btn btn--sm btn--ghost" (click)="clearSelection()">Clear</button>
+        <button type="button" class="btn btn--sm btn--success" (click)="openBatchAssign()">
+          <svg lucideUserCheck></svg> Assign ({{ selectedCount() }})
+        </button>
+      </div>
+    </div>
+  }
+
+  <div class="toolbar">
+    <app-search-box
+      [value]="view.search()"
+      placeholder="Search by name, phone, state, or carrier…"
+      (valueChange)="view.setSearch($event)"
+    />
+    <button type="button" class="btn toolbar-end" [disabled]="syncing()" (click)="syncSheet()">
+      <svg lucideRefreshCw [class.spin]="syncing()"></svg>{{ syncing() ? 'Syncing…' : 'Sync sheet' }}
+    </button>
+  </div>
 
   <div class="card card--flush">
     @if (loading()) {
@@ -42,6 +57,14 @@
         <table>
           <thead>
             <tr>
+              <th class="checkbox-col">
+                <input
+                  type="checkbox"
+                  [checked]="allVisibleSelected()"
+                  (change)="toggleSelectAllVisible()"
+                  aria-label="Select all leads on this page"
+                />
+              </th>
               <th class="sortable" (click)="view.toggleSort('customerName')">
                 Customer <span class="arrow">{{ sortArrow('customerName') }}</span>
               </th>
@@ -57,6 +80,14 @@
           <tbody>
             @for (lead of view.rows(); track lead.id) {
               <tr class="clickable" (click)="detailLead.set(lead)">
+                <td class="checkbox-col" (click)="$event.stopPropagation()">
+                  <input
+                    type="checkbox"
+                    [checked]="isSelected(lead)"
+                    (change)="toggleSelect(lead)"
+                    [attr.aria-label]="'Select ' + lead.customerName"
+                  />
+                </td>
                 <td>
                   <div class="person">
                     <span class="avatar-sm" [class]="getAvatarTone(lead.id)">{{ getInitials(lead.customerName) }}</span>
@@ -111,11 +142,14 @@
 }
 
 <!-- Assign -->
-@if (assignLead(); as lead) {
+@if (assignLeads().length > 0) {
   <app-modal
     title="Assign to retention"
-    [subtitle]="'Choose who works ' + lead.customerName"
-    (close)="assignLead.set(null)"
+    [subtitle]="
+      'Choose who works ' +
+      (assignLeads().length === 1 ? assignLeads()[0].customerName : assignLeads().length + ' leads')
+    "
+    (close)="assignLeads.set([])"
   >
     @if (error()) {
       <div class="error">{{ error() }}</div>
@@ -155,10 +189,10 @@
       <button
         type="button"
         class="btn"
-        [disabled]="!chosenRetentionId() || busyId() === lead.id"
+        [disabled]="!chosenRetentionId() || assigning()"
         (click)="confirmAssign()"
       >
-        @if (busyId() === lead.id) {
+        @if (assigning()) {
           <span class="spinner"></span> Assigning…
         } @else {
           <svg lucideUserCheck></svg> Confirm assignment

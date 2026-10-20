@@ -2,10 +2,10 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
   LucideBanknote,
-  LucideBanknoteX,
   LucideBuilding2,
   LucideCircleCheck,
-  LucideClock,
+  LucideCircleX,
+  LucideSquarePen,
   LucideTag,
   LucideUndo2,
   LucideUserCheck,
@@ -17,7 +17,16 @@ import { ExternalClient } from '../../../core/models/external-client.model';
 import { Lead } from '../../../core/models/lead.model';
 import { createListView } from '../../../core/list-view';
 import { D_CODE_OPTIONS } from '../../../core/lead-options';
-import { formatPhone, formatPkr, getAvatarTone, getInitials, timeAgo } from '../../../core/format-utils';
+import {
+  APP_TIME_ZONE,
+  formatDate,
+  formatPhone,
+  formatPkr,
+  getAvatarTone,
+  getInitials,
+  pacificIsoDate,
+  timeAgo,
+} from '../../../core/format-utils';
 import { Modal } from '../../../shared/ui/modal';
 import { Select } from '../../../shared/ui/select';
 import {
@@ -26,11 +35,15 @@ import {
   PaymentBadge,
   SearchBox,
   SkeletonRows,
-  StatTile,
   StatusBadge,
+  PageHero,
 } from '../../../shared/ui/ui';
 import { LeadDetail } from '../../../shared/lead-detail';
+import { RowMenu } from '../../../shared/ui/row-menu';
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
+import { DayBar, rangeBounds, rangeLabel } from '../../../shared/ui/day-bar';
+import { LeadQuickEdit } from '../../../shared/lead-quick-edit';
+import { apiErrorMessage } from '../../../core/api';
 
 interface LookupUser {
   id: string;
@@ -40,22 +53,22 @@ interface LookupUser {
 
 const STATUS_FILTERS = [
   { label: 'All', value: '' },
-  { label: 'Submitted', value: 'SUBMITTED' },
-  { label: 'Rejected', value: 'REJECTED' },
   { label: 'Assigned', value: 'ASSIGNED' },
-  { label: 'Accepted', value: 'ACCEPTED' },
+  { label: 'Approved', value: 'ACCEPTED' },
   { label: 'Assigned (External)', value: 'ASSIGNED_EXTERNAL' },
-  { label: 'Charged Back', value: 'CHARGED_BACK' },
 ];
 
 @Component({
   selector: 'app-admin-cpl-leads',
   imports: [
+    PageHero,
+    RowMenu,
     FormsModule,
     Modal,
     Select,
     LeadDetail,
-    StatTile,
+    LeadQuickEdit,
+    DayBar,
     StatusBadge,
     PaymentBadge,
     SearchBox,
@@ -64,12 +77,12 @@ const STATUS_FILTERS = [
     SkeletonRows,
     LucideBuilding2,
     LucideCircleCheck,
+    LucideCircleX,
     LucideUserCheck,
     LucideUndo2,
-    LucideClock,
+    LucideSquarePen,
     LucideTag,
     LucideBanknote,
-    LucideBanknoteX,
   ],
   templateUrl: './cpl-leads.html',
 })
@@ -91,6 +104,7 @@ export class AdminCplLeads implements OnInit {
   readonly assignLead = signal<Lead | null>(null);
   readonly assignExternalLead = signal<Lead | null>(null);
   readonly returnLead = signal<Lead | null>(null);
+  readonly editLead = signal<Lead | null>(null);
 
   readonly clientSearch = signal('');
   readonly chosenClientId = signal('');
@@ -105,14 +119,17 @@ export class AdminCplLeads implements OnInit {
 
   readonly dCodeFilter = signal('');
   readonly juniorFilter = signal('');
-  readonly dateFrom = signal('');
-  readonly dateTo = signal('');
+  /** Day shown in the log below — Pacific yyyy-MM-dd, '' for every day. Starts on today. */
+  readonly day = signal(pacificIsoDate());
+  /** End of a date range (inclusive); '' means just `day`. */
+  readonly dayTo = signal('');
 
   readonly getInitials = getInitials;
   readonly getAvatarTone = getAvatarTone;
   readonly formatPhone = formatPhone;
   readonly formatPkr = formatPkr;
   readonly timeAgo = timeAgo;
+  readonly formatDate = formatDate;
 
   /** Leads picked for the batch "Mark Paid" action, keyed by id across pages/filters. */
   readonly selectedIds = signal<Set<string>>(new Set());
@@ -121,11 +138,10 @@ export class AdminCplLeads implements OnInit {
   batchPkrAmount: number | null = null;
   batchNote = '';
 
-  /** Lead being charged back — single-record action, mirrors the batch "Mark Paid" modal. */
-  readonly chargeBackLead = signal<Lead | null>(null);
-  readonly chargeBackSubmitting = signal(false);
-  chargeBackPkrAmount: number | null = null;
-  chargeBackReason = '';
+  /** Admin approve/decline on the client's behalf — Approve is immediate, Reject opens a modal for an optional reason. */
+  readonly rejectModalOpen = signal(false);
+  readonly decisionSubmitting = signal(false);
+  rejectReason = '';
 
   /** Junior Closers who actually appear on a CPL lead — drives the "filter by junior" dropdown. */
   readonly juniorClosers = computed(() => {
@@ -141,25 +157,85 @@ export class AdminCplLeads implements OnInit {
     ...this.juniorClosers().map((j) => ({ value: j.id, label: j.name })),
   ]);
 
-  /** D-code / Junior Closer / date-range — stacked pre-filters feeding createListView's
-   * search/status/sort/pagination below, same pattern as the client-search filters
-   * inside the assign modals on this and other admin pages. */
-  private readonly filteredByCpl = computed(() => {
+  private readonly byFilters = computed(() => {
     let rows = this.leads();
     const dCode = this.dCodeFilter();
     const junior = this.juniorFilter();
-    const from = this.dateFrom();
-    const to = this.dateTo();
     if (dCode) rows = rows.filter((l) => l.dCode === dCode);
     if (junior) rows = rows.filter((l) => l.juniorCloser?.id === junior);
-    if (from) rows = rows.filter((l) => l.createdAt >= from);
-    if (to) rows = rows.filter((l) => l.createdAt <= `${to}T23:59:59.999Z`);
     return rows;
   });
 
+  /** Waiting on the admin — sits on top whatever day it came in. */
+  isPending(lead: Lead): boolean {
+    return lead.status === 'SUBMITTED';
+  }
+
+  /** A client declined it — kept out of the queue and the log, behind the "Rejected CPLs" toggle. */
+  isRejected(lead: Lead): boolean {
+    return lead.status === 'REJECTED';
+  }
+
+  readonly showRejected = signal(false);
+
+  readonly rejectedLeads = computed(() => {
+    const term = this.view.search().trim().toLowerCase();
+    return this.byFilters()
+      .filter((l) => this.isRejected(l))
+      .filter((l) => !term || this.searchFields(l).some((f) => f != null && String(f).toLowerCase().includes(term)))
+      .sort((a, b) => new Date(b.updatedAt ?? b.createdAt).getTime() - new Date(a.updatedAt ?? a.createdAt).getTime());
+  });
+
+  /** Unfiltered count for the toggle badge, so it doesn't change with search. */
+  readonly rejectedCount = computed(() => this.byFilters().filter((l) => this.isRejected(l)).length);
+
+  private readonly searchFields = (l: Lead) => [l.customerName, l.phone, l.state, l.juniorCloser?.name];
+
+  /** The "needs your action" list — search applies, day and status pills don't. Oldest first — the longest-waiting leads lead the list. */
+  readonly pendingNewestFirst = signal(true);
+
+  readonly pendingLeads = computed(() => {
+    const term = this.view.search().trim().toLowerCase();
+    const dir = this.pendingNewestFirst() ? -1 : 1;
+    return this.byFilters()
+      .filter((l) => this.isPending(l))
+      .filter((l) => !term || this.searchFields(l).some((f) => f != null && String(f).toLowerCase().includes(term)))
+      .sort((a, b) => dir * (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()));
+  });
+
+  /** Everything the admin has already dealt with — the day-by-day log. */
+  private readonly logged = computed(() => this.byFilters().filter((l) => !this.isPending(l) && !this.isRejected(l)));
+  readonly loggedTotal = computed(() => this.logged().length);
+
+  /** Searching looks across every day, so a customer is findable without knowing when they came in. */
+  readonly dayMode = computed(() => !!this.day() && !this.view.search().trim());
+
+  /** One calendar day (not a range) — the log shows times instead of dates. */
+  readonly singleDay = computed(() => this.dayMode() && !this.dayTo());
+
+  private readonly byDay = computed(() => {
+    const rows = this.logged();
+    if (!this.dayMode()) return rows;
+    const [from, to] = rangeBounds(this.day(), this.dayTo());
+    return rows.filter((l) => {
+      const t = new Date(l.updatedAt ?? l.createdAt).getTime();
+      return t >= from && t < to;
+    });
+  });
+
+  /** Lead count per Pacific day, for the day tabs. */
+  readonly dayCounts = computed(() => {
+    const counts: Record<string, number> = {};
+    for (const l of this.logged()) {
+      const iso = pacificIsoDate(l.updatedAt ?? l.createdAt);
+      counts[iso] = (counts[iso] ?? 0) + 1;
+    }
+    return counts;
+  });
+
   readonly view = createListView<Lead>({
-    source: this.filteredByCpl,
-    searchFields: (l) => [l.customerName, l.phone, l.state, l.juniorCloser?.name],
+    source: this.byDay,
+    searchFields: this.searchFields,
     statusOf: (l) => l.status,
     sorters: {
       customerName: (l) => l.customerName,
@@ -167,29 +243,75 @@ export class AdminCplLeads implements OnInit {
       updatedAt: (l) => new Date(l.updatedAt ?? l.createdAt).getTime(),
     },
     initialSort: { key: 'updatedAt', dir: 'desc' },
-    pageSize: 10,
+    pageSize: 15,
   });
 
-  readonly stats = computed(() => {
-    const rows = this.leads();
-    const accepted = rows.filter((l) => l.status === 'ACCEPTED');
+  /** One-line recap of whatever the table is currently showing. */
+  readonly summary = computed(() => {
+    const rows = this.byDay();
     return {
       total: rows.length,
-      submitted: rows.filter((l) => l.status === 'SUBMITTED').length,
-      assigned: rows.filter((l) => l.status === 'ASSIGNED').length,
-      accepted: accepted.length,
-      unpaid: accepted.filter((l) => l.paymentStatus === 'UNPAID').length,
-      chargedBack: rows.filter((l) => l.status === 'CHARGED_BACK').length,
+      withClients: rows.filter((l) => l.status === 'ASSIGNED' || l.status === 'ASSIGNED_EXTERNAL').length,
+      accepted: rows.filter((l) => l.status === 'ACCEPTED').length,
+      unpaid: rows.filter((l) => this.isEligibleForBatchPaid(l)).length,
     };
   });
 
+
+  /** Hero headline: the day being viewed, so it never repeats the topbar's page title. */
+  readonly heroTitle = computed(() => {
+    const iso = this.day();
+    if (!iso) return 'Every day, all in one place';
+    if (this.dayTo()) return rangeLabel(iso, this.dayTo());
+    const [y, m, d] = iso.split('-').map(Number);
+    const label = new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-US', {
+      weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC',
+    });
+    return iso === pacificIsoDate() ? `Today · ${label}` : label;
+  });
+
+  readonly heroSub = computed(() => {
+    const s = this.summary();
+    if (s.total === 0) return this.dayMode() ? (this.dayTo() ? 'Nothing logged in this range yet.' : 'Nothing logged for this day yet.') : 'Nothing logged yet.';
+    return `${s.accepted} approved · ${s.withClients} with clients · ${s.unpaid} unpaid`;
+  });
+
+
+  /** Pending list is capped so the day log stays near the top; "Show all" expands it. */
+  readonly showAllPending = signal(false);
+  readonly visiblePending = computed(() => (this.showAllPending() ? this.pendingLeads() : this.pendingLeads().slice(0, 5)));
+
+  /** Whole days a lead has been waiting on the admin. */
+  waitDays(lead: Lead): number {
+    return Math.max(0, Math.floor((Date.now() - new Date(lead.createdAt).getTime()) / 86_400_000));
+  }
+
+  waitLabel(lead: Lead): string {
+    const d = this.waitDays(lead);
+    return d === 0 ? 'Today' : `${d}d`;
+  }
+
+  /** Set after a successful assignment so the admin sees the assigned lead (with its copy action). */
+  readonly assignedLead = signal<{ lead: Lead; to: string } | null>(null);
+
+
   readonly statusCounts = computed(() => {
-    const rows = this.filteredByCpl();
+    const rows = this.byDay();
     const counts: Record<string, number> = {};
     for (const filter of STATUS_FILTERS) counts[filter.value] = 0;
     counts[''] = rows.length;
     for (const lead of rows) counts[lead.status] = (counts[lead.status] ?? 0) + 1;
     return counts;
+  });
+
+  /** Status dropdown — one select instead of a row of pills; counts ride along in the label. */
+  readonly statusOptions = computed(() => {
+    const counts = this.statusCounts();
+    const current = this.view.status();
+    return STATUS_FILTERS.filter((f) => !f.value || counts[f.value] > 0 || current === f.value).map((f) => ({
+      value: f.value,
+      label: f.value ? `${f.label} (${counts[f.value]})` : `All statuses (${counts['']})`,
+    }));
   });
 
   readonly selectedCount = computed(() => this.selectedIds().size);
@@ -199,13 +321,31 @@ export class AdminCplLeads implements OnInit {
     return lead.paymentStatus === 'UNPAID' && (lead.status === 'ACCEPTED' || lead.status === 'ASSIGNED_EXTERNAL');
   }
 
+  /** Awaiting a response from a client (login account or external) — admin can decide for them. */
+  isEligibleForDecision(lead: Lead): boolean {
+    return lead.status === 'ASSIGNED' || lead.status === 'ASSIGNED_EXTERNAL';
+  }
+
+  /** A row is selectable if any batch action (Approve / Reject / Mark Paid) applies to it. */
+  isSelectable(lead: Lead): boolean {
+    return this.isEligibleForDecision(lead) || this.isEligibleForBatchPaid(lead);
+  }
+
+  private selectedLeads(): Lead[] {
+    const ids = this.selectedIds();
+    return this.leads().filter((l) => ids.has(l.id));
+  }
+
+  readonly decidableSelectedCount = computed(() => this.selectedLeads().filter((l) => this.isEligibleForDecision(l)).length);
+  readonly payableSelectedCount = computed(() => this.selectedLeads().filter((l) => this.isEligibleForBatchPaid(l)).length);
+
   isSelected(lead: Lead): boolean {
     return this.selectedIds().has(lead.id);
   }
 
   toggleSelect(lead: Lead, event: Event): void {
     event.stopPropagation();
-    if (!this.isEligibleForBatchPaid(lead)) return;
+    if (!this.isSelectable(lead)) return;
     this.selectedIds.update((ids) => {
       const next = new Set(ids);
       if (next.has(lead.id)) next.delete(lead.id);
@@ -216,12 +356,12 @@ export class AdminCplLeads implements OnInit {
 
   /** Header checkbox — true only when every eligible row on the current page is selected. */
   readonly allVisibleEligibleSelected = computed(() => {
-    const eligible = this.view.rows().filter((l) => this.isEligibleForBatchPaid(l));
+    const eligible = this.view.rows().filter((l) => this.isSelectable(l));
     return eligible.length > 0 && eligible.every((l) => this.selectedIds().has(l.id));
   });
 
   toggleSelectAllVisible(): void {
-    const eligible = this.view.rows().filter((l) => this.isEligibleForBatchPaid(l));
+    const eligible = this.view.rows().filter((l) => this.isSelectable(l));
     const allSelected = this.allVisibleEligibleSelected();
     this.selectedIds.update((ids) => {
       const next = new Set(ids);
@@ -287,29 +427,75 @@ export class AdminCplLeads implements OnInit {
   clearCplFilters(): void {
     this.dCodeFilter.set('');
     this.juniorFilter.set('');
-    this.dateFrom.set('');
-    this.dateTo.set('');
     this.view.page.set(1);
   }
 
-  /**
-   * Records the client's accept decision on their behalf — the normal path is the client
-   * logging in and accepting it themselves, but that decision is often made over a phone
-   * call in practice, so admin needs a way to record it without waiting on the client's login.
-   */
-  async approveLead(lead: Lead, event?: Event): Promise<void> {
+  // ─── Edit (rejected leads only) ────────────────────────────
+  openEdit(lead: Lead, event?: Event): void {
     event?.stopPropagation();
     this.error.set(null);
-    this.busyId.set(lead.id);
+    this.editLead.set(lead);
+  }
+
+  onEdited(updated: Lead): void {
+    this.leads.update((rows) => rows.map((l) => (l.id === updated.id ? updated : l)));
+    this.editLead.set(null);
+    this.notice.set(`Saved changes to ${updated.customerName}.`);
+  }
+
+  /** Time of day in Pacific — what the day log shows in place of a date. */
+  timeOf(dateStr: string): string {
+    return new Date(dateStr).toLocaleTimeString('en-US', { timeZone: APP_TIME_ZONE, hour: 'numeric', minute: '2-digit' });
+  }
+
+  /**
+   * Records the client's approve/decline decision on their behalf for the selected leads — the
+   * normal path is the client logging in themselves (and external clients have no login at
+   * all), but the decision is often made over a phone call, so admin records it here. Same
+   * select-then-act flow as Mark Paid. Reject asks for an optional reason first.
+   */
+  async batchAccept(): Promise<void> {
+    if (this.decidableSelectedCount() === 0) return;
+    this.error.set(null);
+    this.decisionSubmitting.set(true);
     try {
-      const updated = await this.leadService.approveLead(lead.id);
-      this.leads.update((rows) => rows.map((l) => (l.id === lead.id ? updated : l)));
-      if (this.detailLead()?.id === lead.id) this.detailLead.set(updated);
-      this.notice.set(`${lead.customerName} approved on behalf of ${updated.client?.name ?? 'the client'}.`);
-    } catch (err: any) {
-      this.error.set(err?.error?.error ?? 'Could not approve this lead.');
+      const leadIds = this.selectedLeads().filter((l) => this.isEligibleForDecision(l)).map((l) => l.id);
+      const { count } = await this.leadService.batchDecide(leadIds, 'ACCEPT');
+      await this.refresh();
+      this.clearSelection();
+      this.notice.set(`Approved ${count} lead${count === 1 ? '' : 's'} on the client's behalf.`);
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not approve these leads.'));
     } finally {
-      this.busyId.set(null);
+      this.decisionSubmitting.set(false);
+    }
+  }
+
+  openRejectModal(): void {
+    if (this.decidableSelectedCount() === 0) return;
+    this.error.set(null);
+    this.rejectReason = '';
+    this.rejectModalOpen.set(true);
+  }
+
+  closeRejectModal(): void {
+    this.rejectModalOpen.set(false);
+  }
+
+  async confirmBatchReject(): Promise<void> {
+    this.error.set(null);
+    this.decisionSubmitting.set(true);
+    try {
+      const leadIds = this.selectedLeads().filter((l) => this.isEligibleForDecision(l)).map((l) => l.id);
+      const { count } = await this.leadService.batchDecide(leadIds, 'REJECT', this.rejectReason.trim() || undefined);
+      await this.refresh();
+      this.clearSelection();
+      this.rejectModalOpen.set(false);
+      this.notice.set(`Declined ${count} lead${count === 1 ? '' : 's'} — sent back to the junior closer to fix.`);
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not decline these leads.'));
+    } finally {
+      this.decisionSubmitting.set(false);
     }
   }
 
@@ -333,9 +519,9 @@ export class AdminCplLeads implements OnInit {
       const updated = await this.leadService.assignLead(lead.id, clientId);
       this.leads.update((rows) => rows.map((l) => (l.id === lead.id ? updated : l)));
       this.assignLead.set(null);
-      this.notice.set(`${lead.customerName} assigned.`);
-    } catch (err: any) {
-      this.error.set(err?.error?.error ?? 'Could not assign the lead.');
+      this.assignedLead.set({ lead: updated, to: updated.client?.name ?? 'client' });
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not assign the lead.'));
     } finally {
       this.busyId.set(null);
     }
@@ -361,9 +547,9 @@ export class AdminCplLeads implements OnInit {
       const updated = await this.leadService.assignLeadExternal(lead.id, externalClientId);
       this.leads.update((rows) => rows.map((l) => (l.id === lead.id ? updated : l)));
       this.assignExternalLead.set(null);
-      this.notice.set(`${lead.customerName} assigned to external client.`);
-    } catch (err: any) {
-      this.error.set(err?.error?.error ?? 'Could not assign the lead.');
+      this.assignedLead.set({ lead: updated, to: updated.externalClient?.name ?? 'external client' });
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not assign the lead.'));
     } finally {
       this.busyId.set(null);
     }
@@ -389,8 +575,8 @@ export class AdminCplLeads implements OnInit {
       this.leads.update((rows) => rows.map((l) => (l.id === lead.id ? updated : l)));
       this.returnLead.set(null);
       this.notice.set(`${lead.customerName} sent back to ${lead.juniorCloser?.name ?? 'the junior closer'} to fix.`);
-    } catch (err: any) {
-      this.error.set(err?.error?.error ?? 'Could not send the lead back.');
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not send the lead back.'));
     } finally {
       this.busyId.set(null);
     }
@@ -409,15 +595,15 @@ export class AdminCplLeads implements OnInit {
       const updated = await this.leadService.markUnpaid(lead.id);
       this.leads.update((rows) => rows.map((l) => (l.id === lead.id ? updated : l)));
       if (this.detailLead()?.id === lead.id) this.detailLead.set(updated);
-    } catch (err: any) {
-      this.error.set(err?.error?.error ?? 'Could not update payment status.');
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not update payment status.'));
     } finally {
       this.busyId.set(null);
     }
   }
 
   openBatchModal(): void {
-    if (this.selectedCount() === 0) return;
+    if (this.payableSelectedCount() === 0) return;
     this.error.set(null);
     this.batchPkrAmount = null;
     this.batchNote = '';
@@ -437,61 +623,16 @@ export class AdminCplLeads implements OnInit {
     this.error.set(null);
     this.batchSubmitting.set(true);
     try {
-      const leadIds = [...this.selectedIds()];
+      const leadIds = this.selectedLeads().filter((l) => this.isEligibleForBatchPaid(l)).map((l) => l.id);
       const { count } = await this.leadService.batchMarkPaid(leadIds, this.batchPkrAmount, this.batchNote.trim() || undefined);
       await this.refresh();
       this.clearSelection();
       this.batchModalOpen.set(false);
       this.notice.set(`Marked ${count} lead${count === 1 ? '' : 's'} paid — ${formatPkr(this.batchPkrAmount)} recorded.`);
-    } catch (err: any) {
-      this.error.set(err?.error?.error ?? 'Could not mark these leads paid.');
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not mark these leads paid.'));
     } finally {
       this.batchSubmitting.set(false);
-    }
-  }
-
-  /**
-   * Opens the charge-back modal for an ACCEPTED + PAID lead. Marking a lead charged back
-   * is deliberately not a quick toggle — it requires the PKR amount clawed back and a
-   * reason, same reasoning as why marking a lead PAID requires going through the batch
-   * modal above.
-   */
-  openChargeBack(lead: Lead, event?: Event): void {
-    event?.stopPropagation();
-    this.error.set(null);
-    this.chargeBackPkrAmount = null;
-    this.chargeBackReason = '';
-    this.chargeBackLead.set(lead);
-  }
-
-  closeChargeBackModal(): void {
-    this.chargeBackLead.set(null);
-  }
-
-  async confirmChargeBack(): Promise<void> {
-    const lead = this.chargeBackLead();
-    if (!lead) return;
-    if (!this.chargeBackPkrAmount || this.chargeBackPkrAmount <= 0) {
-      this.error.set('Enter the PKR amount charged back.');
-      return;
-    }
-    if (!this.chargeBackReason.trim()) {
-      this.error.set('A reason is required.');
-      return;
-    }
-
-    this.error.set(null);
-    this.chargeBackSubmitting.set(true);
-    try {
-      const updated = await this.leadService.chargeBackLead(lead.id, this.chargeBackPkrAmount, this.chargeBackReason.trim());
-      this.leads.update((rows) => rows.map((l) => (l.id === lead.id ? updated : l)));
-      if (this.detailLead()?.id === lead.id) this.detailLead.set(updated);
-      this.chargeBackLead.set(null);
-      this.notice.set(`${lead.customerName} marked charged back — ${formatPkr(this.chargeBackPkrAmount)} recorded.`);
-    } catch (err: any) {
-      this.error.set(err?.error?.error ?? 'Could not mark this lead charged back.');
-    } finally {
-      this.chargeBackSubmitting.set(false);
     }
   }
 }

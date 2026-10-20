@@ -30,10 +30,15 @@ import {
   PLAN_TYPE_OPTIONS,
   RETIRED_INCOME_OPTIONS,
   SMOKER_OPTIONS,
+  US_STATE_OPTIONS,
 } from '../../../core/lead-options';
 import { Select } from '../../../shared/ui/select';
 import { Modal } from '../../../shared/ui/modal';
 import { NoCopy } from '../../../shared/no-copy.directive';
+import { PhoneInput } from '../../../shared/ui/phone-input';
+import { ZipInput } from '../../../shared/ui/zip-input';
+import { DateInput } from '../../../shared/ui/date-input';
+import { apiErrorMessage } from '../../../core/api';
 
 interface LookupUser {
   id: string;
@@ -82,7 +87,7 @@ const TRACKED: (keyof CloserCreateLeadInput)[] = [
  */
 @Component({
   selector: 'app-new-lead',
-  imports: [
+  imports: [DateInput, PhoneInput, ZipInput, 
     FormsModule,
     RouterLink,
     Select,
@@ -118,6 +123,7 @@ export class NewLead implements OnInit {
 
   readonly draftReasonOptions = DRAFT_REASON_OPTIONS;
   readonly maritalStatusOptions = MARITAL_STATUS_OPTIONS;
+  readonly stateOptions = US_STATE_OPTIONS;
   readonly genderOptions = GENDER_OPTIONS;
   readonly smokerOptions = SMOKER_OPTIONS;
   readonly needOptions = NEED_OPTIONS;
@@ -237,8 +243,8 @@ export class NewLead implements OnInit {
       ) as CloserCreateLeadInput;
       await this.leadService.createLeadAsCloser(payload);
       this.router.navigateByUrl('/closer/history');
-    } catch (err: any) {
-      this.error.set(err?.error?.error ?? 'Could not submit the lead.');
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not submit the lead.'));
     } finally {
       this.submitting.set(false);
     }
@@ -270,8 +276,8 @@ export class NewLead implements OnInit {
       await this.leadService.createLeadAsCloserDraft(payload);
       this.draftModalOpen.set(false);
       this.router.navigateByUrl('/closer/drafts');
-    } catch (err: any) {
-      this.error.set(err?.error?.error ?? 'Could not save this as a draft.');
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not save this as a draft.'));
     } finally {
       this.savingDraft.set(false);
     }

@@ -1,148 +1,172 @@
-<div class="page">
-  <div class="page-head">
-    <div>
-      <h1>Overall Analytics</h1>
-      <p class="sub">Pipeline health across the whole platform.</p>
-    </div>
-    <div class="page-head-actions">
-      <a class="btn btn--ghost" routerLink="/admin/analytics/junior-closers">Junior closers</a>
-      <a class="btn btn--ghost" routerLink="/admin/analytics/closers">Closers</a>
-    </div>
-  </div>
-
+<div class="page ao">
   @if (error()) {
     <div class="error">{{ error() }}</div>
   }
 
+  <div class="toolbar">
+    <div class="pills" role="group" aria-label="Period">
+      @for (p of periods; track p.value) {
+        <button type="button" class="pill" [class.active]="period() === p.value" (click)="period.set(p.value)">{{ p.label }}</button>
+      }
+    </div>
+    <div class="pills" role="group" aria-label="Source">
+      <button type="button" class="pill" [class.active]="source() === ''" (click)="source.set('')">All sources</button>
+      @for (s of sources; track s.value) {
+        <button type="button" class="pill" [class.active]="source() === s.value" (click)="source.set(s.value)">{{ s.label }}</button>
+      }
+    </div>
+  </div>
+
   @if (loading()) {
     <div class="card"><app-skeleton-rows [count]="6" /></div>
-  } @else if (metrics(); as m) {
-    <div class="stats-row">
-      <app-stat-tile [value]="m.total" label="Total leads" tone="tone-gold">
-        <svg lucideLayers></svg>
-      </app-stat-tile>
-      <app-stat-tile [value]="m.inFlight" label="Still in flight" tone="tone-warning">
+  } @else if (overall() && totalLeads() === 0) {
+    <div class="card">
+      <app-empty-state title="No leads yet">
         <svg lucideChartColumn></svg>
-      </app-stat-tile>
-      <app-stat-tile [value]="m.accepted" label="Accepted" tone="tone-success">
-        <svg lucideCircleCheck></svg>
-      </app-stat-tile>
-      <app-stat-tile [value]="m.rejected" label="Rejected" tone="tone-danger">
-        <svg lucideCircleX></svg>
-      </app-stat-tile>
-      <app-stat-tile [value]="m.closed" label="Closed & paid" tone="tone-f">
-        <svg lucideWallet></svg>
-      </app-stat-tile>
-      <app-stat-tile [value]="m.unpaid" label="Accepted, unpaid" tone="tone-neutral">
-        <svg lucideWallet></svg>
-      </app-stat-tile>
+      </app-empty-state>
     </div>
-
-    <div class="stats-row">
-      <app-stat-tile
-        [value]="m.acceptRate === null ? '—' : m.acceptRate + '%'"
-        label="Accept rate (of decided leads)"
-        tone="tone-a"
-      >
-        <svg lucideTarget></svg>
-      </app-stat-tile>
-      <app-stat-tile
-        [value]="m.collectionRate === null ? '—' : m.collectionRate + '%'"
-        label="Paid (of accepted leads)"
-        tone="tone-b"
-      >
-        <svg lucideWallet></svg>
-      </app-stat-tile>
-    </div>
-
-    @if (m.total === 0) {
-      <div class="card">
-        <app-empty-state title="No leads yet" hint="Analytics fill in once leads start moving through the pipeline.">
-          <svg lucideChartColumn></svg>
-        </app-empty-state>
+  } @else if (overall()) {
+    <div class="ao-kpis">
+      <div class="ao-kpi">
+        <span class="ao-kpi-l">Leads in</span>
+        <span class="ao-kpi-v">{{ kpis().leads }}</span>
+        <span class="ao-kpi-sub">
+          @if (kpis().leadsDelta; as d) { <span [class]="d.cls">{{ d.text }}</span> {{ priorLabel() }} } @else { all time }
+        </span>
       </div>
-    } @else {
-      <div class="card">
-        <div class="inline-head">
-          <h2>Leads by status</h2>
-          <span class="count">{{ m.total }} total</span>
-        </div>
+      <div class="ao-kpi">
+        <span class="ao-kpi-l">Approval rate</span>
+        <span class="ao-kpi-v ao-tone--{{ kpis().rateTone }}">{{ kpis().rate === null ? '—' : kpis().rate + '%' }}</span>
+        <span class="ao-kpi-sub">
+          @if (kpis().rateDelta; as d) { <span [class]="d.cls">{{ d.text }}</span> {{ priorLabel() }} } @else { of decided leads }
+        </span>
+      </div>
+      <div class="ao-kpi">
+        <span class="ao-kpi-l">Approved</span>
+        <span class="ao-kpi-v">{{ kpis().approved }}</span>
+        <span class="ao-kpi-sub">
+          @if (kpis().approvedDelta; as d) { <span [class]="d.cls">{{ d.text }}</span> {{ priorLabel() }} } @else { all time }
+        </span>
+      </div>
+      <div class="ao-kpi" [class.ao-kpi--warn]="kpis().unpaid > 0">
+        <span class="ao-kpi-l">Approved, not paid</span>
+        <span class="ao-kpi-v">{{ kpis().unpaid }}</span>
+        <span class="ao-kpi-sub">
+          {{ kpis().collected === null ? '—' : kpis().collected + '%' }} collected ·
+          <a routerLink="../../leads">Collect</a>
+        </span>
+      </div>
+      <div class="ao-kpi">
+        <span class="ao-kpi-l">Charge-backs</span>
+        <span class="ao-kpi-v">{{ kpis().chargeBacks }}</span>
+        <span class="ao-kpi-sub">
+          @if (kpis().cbDelta; as d) { <span [class]="d.cls">{{ d.text }}</span> {{ priorLabel() }} } @else { all time }
+        </span>
+      </div>
+    </div>
 
-        <div class="chart">
-          @for (bar of statusBars(); track bar.status) {
-            <div class="chart-row" [title]="bar.label + ' — ' + pluralize(bar.count, 'lead')">
-              <span class="chart-key">{{ bar.label }}</span>
-              <span class="chart-track">
-                <span class="chart-bar" [class]="bar.barCls" [style.width.%]="bar.pct"></span>
-              </span>
-              <span class="chart-val">{{ bar.count }}</span>
+    <div class="ao-grid">
+      <section class="card ao-span2">
+        <div class="inline-head">
+          <h2>Weekly intake by source</h2>
+          <div class="chart-legend chart-legend--inline">
+            @for (s of sources; track s.value) {
+              <span><i class="src-sw {{ s.cls }}"></i> {{ s.label }}</span>
+            }
+          </div>
+        </div>
+        <div class="ao-weeks">
+          @for (w of weeks(); track w.label) {
+            <div class="ao-week" [title]="w.title">
+              <div class="ao-week-plot">
+                @if (w.total) {
+                  <div class="ao-week-stack" [style.height.%]="w.heightPct">
+                    <span class="ao-week-n">{{ w.total }}</span>
+                    @for (seg of w.segs; track seg.cls) {
+                      <span class="ao-seg {{ seg.cls }}" [style.height.%]="seg.pct"></span>
+                    }
+                  </div>
+                }
+              </div>
+              <span class="ao-week-l">{{ w.label }}</span>
             </div>
           }
         </div>
+      </section>
 
-        <div class="chart-legend">
-          <span><i class="sw--vol"></i> In flight</span>
-          <span><i class="sw--good"></i> Accepted</span>
-          <span><i class="sw--bad"></i> Rejected</span>
+      <section class="card">
+        <div class="inline-head">
+          <h2>Where leads are now</h2>
+          <span class="count">{{ totalLeads() }} total</span>
         </div>
-
-        <div class="table-wrap stack-top">
-          <table>
-            <thead>
-              <tr>
-                <th>Status</th>
-                <th class="hide-sm">What it means</th>
-                <th class="right">Leads</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (bar of statusBars(); track bar.status) {
-                <tr>
-                  <td>
-                    <span class="badge" [class]="'badge badge--' + bar.status.toLowerCase()">{{ bar.label }}</span>
-                  </td>
-                  <td class="hide-sm"><span class="cell-sub">{{ bar.hint }}</span></td>
-                  <td class="right num">{{ bar.count }}</td>
-                </tr>
+        <div class="ao-stages">
+          @for (s of stages(); track s.key) {
+            <div class="ao-stage">
+              <div class="ao-stage-top">
+                <span>{{ s.label }}</span>
+                <b class="num">{{ s.n }}</b>
+              </div>
+              <span class="ao-track"><i class="{{ s.cls }}" [style.width.%]="s.pct"></i></span>
+              @if (s.detail) {
+                <span class="ao-stage-d">{{ s.detail }}</span>
               }
-            </tbody>
-          </table>
+            </div>
+          }
         </div>
-      </div>
-    }
-
-    <div class="card">
-      <div class="inline-head">
-        <h2>Accounts</h2>
-        <span class="inline-links">
-          <a class="count" routerLink="/admin/clients">Clients</a>
-          <a class="count" routerLink="/admin/team">Team</a>
-        </span>
-      </div>
-
-      <div class="stats-row" style="margin-bottom: 1.1rem;">
-        @for (row of roleRows(); track row.role) {
-          <app-stat-tile [value]="row.count" [label]="row.label" [tone]="row.tone">
-            @switch (row.role) {
-              @case ('ADMIN') { <svg lucideShieldCheck></svg> }
-              @case ('CLIENT') { <svg lucideBriefcase></svg> }
-              @default { <svg lucideUsers></svg> }
-            }
-          </app-stat-tile>
-        }
-      </div>
-
-      <div class="chart">
-        @for (row of roleRows(); track row.role) {
-          <div class="chart-row" [title]="row.label + ' — ' + pluralize(row.count, 'account')">
-            <span class="chart-key">{{ row.label }}</span>
-            <span class="chart-track">
-              <span class="chart-bar" [style.width.%]="row.pct"></span>
-            </span>
-            <span class="chart-val">{{ row.count }}</span>
-          </div>
-        }
-      </div>
+      </section>
     </div>
+
+    <section class="card card--flush">
+      <div class="inline-head ao-pad"><h2>By source</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Source</th>
+              <th class="right">Leads</th>
+              <th class="right">Approved</th>
+              <th class="right">Declined</th>
+              <th>Approval rate</th>
+              <th class="right hide-sm">Paid of approved</th>
+              <th class="right hide-sm">Charge-backs</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (s of bySource(); track s.value) {
+              <tr [class.ao-dim]="source() && source() !== s.value">
+                <td><span class="ao-src"><i class="src-sw {{ s.cls }}"></i><span class="cell-main">{{ s.label }}</span></span></td>
+                <td class="right num">{{ s.leads }}</td>
+                <td class="right num">{{ s.approved }}</td>
+                <td class="right num">{{ s.declined }}</td>
+                <td>
+                  @if (s.rate === null) {
+                    <span class="empty">—</span>
+                  } @else {
+                    <span class="ao-rate ao-tone--{{ s.rateTone }}">
+                      <span class="ao-track ao-track--sm"><i [style.width.%]="s.rate"></i></span>
+                      <b>{{ s.rate }}%</b>
+                    </span>
+                  }
+                </td>
+                <td class="right num hide-sm">{{ s.paid }} of {{ s.acceptedNow }}</td>
+                <td class="right num hide-sm">{{ s.chargeBacks }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card ao-team">
+      <h2>Team</h2>
+      <div class="ao-team-list">
+        @for (t of team(); track t.label) {
+          <span><b>{{ t.n }}</b> {{ t.label }}</span>
+        }
+      </div>
+      @if (isAdmin) {
+        <a routerLink="../../team">Manage team</a>
+      }
+    </section>
   }
 </div>

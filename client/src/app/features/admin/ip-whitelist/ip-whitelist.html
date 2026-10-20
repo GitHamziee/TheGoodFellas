@@ -1,12 +1,13 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <p class="sub">
-        Admin and Client accounts can sign in from anywhere. Every other role only works from an IP
-        whitelisted here. Don't know your office's IP — use "Add this network" from a computer sitting on it.
-      </p>
-    </div>
-    <div class="page-head-actions">
+  <app-page-hero
+    eyebrow="Security"
+    title="IP Whitelist"
+    sub="Admin and Client accounts can sign in from anywhere. Every other role only works from an IP whitelisted here. Don't know your office's IP — use &quot;Add this network&quot; from a computer sitting on it."
+    tone="clay"
+    [count]="loading() ? '–' : ips().length"
+    countLabel="whitelisted addresses"
+  >
+    <svg lucideShield></svg>
       <button type="button" class="btn btn--ghost" [disabled]="detecting()" (click)="addCurrentNetwork()">
         @if (detecting()) {
           <span class="spinner"></span> Detecting…
@@ -17,8 +18,7 @@
       <button type="button" class="btn" (click)="openCreate()">
         <svg lucidePlus></svg> Whitelist an IP
       </button>
-    </div>
-  </div>
+  </app-page-hero>
 
   @if (error() && !showCreate()) {
     <div class="error">{{ error() }}</div>

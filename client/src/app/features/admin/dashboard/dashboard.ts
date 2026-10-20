@@ -9,15 +9,16 @@ import {
   LucideLayers,
   LucideTag,
   LucideTrendingUp,
-  LucideTriangleAlert,
   LucideUserCheck,
   LucideWallet,
 } from '@lucide/angular';
 import { LeadService } from '../../../core/services/lead.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { Lead, LeadStatus } from '../../../core/models/lead.model';
-import { getAvatarTone, getInitials, isThisMonth, timeAgo } from '../../../core/format-utils';
+import { getAvatarTone, getInitials, pacificIsoDate, pacificToday, timeAgo } from '../../../core/format-utils';
 import { EmptyState, SkeletonRows, StatusBadge } from '../../../shared/ui/ui';
+import { Period, PeriodFilter, periodBounds } from '../../../shared/ui/period-filter';
+import { Leaderboard, buildLeaderboard } from '../../../shared/ui/leaderboard';
 import { reloadOnChange } from '../../../core/live-reload';
 
 /** A lead sitting in an admin-owned status longer than this is called out as stalled. */
@@ -28,15 +29,17 @@ const FLOW: { status: LeadStatus; label: string; owner: string; mine: boolean }[
   { status: 'NEW', label: 'Intake', owner: 'With closer', mine: false },
   { status: 'SUBMITTED', label: 'Review', owner: 'With you', mine: true },
   { status: 'ASSIGNED', label: 'Offered', owner: 'With client', mine: false },
-  { status: 'ACCEPTED', label: 'Accepted', owner: 'Closed', mine: false },
+  { status: 'ACCEPTED', label: 'Approved', owner: 'Closed', mine: false },
 ];
 
 @Component({
   selector: 'app-admin-dashboard',
   imports: [
     RouterLink,
+    PeriodFilter,
     StatusBadge,
     EmptyState,
+    Leaderboard,
     SkeletonRows,
     LucideArrowRight,
     LucideCircleCheck,
@@ -46,7 +49,6 @@ const FLOW: { status: LeadStatus; label: string; owner: string; mine: boolean }[
     LucideLayers,
     LucideTag,
     LucideTrendingUp,
-    LucideTriangleAlert,
     LucideUserCheck,
     LucideWallet,
   ],
@@ -58,7 +60,19 @@ export class AdminDashboard implements OnInit {
   private readonly leadService = inject(LeadService);
   private readonly auth = inject(AuthService);
 
-  readonly leads = signal<Lead[]>([]);
+  /** Every lead, unfiltered: the command bar is a backlog and must never hide old work. */
+  readonly allLeads = signal<Lead[]>([]);
+  readonly period = signal<Period>('day');
+  readonly anchor = signal(pacificIsoDate(pacificToday()));
+
+  /** Leads submitted inside the selected day / week / month; every metric below the command bar reads this. */
+  readonly leads = computed(() => {
+    const [start, end] = periodBounds(this.period(), this.anchor());
+    return this.allLeads().filter((l) => {
+      const t = new Date(l.createdAt).getTime();
+      return t >= start && t < end;
+    });
+  });
   readonly loading = signal(true);
 
   readonly staleAfterDays = STALE_AFTER_DAYS;
@@ -69,7 +83,7 @@ export class AdminDashboard implements OnInit {
 
   /** The three things only an admin can clear. This drives the top command bar. */
   readonly actions = computed(() => {
-    const rows = this.leads();
+    const rows = this.allLeads();
     const toAssign = rows.filter((l) => l.status === 'SUBMITTED');
     const toFix = rows.filter((l) => l.status === 'REJECTED');
     const toCollect = rows.filter((l) => l.status === 'ACCEPTED' && l.paymentStatus === 'UNPAID');
@@ -124,7 +138,6 @@ export class AdminDashboard implements OnInit {
     const max = Math.max(1, accepted.length, rejected.length, pending);
     return {
       total: rows.length,
-      thisMonth: rows.filter((l) => isThisMonth(l.createdAt)).length,
       accepted: accepted.length,
       rejected: rejected.length,
       pending,
@@ -161,6 +174,67 @@ export class AdminDashboard implements OnInit {
       .slice(0, 5);
   });
 
+  /** Closers ranked by lead volume — how many leads each one has handled, regardless of outcome. */
+  readonly volumeBoard = computed(() => {
+    const byCloser = new Map<string, { id: string; name: string; total: number; accepted: number }>();
+
+    for (const lead of this.leads()) {
+      if (!lead.closer) continue;
+      const row = byCloser.get(lead.closer.id) ?? {
+        id: lead.closer.id,
+        name: lead.closer.name,
+        total: 0,
+        accepted: 0,
+      };
+      row.total += 1;
+      if (lead.status === 'ACCEPTED') row.accepted += 1;
+      byCloser.set(lead.closer.id, row);
+    }
+
+    return [...byCloser.values()].sort((a, b) => b.total - a.total || b.accepted - a.accepted).slice(0, 5);
+  });
+
+  /** Per-junior-closer totals, shared by both junior boards. */
+  private readonly juniorStats = computed(() => {
+    const byJunior = new Map<string, { id: string; name: string; total: number; accepted: number }>();
+
+    for (const lead of this.leads()) {
+      if (!lead.juniorCloser) continue;
+      const row = byJunior.get(lead.juniorCloser.id) ?? {
+        id: lead.juniorCloser.id,
+        name: lead.juniorCloser.name,
+        total: 0,
+        accepted: 0,
+      };
+      row.total += 1;
+      if (lead.status === 'ACCEPTED') row.accepted += 1;
+      byJunior.set(lead.juniorCloser.id, row);
+    }
+
+    return [...byJunior.values()];
+  });
+
+  /** Junior closers ranked by accepted leads — whose submissions actually get approved. */
+  readonly juniorLeaderboard = computed(() =>
+    this.juniorStats()
+      .map((r) => ({ ...r, rate: r.total ? Math.round((r.accepted / r.total) * 100) : 0 }))
+      .sort((a, b) => b.accepted - a.accepted || b.rate - a.rate)
+      .slice(0, 5),
+  );
+
+  /** Junior closers ranked by lead volume — how many leads each one has submitted. */
+  readonly juniorVolumeBoard = computed(() =>
+    [...this.juniorStats()].sort((a, b) => b.total - a.total || b.accepted - a.accepted).slice(0, 5),
+  );
+
+  /** The four leaderboards, top three each. */
+  readonly boards = computed(() => [
+    buildLeaderboard('Top Closers', 'Ranked by approval rate', '/admin/analytics/closers', this.leaderboard(), 'rate'),
+    buildLeaderboard('Top Closers by Volume', 'Ranked by leads handled', '/admin/analytics/closers', this.volumeBoard(), 'volume'),
+    buildLeaderboard('Top Junior Closers', 'Ranked by approval rate', '/admin/analytics/junior-closers', this.juniorLeaderboard(), 'rate'),
+    buildLeaderboard('Top Junior Closers by Volume', 'Ranked by leads submitted', '/admin/analytics/junior-closers', this.juniorVolumeBoard(), 'volume'),
+  ]);
+
   readonly recent = computed(() =>
     [...this.leads()]
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
@@ -169,7 +243,7 @@ export class AdminDashboard implements OnInit {
 
   async ngOnInit(): Promise<void> {
     try {
-      this.leads.set(await this.leadService.allLeads());
+      this.allLeads.set(await this.leadService.allLeads());
     } finally {
       this.loading.set(false);
     }

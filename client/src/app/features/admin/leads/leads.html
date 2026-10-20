@@ -1,39 +1,16 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1>CPA &amp; Retention Leads</h1>
-      <p class="sub">CPA (Junior → Closer → Admin → Client) and Retention (AI-sourced) leads in one pipeline — same assignment and payment flow. Use the source filter to narrow. CPL (live-transfer) leads live on their own page.</p>
-    </div>
-  </div>
+  <app-page-hero
+    eyebrow="CPA & Retention"
+    [title]="heroTitle()"
+    [sub]="heroSub()"
+    [tone]="pendingLeads().length ? 'gold' : 'green'"
+    [count]="loading() ? '–' : summary().total"
+    [countLabel]="singleDay() ? 'logged this day' : 'leads logged'"
+  >
+    <svg lucideLayers></svg>
+  </app-page-hero>
 
-  <div class="stats-row">
-    <app-stat-tile [value]="stats().total" label="Total leads" tone="tone-gold">
-      <svg lucideLayers></svg>
-    </app-stat-tile>
-    <app-stat-tile [value]="stats().submitted" label="Awaiting assignment" tone="tone-warning">
-      <svg lucideSend></svg>
-    </app-stat-tile>
-    <app-stat-tile [value]="stats().assigned" label="With clients" tone="tone-a">
-      <svg lucideInbox></svg>
-    </app-stat-tile>
-    <app-stat-tile [value]="stats().accepted" label="Accepted" tone="tone-success">
-      <svg lucideCircleCheck></svg>
-    </app-stat-tile>
-    <app-stat-tile [value]="stats().rejected" label="Rejected" tone="tone-danger">
-      <svg lucideCircleX></svg>
-    </app-stat-tile>
-    <app-stat-tile [value]="stats().assignedExternal" label="Assigned — external" tone="tone-a">
-      <svg lucideInbox></svg>
-    </app-stat-tile>
-    <app-stat-tile [value]="stats().unpaid" label="Accepted, unpaid" tone="tone-neutral">
-      <svg lucideWallet></svg>
-    </app-stat-tile>
-    <app-stat-tile [value]="stats().chargedBack" label="Charged back" tone="tone-danger">
-      <svg lucideBanknoteX></svg>
-    </app-stat-tile>
-  </div>
-
-  @if (error() && !batchModalOpen() && !chargeBackModalOpen()) {
+  @if (error() && !batchModalOpen() && !chargeBackModalOpen() && !rejectModalOpen()) {
     <div class="error">{{ error() }}</div>
   }
   @if (notice()) {
@@ -45,6 +22,32 @@
       <span><strong>{{ selectedCount() }}</strong> lead{{ selectedCount() === 1 ? '' : 's' }} selected</span>
       <div class="row-actions">
         <button type="button" class="btn btn--sm btn--ghost" (click)="clearSelection()">Clear</button>
+        <button
+          type="button"
+          class="btn btn--sm"
+          [disabled]="retentionAssignableSelectedCount() === 0"
+          (click)="openBatchAssignRetention()"
+        >
+          <svg lucideHeadset></svg> Assign to retention ({{ retentionAssignableSelectedCount() }})
+        </button>
+        <button
+          type="button"
+          class="btn btn--sm btn--success"
+          title="Approve on the client's behalf"
+          [disabled]="decidableSelectedCount() === 0 || decisionSubmitting()"
+          (click)="batchAccept()"
+        >
+          <svg lucideCircleCheck></svg> Approve ({{ decidableSelectedCount() }})
+        </button>
+        <button
+          type="button"
+          class="btn btn--sm btn--danger"
+          title="Decline on the client's behalf"
+          [disabled]="decidableSelectedCount() === 0 || decisionSubmitting()"
+          (click)="openRejectModal()"
+        >
+          <svg lucideCircleX></svg> Decline ({{ decidableSelectedCount() }})
+        </button>
         <button
           type="button"
           class="btn btn--sm btn--success"
@@ -65,40 +68,136 @@
     </div>
   }
 
+  <!-- Needs action: every lead waiting on the admin, oldest first, whatever day it came in -->
+  @if (!loading() && pendingLeads().length > 0) {
+    <div class="card card--flush pending-card">
+      <div class="card-head">
+        <h2>Needs your action</h2>
+        <span class="count">{{ pendingLeads().length }} waiting</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Customer</th>
+              <th class="hide-sm">Closer / Retention</th>
+              <th>Status</th>
+              <th class="hide-md">Reason / notes</th>
+              <th>
+                <button type="button" class="btn btn--sm btn--ghost" (click)="pendingNewestFirst.set(!pendingNewestFirst())" title="Click to flip the order">
+                  Waiting {{ pendingNewestFirst() ? '↑ newest first' : '↓ oldest first' }}
+                </button>
+              </th>
+              <th class="right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (lead of visiblePending(); track lead.id) {
+              <tr class="clickable" (click)="selected.set(lead)">
+                <td>
+                  <div class="cell-main">
+                    {{ lead.customerName }}
+                    @if (lead.leadType === 'RETENTION') {
+                      <span class="chip"><svg lucideHeadset></svg>Retention</span>
+                    }
+                  </div>
+                  <div class="cell-sub">{{ formatPhone(lead.phone) }} · {{ lead.state }}</div>
+                  @if (lead.suggestedClient; as suggested) {
+                    <div class="cell-sub">Suggested client: {{ suggested.name }}</div>
+                  }
+                </td>
+                <td class="hide-sm">
+                  @if (lead.retention) {
+                    <div class="person">
+                      <span class="avatar-sm" [class]="getAvatarTone(lead.retention.id)">{{ getInitials(lead.retention.name) }}</span>
+                      <span class="nm">{{ lead.retention.name }}</span>
+                    </div>
+                  } @else if (lead.closer) {
+                    <div class="person">
+                      <span class="avatar-sm" [class]="getAvatarTone(lead.closer.id)">{{ getInitials(lead.closer.name) }}</span>
+                      <span class="nm">{{ lead.closer.name }}</span>
+                    </div>
+                  } @else {
+                    <span class="empty">Unassigned</span>
+                  }
+                </td>
+                <td><app-status-badge [status]="lead.status" /></td>
+                <td class="hide-md">
+                  @if (lead.status === 'REJECTED' && lead.rejectionReason) {
+                    <span class="cell-sub">{{ lead.rejectionReason }}</span>
+                  } @else if (lead.closerNotes) {
+                    <span class="cell-sub">{{ lead.closerNotes }}</span>
+                  } @else {
+                    <span class="empty">—</span>
+                  }
+                </td>
+                <td>
+                  <span class="chip age" [class.age--warn]="waitDays(lead) >= 2 && waitDays(lead) < 7" [class.age--late]="waitDays(lead) >= 7">{{ waitLabel(lead) }}</span>
+                  <div class="cell-sub">{{ formatDate(lead.createdAt) }}</div>
+                </td>
+                <td (click)="$event.stopPropagation()">
+                  <div class="row-actions">
+                    @if (lead.status === 'NEW') {
+                      <button type="button" class="btn btn--sm" (click)="openAssignRetention(lead, $event)">
+                        <svg lucideHeadset></svg> Assign
+                      </button>
+                    } @else {
+                      <button type="button" class="btn btn--sm" (click)="openAssign(lead, $event)">
+                        <svg lucideUserCheck></svg> Assign
+                      </button>
+                      <app-row-menu>
+                        @if (lead.status === 'REJECTED') {
+                          <button type="button" class="menu-item" (click)="openEdit(lead)"><svg lucideSquarePen></svg> Edit details</button>
+                        }
+                        <button type="button" class="menu-item" (click)="openReturn(lead)"><svg lucideUndo2></svg> Send back</button>
+                        <button type="button" class="menu-item" (click)="openAssignExternal(lead)"><svg lucideBuilding2></svg> Assign to external</button>
+                      </app-row-menu>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      @if (pendingLeads().length > 5) {
+        <div class="pending-more">
+          <button type="button" class="btn btn--sm btn--ghost" (click)="showAllPending.set(!showAllPending())">
+            {{ showAllPending() ? 'Show fewer' : 'Show all ' + pendingLeads().length }}
+          </button>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- Search/filters + day tabs stay pinned while a long day scrolls -->
+  <div class="log-controls">
   <div class="toolbar">
     <app-search-box
       [value]="view.search()"
       placeholder="Search name, phone, state, or person…"
       (valueChange)="view.setSearch($event)"
     />
-
     <app-select
       [options]="sourceOptions"
       [ngModel]="sourceFilter()"
       (ngModelChange)="setSourceFilter($event)"
       ariaLabel="Filter by source"
     />
-
     <app-select
       [options]="closerOptions()"
       [ngModel]="closerFilter()"
       (ngModelChange)="setCloserFilter($event)"
       ariaLabel="Filter by closer"
     />
-
-    <div class="pills">
-      @for (filter of statusFilters; track filter.value) {
-        <button
-          type="button"
-          class="pill"
-          [class.active]="view.status() === filter.value"
-          (click)="view.setStatus(filter.value)"
-        >
-          {{ filter.label }}
-          <span class="n">{{ statusCounts()[filter.value] }}</span>
-        </button>
-      }
-    </div>
+    <app-select
+      [options]="statusOptions()"
+      [ngModel]="view.status()"
+      (ngModelChange)="view.setStatus($event)"
+      ariaLabel="Filter by status"
+    />
+  </div>
+  <app-day-bar [(day)]="day" [(dayTo)]="dayTo" [counts]="dayCounts()" [total]="loggedTotal()" [span]="2" />
   </div>
 
   <div class="card card--flush">
@@ -106,7 +205,11 @@
       <app-skeleton-rows [count]="6" />
     } @else if (view.total() === 0) {
       @if (view.isFiltered()) {
-        <app-empty-state title="No leads match those filters" hint="Try a different search term or clear the filters.">
+        <app-empty-state title="No leads match those filters" hint="Try a different search term or status.">
+          <svg lucideFileText></svg>
+        </app-empty-state>
+      } @else if (dayMode()) {
+        <app-empty-state title="Nothing logged for this day" hint="Leads you've handled show up under the day they came in. Pick another day above, or choose All dates.">
           <svg lucideFileText></svg>
         </app-empty-state>
       } @else {
@@ -116,7 +219,7 @@
       }
     } @else {
       <div class="table-wrap">
-        <table>
+        <table class="log-table">
           <thead>
             <tr>
               <th class="checkbox-col">
@@ -135,16 +238,17 @@
               <th class="sortable" (click)="view.toggleSort('status')">
                 Status <span class="arrow">{{ sortArrow('status') }}</span>
               </th>
-              <th class="hide-md">Payment</th>
-              <th class="sortable" (click)="view.toggleSort('createdAt')">
-                Created <span class="arrow">{{ sortArrow('createdAt') }}</span>
+              <th class="sortable right" (click)="view.toggleSort('updatedAt')">
+                {{ singleDay() ? 'Time' : 'Updated' }} <span class="arrow">{{ sortArrow('updatedAt') }}</span>
               </th>
-              <th class="right">Actions</th>
+              @if (showActions()) {
+                <th class="right">Actions</th>
+              }
             </tr>
           </thead>
           <tbody>
             @for (lead of view.rows(); track lead.id) {
-              <tr class="clickable" (click)="selected.set(lead)">
+              <tr class="clickable" [attr.data-status]="lead.status" (click)="selected.set(lead)">
                 <td class="checkbox-col" (click)="$event.stopPropagation()">
                   <input
                     type="checkbox"
@@ -202,79 +306,35 @@
                       <span class="nm">{{ lead.externalClient.name }} <span class="cell-sub">(external)</span></span>
                     </div>
                   } @else {
-                    <span class="empty">Unassigned</span>
-                  }
-                </td>
-                <td><app-status-badge [status]="lead.status" /></td>
-                <td class="hide-md">
-                  @if (lead.status === 'ACCEPTED' || lead.status === 'ASSIGNED_EXTERNAL') {
-                    <app-payment-badge [status]="lead.paymentStatus" />
-                  } @else {
                     <span class="empty">—</span>
                   }
                 </td>
                 <td>
-                  <span class="chip"><svg lucideClock></svg>{{ timeAgo(lead.createdAt) }}</span>
-                </td>
-                <td (click)="$event.stopPropagation()">
-                  <div class="row-actions">
-                    @if (lead.leadType === 'RETENTION' && lead.status === 'NEW') {
-                      <button type="button" class="btn btn--sm" (click)="openAssignRetention(lead, $event)">
-                        <svg lucideHeadset></svg> {{ lead.retention ? 'Reassign' : 'Assign' }}
-                      </button>
-                    }
-                    @if (lead.status === 'SUBMITTED' || lead.status === 'REJECTED') {
-                      @if (lead.leadType !== 'RETENTION') {
-                        <button
-                          type="button"
-                          class="btn btn--sm btn--icon btn--ghost"
-                          title="Send back"
-                          aria-label="Send back"
-                          (click)="openReturn(lead, $event)"
-                        >
-                          <svg lucideUndo2></svg>
-                        </button>
-                      }
-                      <button
-                        type="button"
-                        class="btn btn--sm btn--icon btn--ghost"
-                        title="Assign external"
-                        aria-label="Assign external"
-                        (click)="openAssignExternal(lead, $event)"
-                      >
-                        <svg lucideBuilding2></svg>
-                      </button>
-                      <button
-                        type="button"
-                        class="btn btn--sm btn--icon"
-                        title="Assign"
-                        aria-label="Assign"
-                        (click)="openAssign(lead, $event)"
-                      >
-                        <svg lucideUserCheck></svg>
-                      </button>
-                    }
-                    @if (lead.status === 'ASSIGNED') {
-                      <button
-                        type="button"
-                        class="btn btn--sm btn--success"
-                        title="Approve on the client's behalf"
-                        [disabled]="busyId() === lead.id"
-                        (click)="approveLead(lead, $event)"
-                      >
-                        @if (busyId() === lead.id) {
-                          <span class="spinner"></span>
-                        } @else {
-                          <svg lucideCircleCheck></svg>
-                        }
-                        Approve
-                      </button>
-                    }
-                    @if (lead.status !== 'SUBMITTED' && lead.status !== 'REJECTED' && lead.status !== 'ASSIGNED' && !(lead.leadType === 'RETENTION' && lead.status === 'NEW')) {
-                      <span class="empty">—</span>
+                  <div class="status-stack">
+                    <app-status-badge [status]="lead.status" />
+                    @if (lead.status === 'ACCEPTED' || lead.status === 'ASSIGNED_EXTERNAL') {
+                      <app-payment-badge [status]="lead.paymentStatus" />
                     }
                   </div>
                 </td>
+                <td class="right">
+                  @if (singleDay()) {
+                    <span class="cell-sub">{{ timeOf(lead.updatedAt) }}</span>
+                  } @else {
+                    <span class="cell-sub">{{ formatDate(lead.updatedAt) }}</span>
+                  }
+                </td>
+                @if (showActions()) {
+                  <td (click)="$event.stopPropagation()">
+                    <div class="row-actions">
+                      @if (lead.leadType === 'RETENTION' && lead.status === 'NEW') {
+                        <button type="button" class="btn btn--sm" (click)="openAssignRetention(lead, $event)">
+                          <svg lucideHeadset></svg> Reassign
+                        </button>
+                      }
+                    </div>
+                  </td>
+                }
               </tr>
             }
           </tbody>
@@ -307,30 +367,19 @@
         </button>
       }
       @if (lead.status === 'SUBMITTED' || lead.status === 'REJECTED') {
-        @if (lead.leadType !== 'RETENTION') {
-          <button type="button" class="btn btn--ghost" (click)="selected.set(null); openReturn(lead)">
-            <svg lucideUndo2></svg> Send back
+        @if (lead.status === 'REJECTED') {
+          <button type="button" class="btn btn--ghost" (click)="selected.set(null); openEdit(lead)">
+            <svg lucideSquarePen></svg> Edit
           </button>
         }
+        <button type="button" class="btn btn--ghost" (click)="selected.set(null); openReturn(lead)">
+          <svg lucideUndo2></svg> Send back
+        </button>
         <button type="button" class="btn btn--ghost" (click)="selected.set(null); openAssignExternal(lead)">
           <svg lucideBuilding2></svg> Assign to external
         </button>
         <button type="button" class="btn" (click)="selected.set(null); openAssign(lead)">
           <svg lucideUserCheck></svg> Assign to client
-        </button>
-      }
-      @if (lead.status === 'ASSIGNED') {
-        <button
-          type="button"
-          class="btn btn--success"
-          [disabled]="busyId() === lead.id"
-          (click)="approveLead(lead, $event)"
-        >
-          @if (busyId() === lead.id) {
-            <span class="spinner"></span> Approving…
-          } @else {
-            <svg lucideCircleCheck></svg> Approve on the client's behalf
-          }
         </button>
       }
       @if (lead.status === 'ACCEPTED' || lead.status === 'ASSIGNED_EXTERNAL') {
@@ -406,6 +455,30 @@
           }
         </button>
       }
+
+      @if (lead.retention; as retention) {
+        <button
+          type="button"
+          class="pick-row"
+          [class.chosen]="returnTarget() === 'RETENTION'"
+          (click)="returnTarget.set('RETENTION')"
+        >
+          <span class="avatar-sm" [class]="getAvatarTone(retention.id)">
+            {{ getInitials(retention.name) }}
+          </span>
+          <span class="who">
+            <span class="cell-main">{{ retention.name }} — Retention</span>
+            <span class="cell-sub">Sends it back to the shared Retention queue</span>
+          </span>
+          @if (returnTarget() === 'RETENTION') {
+            <svg lucideCircleCheck class="tick"></svg>
+          }
+        </button>
+      }
+
+      @if (!lead.closer && !lead.juniorCloser && !lead.retention) {
+        <div class="warn">This lead has no closer, junior closer, or retention person to send it back to.</div>
+      }
     </div>
 
     <div class="form-grid">
@@ -425,7 +498,7 @@
       <button
         type="button"
         class="btn"
-        [disabled]="!returnReason().trim() || busyId() === lead.id"
+        [disabled]="!returnReason().trim() || !returnTarget() || busyId() === lead.id"
         (click)="confirmReturn()"
       >
         @if (busyId() === lead.id) {
@@ -439,11 +512,16 @@
 }
 
 <!-- Assign to retention person -->
-@if (assignRetentionLead(); as lead) {
+@if (assignRetentionLead() || batchRetentionOpen()) {
   <app-modal
     title="Assign to retention"
-    [subtitle]="'Choose who works ' + lead.customerName"
-    (close)="assignRetentionLead.set(null)"
+    [subtitle]="
+      'Choose who works ' +
+      (batchRetentionOpen()
+        ? retentionAssignableSelectedCount() + ' lead' + (retentionAssignableSelectedCount() === 1 ? '' : 's')
+        : assignRetentionLead()?.customerName)
+    "
+    (close)="assignRetentionLead.set(null); batchRetentionOpen.set(false)"
   >
     @if (error()) {
       <div class="error">{{ error() }}</div>
@@ -483,10 +561,10 @@
       <button
         type="button"
         class="btn"
-        [disabled]="!chosenRetentionId() || busyId() === lead.id"
-        (click)="confirmAssignRetention()"
+        [disabled]="!chosenRetentionId() || retentionAssigning() || (!!assignRetentionLead() && busyId() === assignRetentionLead()?.id)"
+        (click)="batchRetentionOpen() ? confirmBatchAssignRetention() : confirmAssignRetention()"
       >
-        @if (busyId() === lead.id) {
+        @if (retentionAssigning() || (!!assignRetentionLead() && busyId() === assignRetentionLead()?.id)) {
           <span class="spinner"></span> Assigning…
         } @else {
           <svg lucideHeadset></svg> Confirm assignment
@@ -612,6 +690,35 @@
   </app-modal>
 }
 
+@if (rejectModalOpen()) {
+  <app-modal
+    title="Decline leads"
+    [subtitle]="decidableSelectedCount() + ' lead' + (decidableSelectedCount() === 1 ? '' : 's') + ' selected'"
+    (close)="closeRejectModal()"
+  >
+    @if (error()) {
+      <div class="error">{{ error() }}</div>
+    }
+
+    <div class="form-grid">
+      <label class="full">
+        <span>Reason <span class="hint">Optional</span></span>
+        <input type="text" maxlength="200" [(ngModel)]="rejectReason" name="rejectReason" placeholder="e.g. Client declined on call" />
+      </label>
+    </div>
+
+    <div footer>
+      <button type="button" class="btn btn--danger" [disabled]="decisionSubmitting()" (click)="confirmBatchReject()">
+        @if (decisionSubmitting()) {
+          <span class="spinner"></span> Saving…
+        } @else {
+          <svg lucideCircleX></svg> Confirm decline
+        }
+      </button>
+    </div>
+  </app-modal>
+}
+
 @if (chargeBackModalOpen()) {
   <app-modal
     title="Charge back leads"
@@ -624,13 +731,19 @@
 
     <div class="form-grid">
       <label>
-        PKR clawed back <span class="hint">Total for this batch</span>
+        <span>PKR clawed back <span class="hint">Total for this batch</span></span>
         <input type="number" min="0" [(ngModel)]="chargeBackPkrAmount" name="chargeBackPkrAmount" placeholder="0" />
       </label>
       <label class="full">
         Reason <span class="req">Required</span>
-        <input type="text" [(ngModel)]="chargeBackReason" name="chargeBackReason" placeholder="e.g. Client cancelled the policy" />
+        <app-select [options]="chargeBackReasonOptions" [(ngModel)]="chargeBackReasonChoice" name="chargeBackReasonChoice" placeholder="Select a reason…" />
       </label>
+      @if (chargeBackReasonChoice === 'OTHER') {
+        <label class="full">
+          Custom reason
+          <input type="text" maxlength="200" [(ngModel)]="chargeBackReasonNote" name="chargeBackReasonNote" placeholder="Type the reason…" />
+        </label>
+      }
     </div>
 
     <div footer>
@@ -657,11 +770,11 @@
 
     <div class="form-grid">
       <label>
-        PKR received <span class="hint">Total for this batch</span>
+        <span>PKR received <span class="hint">Total for this batch</span></span>
         <input type="number" min="0" [(ngModel)]="batchPkrAmount" name="batchPkrAmount" placeholder="0" />
       </label>
       <label class="full">
-        Note <span class="hint">Optional</span>
+        <span>Note <span class="hint">Optional</span></span>
         <input type="text" [(ngModel)]="batchNote" name="batchNote" placeholder="e.g. Bank transfer ref #1234" />
       </label>
     </div>
@@ -675,5 +788,22 @@
         }
       </button>
     </div>
+  </app-modal>
+}
+
+<!-- Edit rejected lead -->
+@if (editLead(); as lead) {
+  <app-lead-quick-edit [lead]="lead" (saved)="onEdited($event)" (closed)="editLead.set(null)" />
+}
+
+<!-- Assigned: full details with the copy action in context -->
+@if (assignedLead(); as done) {
+  <app-modal
+    [wide]="true"
+    title="Lead assigned"
+    [subtitle]="done.lead.customerName + ' was assigned to ' + done.to"
+    (close)="assignedLead.set(null)"
+  >
+    <app-lead-detail [lead]="done.lead" />
   </app-modal>
 }

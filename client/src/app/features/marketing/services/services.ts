@@ -161,7 +161,7 @@ export class Services {
     },
     {
       title: 'Status you can trust',
-      desc: 'New, Submitted, Assigned, Accepted, Rejected — every lead is always exactly one of these, visible live in your portal.',
+      desc: 'New, Submitted, Assigned, Approved, Declined — every lead is always exactly one of these, visible live in your portal.',
       icon: 'clock',
     },
   ] as const;

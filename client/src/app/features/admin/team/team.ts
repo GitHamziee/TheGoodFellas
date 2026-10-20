@@ -17,9 +17,11 @@ import { ROLE_LABEL } from '../../../core/nav-config';
 import { createListView } from '../../../core/list-view';
 import { getAvatarTone, getInitials } from '../../../core/format-utils';
 import { Modal } from '../../../shared/ui/modal';
-import { EmptyState, Pagination, SearchBox, SkeletonRows, StatTile } from '../../../shared/ui/ui';
+import { PageHero, EmptyState, Pagination, SearchBox, SkeletonRows, StatTile } from '../../../shared/ui/ui';
 import { Select } from '../../../shared/ui/select';
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
+import { PhoneInput } from '../../../shared/ui/phone-input';
+import { apiErrorMessage } from '../../../core/api';
 
 const ROLE_TONE: Record<Role, string> = {
   ADMIN: 'tone-b',
@@ -38,7 +40,7 @@ const ROLE_TONE: Record<Role, string> = {
  * this page has no pricing/coverage editor because none of these roles carry that data. */
 @Component({
   selector: 'app-admin-team',
-  imports: [
+  imports: [PageHero, PhoneInput, 
     FormsModule,
     Modal,
     Select,
@@ -191,8 +193,8 @@ export class AdminTeam implements OnInit {
       this.team.update((rows) => [...rows, created]);
       this.showCreate.set(false);
       this.notice.set(`Created ${created.name} as ${ROLE_LABEL[created.role]}.`);
-    } catch (err: any) {
-      this.error.set(err?.error?.error ?? 'Could not create the account.');
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not create the account.'));
     } finally {
       this.creating.set(false);
     }
@@ -234,8 +236,8 @@ export class AdminTeam implements OnInit {
       }
       this.pendingRole.set(null);
       this.notice.set(`${updated.name} is now ${ROLE_LABEL[updated.role]}. They'll need to sign in again.`);
-    } catch (err: any) {
-      this.error.set(err?.error?.error ?? 'Could not change the role.');
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not change the role.'));
     } finally {
       this.savingRole.set(false);
     }
@@ -253,8 +255,8 @@ export class AdminTeam implements OnInit {
       this.showResetPassword.set(false);
       this.newPassword = '';
       this.notice.set(`Password reset for ${updated.name}. They'll need to sign in again.`);
-    } catch (err: any) {
-      this.error.set(err?.error?.error ?? 'Could not reset the password.');
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not reset the password.'));
     } finally {
       this.resettingPassword.set(false);
     }

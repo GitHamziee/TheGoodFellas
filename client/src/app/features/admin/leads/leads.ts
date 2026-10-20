@@ -6,15 +6,12 @@ import {
   LucideBuilding2,
   LucideCircleCheck,
   LucideCircleX,
-  LucideClock,
   LucideFileText,
   LucideHeadset,
-  LucideInbox,
   LucideLayers,
-  LucideSend,
+  LucideSquarePen,
   LucideUndo2,
   LucideUserCheck,
-  LucideWallet,
 } from '@lucide/angular';
 import { LeadService } from '../../../core/services/lead.service';
 import { UserService } from '../../../core/services/user.service';
@@ -22,7 +19,16 @@ import { ExternalClientService } from '../../../core/services/external-client.se
 import { ExternalClient } from '../../../core/models/external-client.model';
 import { Lead, LeadStatus } from '../../../core/models/lead.model';
 import { createListView } from '../../../core/list-view';
-import { formatPhone, formatPkr, getAvatarTone, getInitials, timeAgo } from '../../../core/format-utils';
+import {
+  APP_TIME_ZONE,
+  formatDate,
+  formatPhone,
+  formatPkr,
+  getAvatarTone,
+  getInitials,
+  pacificIsoDate,
+  timeAgo,
+} from '../../../core/format-utils';
 import { Modal } from '../../../shared/ui/modal';
 import {
   EmptyState,
@@ -30,20 +36,23 @@ import {
   PaymentBadge,
   SearchBox,
   SkeletonRows,
-  StatTile,
   StatusBadge,
+  PageHero,
 } from '../../../shared/ui/ui';
+import { DayBar, rangeBounds, rangeLabel } from '../../../shared/ui/day-bar';
+import { LeadQuickEdit } from '../../../shared/lead-quick-edit';
 import { Select } from '../../../shared/ui/select';
+import { CHARGE_BACK_REASON_OPTIONS } from '../../../core/lead-options';
 import { LeadDetail } from '../../../shared/lead-detail';
+import { RowMenu } from '../../../shared/ui/row-menu';
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
+import { apiErrorMessage } from '../../../core/api';
 
 const STATUS_FILTERS: { label: string; value: string }[] = [
   { label: 'All', value: '' },
   { label: 'New', value: 'NEW' },
-  { label: 'Submitted', value: 'SUBMITTED' },
   { label: 'Assigned', value: 'ASSIGNED' },
-  { label: 'Accepted', value: 'ACCEPTED' },
-  { label: 'Rejected', value: 'REJECTED' },
+  { label: 'Approved', value: 'ACCEPTED' },
   { label: 'Sent back', value: 'RETURNED_TO_RETENTION' },
   { label: 'Assigned (External)', value: 'ASSIGNED_EXTERNAL' },
   { label: 'Charged Back', value: 'CHARGED_BACK' },
@@ -58,31 +67,31 @@ interface LookupUser {
 @Component({
   selector: 'app-admin-leads',
   imports: [
+    PageHero,
+    RowMenu,
     FormsModule,
     Modal,
     Select,
     LeadDetail,
-    StatTile,
+    LeadQuickEdit,
+    DayBar,
     StatusBadge,
     PaymentBadge,
     SearchBox,
     Pagination,
     EmptyState,
     SkeletonRows,
-    LucideLayers,
-    LucideSend,
     LucideCircleCheck,
     LucideCircleX,
-    LucideWallet,
-    LucideInbox,
     LucideBanknote,
     LucideBanknoteX,
-    LucideClock,
     LucideFileText,
     LucideUndo2,
     LucideBuilding2,
     LucideUserCheck,
     LucideHeadset,
+    LucideLayers,
+    LucideSquarePen,
   ],
   templateUrl: './leads.html',
 })
@@ -104,6 +113,9 @@ export class AdminLeads implements OnInit {
   readonly sourceFilter = signal('');
   readonly retentionPeople = signal<LookupUser[]>([]);
   readonly assignRetentionLead = signal<Lead | null>(null);
+  /** Batch form of the assign-to-retention modal — acts on the ticked unworked retention leads. */
+  readonly batchRetentionOpen = signal(false);
+  readonly retentionAssigning = signal(false);
   readonly retentionSearch = signal('');
   readonly chosenRetentionId = signal('');
 
@@ -111,6 +123,12 @@ export class AdminLeads implements OnInit {
   readonly assignLead = signal<Lead | null>(null);
   readonly assignExternalLead = signal<Lead | null>(null);
   readonly returnLead = signal<Lead | null>(null);
+  readonly editLead = signal<Lead | null>(null);
+
+  /** Day shown in the log below — Pacific yyyy-MM-dd, '' for every day. Starts on today. */
+  readonly day = signal(pacificIsoDate());
+  /** End of a date range (inclusive); '' means just `day`. */
+  readonly dayTo = signal('');
 
   readonly clientSearch = signal('');
   readonly chosenClientId = signal('');
@@ -118,7 +136,7 @@ export class AdminLeads implements OnInit {
   readonly chosenExternalClientId = signal('');
 
   /** Who to send the lead back to, and what they need to fix. */
-  readonly returnTarget = signal<'JUNIOR_CLOSER' | 'CLOSER'>('CLOSER');
+  readonly returnTarget = signal<'JUNIOR_CLOSER' | 'CLOSER' | 'RETENTION' | null>('CLOSER');
   readonly returnReason = signal('');
 
   readonly statusFilters = STATUS_FILTERS;
@@ -127,6 +145,7 @@ export class AdminLeads implements OnInit {
   readonly formatPhone = formatPhone;
   readonly formatPkr = formatPkr;
   readonly timeAgo = timeAgo;
+  readonly formatDate = formatDate;
 
   /** Leads picked for the batch "Mark Paid" action, keyed by id across pages/filters. */
   readonly selectedIds = signal<Set<string>>(new Set());
@@ -135,11 +154,18 @@ export class AdminLeads implements OnInit {
   batchPkrAmount: number | null = null;
   batchNote = '';
 
+  /** Admin approve/decline on the client's behalf — Approve is immediate, Reject opens a modal for an optional reason. */
+  readonly rejectModalOpen = signal(false);
+  readonly decisionSubmitting = signal(false);
+  rejectReason = '';
+
   /** Lead being charged back — single-record action, mirrors the batch "Mark Paid" modal. */
   readonly chargeBackModalOpen = signal(false);
   readonly chargeBackSubmitting = signal(false);
   chargeBackPkrAmount: number | null = null;
-  chargeBackReason = '';
+  chargeBackReasonChoice = '';
+  chargeBackReasonNote = '';
+  readonly chargeBackReasonOptions = CHARGE_BACK_REASON_OPTIONS;
 
   /** Closers that actually appear on a lead — drives the "filter by closer" dropdown. */
   readonly closers = computed(() => {
@@ -175,9 +201,73 @@ export class AdminLeads implements OnInit {
     return closerId ? rows.filter((l) => l.closer?.id === closerId) : rows;
   });
 
+  /** Waiting on the admin: freshly submitted, bounced back by a client, or an AI-sourced
+   * retention lead nobody has picked up yet. These sit on top whatever day they came in. */
+  isPending(lead: Lead): boolean {
+    return (
+      lead.status === 'SUBMITTED' ||
+      lead.status === 'REJECTED' ||
+      (lead.leadType === 'RETENTION' && lead.status === 'NEW' && !lead.retention)
+    );
+  }
+
+  private readonly searchFields = (l: Lead) => [
+    l.customerName,
+    l.phone,
+    l.state,
+    l.closer?.name,
+    l.client?.name,
+    l.externalClient?.name,
+    l.juniorCloser?.name,
+    l.retention?.name,
+  ];
+
+  /** The "needs your action" list — search applies, day and status pills don't. Oldest first — the longest-waiting leads lead the list. */
+  readonly pendingNewestFirst = signal(true);
+
+  readonly pendingLeads = computed(() => {
+    const term = this.view.search().trim().toLowerCase();
+    const dir = this.pendingNewestFirst() ? -1 : 1;
+    return this.byCloser()
+      .filter((l) => this.isPending(l))
+      .filter((l) => !term || this.searchFields(l).some((f) => f != null && String(f).toLowerCase().includes(term)))
+      .sort((a, b) => dir * (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()));
+  });
+
+  /** Everything the admin has already dealt with — the day-by-day log. */
+  private readonly logged = computed(() => this.byCloser().filter((l) => !this.isPending(l)));
+
+  /** Searching looks across every day, so a customer is findable without knowing when they came in. */
+  readonly dayMode = computed(() => !!this.day() && !this.view.search().trim());
+
+  /** One calendar day (not a range) — the log shows times instead of dates. */
+  readonly singleDay = computed(() => this.dayMode() && !this.dayTo());
+
+  private readonly byDay = computed(() => {
+    const rows = this.logged();
+    if (!this.dayMode()) return rows;
+    const [from, to] = rangeBounds(this.day(), this.dayTo());
+    return rows.filter((l) => {
+      const t = new Date(l.updatedAt ?? l.createdAt).getTime();
+      return t >= from && t < to;
+    });
+  });
+
+  readonly loggedTotal = computed(() => this.logged().length);
+
+  /** Lead count per Pacific day, for the day tabs. */
+  readonly dayCounts = computed(() => {
+    const counts: Record<string, number> = {};
+    for (const l of this.logged()) {
+      const iso = pacificIsoDate(l.updatedAt ?? l.createdAt);
+      counts[iso] = (counts[iso] ?? 0) + 1;
+    }
+    return counts;
+  });
+
   readonly view = createListView<Lead>({
-    source: this.byCloser,
-    searchFields: (l) => [l.customerName, l.phone, l.state, l.closer?.name, l.client?.name, l.externalClient?.name, l.juniorCloser?.name, l.retention?.name],
+    source: this.byDay,
+    searchFields: this.searchFields,
     statusOf: (l) => l.status,
     sorters: {
       customerName: (l) => l.customerName,
@@ -186,34 +276,84 @@ export class AdminLeads implements OnInit {
       updatedAt: (l) => new Date(l.updatedAt ?? l.createdAt).getTime(),
     },
     initialSort: { key: 'updatedAt', dir: 'desc' },
-    pageSize: 12,
+    pageSize: 15,
   });
 
-  readonly stats = computed(() => {
-    const rows = this.cpaLeads();
+  /** One-line recap of whatever the table is currently showing. */
+  /** Row-action column only appears when some visible row has an action (retention NEW → Reassign). */
+  readonly showActions = computed(() => this.view.rows().some((l) => l.leadType === 'RETENTION' && l.status === 'NEW'));
+
+  readonly summary = computed(() => {
+    const rows = this.byDay();
     const count = (s: LeadStatus) => rows.filter((l) => l.status === s).length;
     const accepted = rows.filter((l) => l.status === 'ACCEPTED');
     return {
       total: rows.length,
-      submitted: count('SUBMITTED'),
-      assigned: count('ASSIGNED'),
+      withClients: count('ASSIGNED') + count('ASSIGNED_EXTERNAL'),
       accepted: accepted.length,
-      rejected: count('REJECTED'),
-      assignedExternal: count('ASSIGNED_EXTERNAL'),
+      unpaid: rows.filter((l) => this.isEligibleForBatchPaid(l)).length,
       chargedBack: count('CHARGED_BACK'),
-      paid: accepted.filter((l) => l.paymentStatus === 'PAID').length,
-      unpaid: accepted.filter((l) => l.paymentStatus === 'UNPAID').length,
     };
   });
 
   /** Count per status pill, so the filter row doubles as a breakdown. */
+
+  /** Hero headline: the day being viewed, so it never repeats the topbar's page title. */
+  readonly heroTitle = computed(() => {
+    const iso = this.day();
+    if (!iso) return 'Every day, all in one place';
+    if (this.dayTo()) return rangeLabel(iso, this.dayTo());
+    const [y, m, d] = iso.split('-').map(Number);
+    const label = new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-US', {
+      weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC',
+    });
+    return iso === pacificIsoDate() ? `Today · ${label}` : label;
+  });
+
+  readonly heroSub = computed(() => {
+    const s = this.summary();
+    if (s.total === 0) return this.dayMode() ? (this.dayTo() ? 'Nothing logged in this range yet.' : 'Nothing logged for this day yet.') : 'Nothing logged yet.';
+    return [`${s.accepted} approved`, `${s.withClients} with clients`, `${s.unpaid} unpaid`, s.chargedBack ? `${s.chargedBack} charged back` : '']
+      .filter(Boolean)
+      .join(' · ');
+  });
+
+
+  /** Pending list is capped so the day log stays near the top; "Show all" expands it. */
+  readonly showAllPending = signal(false);
+  readonly visiblePending = computed(() => (this.showAllPending() ? this.pendingLeads() : this.pendingLeads().slice(0, 5)));
+
+  /** Whole days a lead has been waiting on the admin. */
+  waitDays(lead: Lead): number {
+    return Math.max(0, Math.floor((Date.now() - new Date(lead.createdAt).getTime()) / 86_400_000));
+  }
+
+  waitLabel(lead: Lead): string {
+    const d = this.waitDays(lead);
+    return d === 0 ? 'Today' : `${d}d`;
+  }
+
+  /** Set after a successful assignment so the admin sees the assigned lead (with its copy action). */
+  readonly assignedLead = signal<{ lead: Lead; to: string } | null>(null);
+
+
   readonly statusCounts = computed(() => {
-    const rows = this.byCloser();
+    const rows = this.byDay();
     const counts: Record<string, number> = { '': rows.length };
     for (const filter of STATUS_FILTERS) counts[filter.value] = 0;
     counts[''] = rows.length;
     for (const lead of rows) counts[lead.status] = (counts[lead.status] ?? 0) + 1;
     return counts;
+  });
+
+  /** Status dropdown — one select instead of a row of pills; counts ride along in the label. */
+  readonly statusOptions = computed(() => {
+    const counts = this.statusCounts();
+    const current = this.view.status();
+    return STATUS_FILTERS.filter((f) => !f.value || counts[f.value] > 0 || current === f.value).map((f) => ({
+      value: f.value,
+      label: f.value ? `${f.label} (${counts[f.value]})` : `All statuses (${counts['']})`,
+    }));
   });
 
   /** Retention-staff dropdown, narrowed by the search box inside the assign-retention modal. */
@@ -237,9 +377,24 @@ export class AdminLeads implements OnInit {
     return lead.paymentStatus === 'PAID' && lead.status === 'ACCEPTED';
   }
 
-  /** A row is selectable if either batch action (Mark Paid / Charge Back) applies to it. */
+  /** Awaiting a response from a client (login account or external) — admin can decide for them. */
+  isEligibleForDecision(lead: Lead): boolean {
+    return lead.status === 'ASSIGNED' || lead.status === 'ASSIGNED_EXTERNAL';
+  }
+
+  /** Unworked retention leads — can be (re)assigned to a retention person. */
+  isEligibleForRetentionAssign(lead: Lead): boolean {
+    return lead.leadType === 'RETENTION' && lead.status === 'NEW';
+  }
+
+  /** A row is selectable if any batch action (Approve / Reject / Mark Paid / Charge Back / Assign to retention) applies to it. */
   isSelectable(lead: Lead): boolean {
-    return this.isEligibleForBatchPaid(lead) || this.isEligibleForBatchChargeBack(lead);
+    return (
+      this.isEligibleForDecision(lead) ||
+      this.isEligibleForBatchPaid(lead) ||
+      this.isEligibleForBatchChargeBack(lead) ||
+      this.isEligibleForRetentionAssign(lead)
+    );
   }
 
   private selectedLeads(): Lead[] {
@@ -247,7 +402,11 @@ export class AdminLeads implements OnInit {
     return this.leads().filter((l) => ids.has(l.id));
   }
 
+  readonly decidableSelectedCount = computed(() => this.selectedLeads().filter((l) => this.isEligibleForDecision(l)).length);
   readonly payableSelectedCount = computed(() => this.selectedLeads().filter((l) => this.isEligibleForBatchPaid(l)).length);
+  readonly retentionAssignableSelectedCount = computed(
+    () => this.selectedLeads().filter((l) => this.isEligibleForRetentionAssign(l)).length,
+  );
   readonly chargeableSelectedCount = computed(
     () => this.selectedLeads().filter((l) => this.isEligibleForBatchChargeBack(l)).length,
   );
@@ -350,10 +509,39 @@ export class AdminLeads implements OnInit {
       if (this.selected()?.id === lead.id) this.selected.set(updated);
       this.assignRetentionLead.set(null);
       this.notice.set(`${lead.customerName} assigned to ${updated.retention?.name ?? 'retention'}.`);
-    } catch (err: any) {
-      this.error.set(err?.error?.error ?? 'Could not assign the lead.');
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not assign the lead.'));
     } finally {
       this.busyId.set(null);
+    }
+  }
+
+  openBatchAssignRetention(): void {
+    if (this.retentionAssignableSelectedCount() === 0) return;
+    this.error.set(null);
+    this.retentionSearch.set('');
+    this.chosenRetentionId.set('');
+    this.batchRetentionOpen.set(true);
+  }
+
+  async confirmBatchAssignRetention(): Promise<void> {
+    const retentionId = this.chosenRetentionId();
+    if (!retentionId || this.retentionAssignableSelectedCount() === 0) return;
+
+    this.error.set(null);
+    this.retentionAssigning.set(true);
+    try {
+      const leadIds = this.selectedLeads().filter((l) => this.isEligibleForRetentionAssign(l)).map((l) => l.id);
+      const { count } = await this.leadService.batchAssignRetention(leadIds, retentionId);
+      const person = this.retentionPeople().find((p) => p.id === retentionId);
+      this.batchRetentionOpen.set(false);
+      this.clearSelection();
+      this.notice.set(`${count} ${count === 1 ? 'lead' : 'leads'} assigned to ${person?.name ?? 'retention'}.`);
+      await this.refresh();
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not assign the leads.'));
+    } finally {
+      this.retentionAssigning.set(false);
     }
   }
 
@@ -389,9 +577,9 @@ export class AdminLeads implements OnInit {
       this.leads.update((rows) => rows.map((l) => (l.id === lead.id ? updated : l)));
       if (this.selected()?.id === lead.id) this.selected.set(updated);
       this.assignLead.set(null);
-      this.notice.set(`${lead.customerName} assigned to ${updated.client?.name ?? 'client'}.`);
-    } catch (err: any) {
-      this.error.set(err?.error?.error ?? 'Could not assign the lead.');
+      this.assignedLead.set({ lead: updated, to: updated.client?.name ?? 'client' });
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not assign the lead.'));
     } finally {
       this.busyId.set(null);
     }
@@ -418,9 +606,9 @@ export class AdminLeads implements OnInit {
       this.leads.update((rows) => rows.map((l) => (l.id === lead.id ? updated : l)));
       if (this.selected()?.id === lead.id) this.selected.set(updated);
       this.assignExternalLead.set(null);
-      this.notice.set(`${lead.customerName} assigned to ${updated.externalClient?.name ?? 'external client'}.`);
-    } catch (err: any) {
-      this.error.set(err?.error?.error ?? 'Could not assign the lead.');
+      this.assignedLead.set({ lead: updated, to: updated.externalClient?.name ?? 'external client' });
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not assign the lead.'));
     } finally {
       this.busyId.set(null);
     }
@@ -430,7 +618,10 @@ export class AdminLeads implements OnInit {
   openReturn(lead: Lead, event?: Event): void {
     event?.stopPropagation();
     this.error.set(null);
-    this.returnTarget.set('CLOSER');
+    // Default to whichever party actually exists on the lead.
+    this.returnTarget.set(
+      lead.closer ? 'CLOSER' : lead.juniorCloser ? 'JUNIOR_CLOSER' : lead.retention ? 'RETENTION' : null,
+    );
     this.returnReason.set('');
     this.returnLead.set(lead);
   }
@@ -438,22 +629,44 @@ export class AdminLeads implements OnInit {
   async confirmReturn(): Promise<void> {
     const lead = this.returnLead();
     const reason = this.returnReason().trim();
-    if (!lead || !reason) return;
+    const target = this.returnTarget();
+    if (!lead || !reason || !target) return;
 
     this.error.set(null);
     this.busyId.set(lead.id);
     try {
-      const updated = await this.leadService.returnLead(lead.id, this.returnTarget(), reason);
+      const updated = await this.leadService.returnLead(lead.id, target, reason);
       this.leads.update((rows) => rows.map((l) => (l.id === lead.id ? updated : l)));
       if (this.selected()?.id === lead.id) this.selected.set(updated);
       this.returnLead.set(null);
-      const who = this.returnTarget() === 'JUNIOR_CLOSER' ? lead.juniorCloser?.name : lead.closer?.name;
+      const who =
+        target === 'JUNIOR_CLOSER' ? lead.juniorCloser?.name
+        : target === 'CLOSER' ? lead.closer?.name
+        : lead.retention?.name;
       this.notice.set(`${lead.customerName} sent back to ${who ?? 'the team'} to fix.`);
-    } catch (err: any) {
-      this.error.set(err?.error?.error ?? 'Could not send the lead back.');
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not send the lead back.'));
     } finally {
       this.busyId.set(null);
     }
+  }
+
+  // ─── Edit (rejected leads only) ────────────────────────────
+  openEdit(lead: Lead, event?: Event): void {
+    event?.stopPropagation();
+    this.error.set(null);
+    this.editLead.set(lead);
+  }
+
+  onEdited(updated: Lead): void {
+    this.leads.update((rows) => rows.map((l) => (l.id === updated.id ? updated : l)));
+    this.editLead.set(null);
+    this.notice.set(`Saved changes to ${updated.customerName}.`);
+  }
+
+  /** Time of day in Pacific — what the day log shows in place of a date. */
+  timeOf(dateStr: string): string {
+    return new Date(dateStr).toLocaleTimeString('en-US', { timeZone: APP_TIME_ZONE, hour: 'numeric', minute: '2-digit' });
   }
 
   setCloserFilter(value: string): void {
@@ -462,23 +675,53 @@ export class AdminLeads implements OnInit {
   }
 
   /**
-   * Records the client's accept decision on their behalf — the normal path is the client
-   * logging in and accepting it themselves, but that decision is often made over a phone
-   * call in practice, so admin needs a way to record it without waiting on the client's login.
+   * Records the client's approve/decline decision on their behalf for the selected leads — the
+   * normal path is the client logging in themselves (and external clients have no login at
+   * all), but the decision is often made over a phone call, so admin records it here. Same
+   * select-then-act flow as Mark Paid / Charge Back. Reject asks for an optional reason first.
    */
-  async approveLead(lead: Lead, event?: Event): Promise<void> {
-    event?.stopPropagation();
+  async batchAccept(): Promise<void> {
+    if (this.decidableSelectedCount() === 0) return;
     this.error.set(null);
-    this.busyId.set(lead.id);
+    this.decisionSubmitting.set(true);
     try {
-      const updated = await this.leadService.approveLead(lead.id);
-      this.leads.update((rows) => rows.map((l) => (l.id === lead.id ? updated : l)));
-      if (this.selected()?.id === lead.id) this.selected.set(updated);
-      this.notice.set(`${lead.customerName} approved on behalf of ${updated.client?.name ?? 'the client'}.`);
-    } catch (err: any) {
-      this.error.set(err?.error?.error ?? 'Could not approve this lead.');
+      const leadIds = this.selectedLeads().filter((l) => this.isEligibleForDecision(l)).map((l) => l.id);
+      const { count } = await this.leadService.batchDecide(leadIds, 'ACCEPT');
+      await this.refresh();
+      this.clearSelection();
+      this.notice.set(`Approved ${count} lead${count === 1 ? '' : 's'} on the client's behalf.`);
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not approve these leads.'));
     } finally {
-      this.busyId.set(null);
+      this.decisionSubmitting.set(false);
+    }
+  }
+
+  openRejectModal(): void {
+    if (this.decidableSelectedCount() === 0) return;
+    this.error.set(null);
+    this.rejectReason = '';
+    this.rejectModalOpen.set(true);
+  }
+
+  closeRejectModal(): void {
+    this.rejectModalOpen.set(false);
+  }
+
+  async confirmBatchReject(): Promise<void> {
+    this.error.set(null);
+    this.decisionSubmitting.set(true);
+    try {
+      const leadIds = this.selectedLeads().filter((l) => this.isEligibleForDecision(l)).map((l) => l.id);
+      const { count } = await this.leadService.batchDecide(leadIds, 'REJECT', this.rejectReason.trim() || undefined);
+      await this.refresh();
+      this.clearSelection();
+      this.rejectModalOpen.set(false);
+      this.notice.set(`Declined ${count} lead${count === 1 ? '' : 's'} — back in the queue for reassignment.`);
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not decline these leads.'));
+    } finally {
+      this.decisionSubmitting.set(false);
     }
   }
 
@@ -501,8 +744,8 @@ export class AdminLeads implements OnInit {
       // Patch in place so the current page/filter/scroll position is preserved.
       this.leads.update((rows) => rows.map((l) => (l.id === lead.id ? updated : l)));
       if (this.selected()?.id === lead.id) this.selected.set(updated);
-    } catch (err: any) {
-      this.error.set(err?.error?.error ?? 'Could not update payment status.');
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not update payment status.'));
     } finally {
       this.busyId.set(null);
     }
@@ -535,8 +778,8 @@ export class AdminLeads implements OnInit {
       this.clearSelection();
       this.batchModalOpen.set(false);
       this.notice.set(`Marked ${count} lead${count === 1 ? '' : 's'} paid — ${formatPkr(this.batchPkrAmount)} recorded.`);
-    } catch (err: any) {
-      this.error.set(err?.error?.error ?? 'Could not mark these leads paid.');
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not mark these leads paid.'));
     } finally {
       this.batchSubmitting.set(false);
     }
@@ -551,7 +794,8 @@ export class AdminLeads implements OnInit {
     if (this.chargeableSelectedCount() === 0) return;
     this.error.set(null);
     this.chargeBackPkrAmount = null;
-    this.chargeBackReason = '';
+    this.chargeBackReasonChoice = '';
+    this.chargeBackReasonNote = '';
     this.chargeBackModalOpen.set(true);
   }
 
@@ -564,8 +808,9 @@ export class AdminLeads implements OnInit {
       this.error.set('Enter the PKR amount charged back.');
       return;
     }
-    if (!this.chargeBackReason.trim()) {
-      this.error.set('A reason is required.');
+    const reason = this.chargeBackReasonChoice === 'OTHER' ? this.chargeBackReasonNote.trim() : this.chargeBackReasonChoice;
+    if (!reason) {
+      this.error.set(this.chargeBackReasonChoice === 'OTHER' ? 'Type the reason for the charge-back.' : 'Pick a reason for the charge-back.');
       return;
     }
 
@@ -573,14 +818,14 @@ export class AdminLeads implements OnInit {
     this.chargeBackSubmitting.set(true);
     try {
       const leadIds = this.selectedLeads().filter((l) => this.isEligibleForBatchChargeBack(l)).map((l) => l.id);
-      const { count } = await this.leadService.batchChargeBack(leadIds, this.chargeBackPkrAmount, this.chargeBackReason.trim());
+      const { count } = await this.leadService.batchChargeBack(leadIds, this.chargeBackPkrAmount, reason);
       const amount = this.chargeBackPkrAmount;
       await this.refresh();
       this.clearSelection();
       this.chargeBackModalOpen.set(false);
       this.notice.set(`Charged back ${count} lead${count === 1 ? '' : 's'} — ${formatPkr(amount)} recorded.`);
-    } catch (err: any) {
-      this.error.set(err?.error?.error ?? 'Could not charge back these leads.');
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not charge back these leads.'));
     } finally {
       this.chargeBackSubmitting.set(false);
     }

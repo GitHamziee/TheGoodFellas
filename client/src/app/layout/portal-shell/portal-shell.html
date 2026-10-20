@@ -1,4 +1,4 @@
-<div class="shell" [class.shell--drawer-open]="drawerOpen()">
+<div class="shell" [class.shell--drawer-open]="drawerOpen()" [class.shell--collapsed]="collapsed()">
   <div class="scrim" (click)="closeDrawer()"></div>
 
   <aside class="sidebar">
@@ -9,20 +9,49 @@
       </button>
     </div>
 
+    <ng-template #icon let-name>
+    @switch (name) {
+      @case ('dashboard') { <svg lucideLayoutDashboard></svg> }
+      @case ('send') { <svg lucideSend></svg> }
+      @case ('history') { <svg lucideClock></svg> }
+      @case ('inbox') { <svg lucideInbox></svg> }
+      @case ('users') { <svg lucideUsers></svg> }
+      @case ('briefcase') { <svg lucideBriefcase></svg> }
+      @case ('queue') { <svg lucideListChecks></svg> }
+      @case ('returned') { <svg lucideUndo2></svg> }
+      @case ('leads') { <svg lucideFileText></svg> }
+      @case ('drafts') { <svg lucideClipboardList></svg> }
+      @case ('chargeback') { <svg lucideBanknoteArrowUp></svg> }
+      @case ('cpl') { <svg lucideTag></svg> }
+      @case ('headset') { <svg lucideHeadset></svg> }
+      @case ('building') { <svg lucideBuilding2></svg> }
+      @case ('analytics') { <svg lucideChartColumn></svg> }
+      @case ('expenses') { <svg lucideWallet></svg> }
+      @case ('states') { <svg lucideMapPin></svg> }
+      @case ('chat') { <svg lucideMessageSquare></svg> }
+      @case ('settings') { <svg lucideSettings></svg> }
+      @case ('shield') { <svg lucideShield></svg> }
+      @case ('review') { <svg lucideClipboardCheck></svg> }
+      @case ('toolkit') { <svg lucideToolbox></svg> }
+      @case ('call') { <svg lucidePhoneCall></svg> }
+    }
+    </ng-template>
+
     <nav class="nav">
-      @for (item of navItems(); track item.path) {
-        @if (item.children) {
+      @for (item of navItems(); track item.label) {
+        @if (item.children && !item.tabs) {
           <button
             class="nav-link nav-link--group"
             type="button"
-            [class.active]="isGroupActive(item.path)"
-            (click)="toggleGroup(item.path)"
+            [class.active]="isGroupActive(item)"
+            [attr.title]="collapsed() ? item.label : null"
+            (click)="toggleGroup(item)"
           >
-            <svg lucideChartColumn></svg>
-            <span>{{ item.label }}</span>
-            <svg class="nav-caret" [class.open]="isGroupOpen(item.path)" lucideChevronDown></svg>
+            <ng-container *ngTemplateOutlet="icon; context: { $implicit: item.icon }" />
+            <span class="nav-label">{{ item.label }}</span>
+            <svg class="nav-caret" [class.open]="isGroupOpen(item)" lucideChevronDown></svg>
           </button>
-          @if (isGroupOpen(item.path)) {
+          @if (isGroupOpen(item)) {
             <div class="nav-sub">
               @for (child of item.children; track child.path) {
                 <a
@@ -36,32 +65,16 @@
             </div>
           }
         } @else {
-          <a class="nav-link" [routerLink]="item.path" routerLinkActive="active" (click)="closeDrawer()">
-            @switch (item.icon) {
-              @case ('dashboard') { <svg lucideLayoutDashboard></svg> }
-              @case ('send') { <svg lucideSend></svg> }
-              @case ('history') { <svg lucideClock></svg> }
-              @case ('inbox') { <svg lucideInbox></svg> }
-              @case ('users') { <svg lucideUsers></svg> }
-              @case ('briefcase') { <svg lucideBriefcase></svg> }
-              @case ('queue') { <svg lucideListChecks></svg> }
-              @case ('returned') { <svg lucideUndo2></svg> }
-              @case ('leads') { <svg lucideFileText></svg> }
-              @case ('drafts') { <svg lucideClipboardList></svg> }
-              @case ('chargeback') { <svg lucideBanknoteArrowUp></svg> }
-              @case ('cpl') { <svg lucideTag></svg> }
-              @case ('headset') { <svg lucideHeadset></svg> }
-              @case ('building') { <svg lucideBuilding2></svg> }
-              @case ('analytics') { <svg lucideChartColumn></svg> }
-              @case ('expenses') { <svg lucideWallet></svg> }
-              @case ('states') { <svg lucideMapPin></svg> }
-              @case ('chat') { <svg lucideMessageSquare></svg> }
-              @case ('settings') { <svg lucideSettings></svg> }
-              @case ('shield') { <svg lucideShield></svg> }
-              @case ('review') { <svg lucideClipboardCheck></svg> }
-              @case ('call') { <svg lucidePhoneCall></svg> }
-            }
-            <span>{{ item.label }}</span>
+          <a
+            class="nav-link"
+            [routerLink]="item.path"
+            [class.active]="item.tabs && isGroupActive(item)"
+            [routerLinkActive]="item.tabs ? '' : 'active'"
+            [attr.title]="collapsed() ? item.label : null"
+            (click)="closeDrawer()"
+          >
+            <ng-container *ngTemplateOutlet="icon; context: { $implicit: item.icon }" />
+            <span class="nav-label">{{ item.label }}</span>
             @if (item.badge === 'chat' && chatUnread() > 0) {
               <span class="nav-badge">{{ chatUnread() }}</span>
             }
@@ -70,16 +83,20 @@
       }
     </nav>
 
-    <div class="sidebar-footer">
-      <div class="avatar">{{ initials() }}</div>
-      <div class="user-meta">
-        <div class="user-name">{{ user()?.name }}</div>
-        <div class="user-role">{{ roleLabel() }}</div>
-      </div>
-      <button class="logout-btn" type="button" (click)="logout()" aria-label="Log out">
-        <svg lucideLogOut></svg>
-      </button>
-    </div>
+    <button
+      class="nav-link collapse-toggle"
+      type="button"
+      (click)="toggleCollapsed()"
+      [attr.aria-expanded]="!collapsed()"
+      [attr.title]="collapsed() ? 'Expand sidebar' : null"
+    >
+      @if (collapsed()) {
+        <svg lucidePanelLeftOpen></svg>
+      } @else {
+        <svg lucidePanelLeftClose></svg>
+      }
+      <span class="nav-label">{{ collapsed() ? 'Expand' : 'Collapse' }}</span>
+    </button>
   </aside>
 
   <div class="main">
@@ -90,10 +107,60 @@
         </button>
         <div class="page-title">{{ pageTitle() }}</div>
       </div>
+      <div class="topbar-right">
+        @if (hasDialer()) {
+          <button
+            class="dialer-toggle"
+            type="button"
+            [class.active]="zoom.open()"
+            [attr.aria-pressed]="zoom.open()"
+            aria-label="Dialer"
+            title="Dialer"
+            (click)="zoom.toggle()"
+          >
+            <svg lucidePhoneCall></svg>
+          </button>
+        }
+        <app-notification-bell />
+        <div class="user-menu" #userMenu>
+          <button
+            class="user-chip"
+            type="button"
+            aria-haspopup="menu"
+            [attr.aria-expanded]="userMenuOpen()"
+            (click)="userMenuOpen.set(!userMenuOpen())"
+          >
+            <span class="user-meta">
+              <span class="user-name">{{ user()?.name }}</span>
+              <span class="user-role">{{ roleLabel() }}</span>
+            </span>
+            <svg class="user-caret" [class.open]="userMenuOpen()" lucideChevronDown></svg>
+          </button>
+          @if (userMenuOpen()) {
+            <div class="user-dropdown" role="menu">
+              <button class="user-dropdown-item" type="button" role="menuitem" (click)="logout()">
+                <svg lucideLogOut></svg> Log out
+              </button>
+            </div>
+          }
+        </div>
+      </div>
     </div>
 
     <div class="content">
+      @if (activeTabs().length) {
+        <nav class="page-tabs" aria-label="Section">
+          @for (tab of activeTabs(); track tab.path) {
+            <a class="page-tab" [routerLink]="tab.path" routerLinkActive="active">{{ tab.label }}</a>
+          }
+        </nav>
+      }
       <router-outlet />
     </div>
   </div>
 </div>
+
+<app-toast-host />
+@if (hasDialer()) {
+  <app-zoom-dialer />
+}

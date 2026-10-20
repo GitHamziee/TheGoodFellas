@@ -13,8 +13,9 @@ import {
 import { LeadService } from '../../../core/services/lead.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { LeadHistoryRow, LeadInboxPreview } from '../../../core/models/lead.model';
-import { getAvatarTone, getInitials, humanizeEnum, isThisMonth, timeAgo } from '../../../core/format-utils';
+import { getAvatarTone, getInitials, humanizeEnum, pacificIsoDate, pacificToday, timeAgo } from '../../../core/format-utils';
 import { EmptyState, SkeletonRows, StatTile, StatusBadge } from '../../../shared/ui/ui';
+import { Period, PeriodFilter, inPeriod } from '../../../shared/ui/period-filter';
 import { reloadOnChange } from '../../../core/live-reload';
 
 const STALE_AFTER_DAYS = 3;
@@ -23,6 +24,7 @@ const STALE_AFTER_DAYS = 3;
   selector: 'app-closer-dashboard',
   imports: [
     RouterLink,
+    PeriodFilter,
     StatTile,
     StatusBadge,
     EmptyState,
@@ -44,7 +46,11 @@ export class CloserDashboard implements OnInit {
   private readonly auth = inject(AuthService);
 
   readonly inbox = signal<LeadInboxPreview[]>([]);
-  readonly history = signal<LeadHistoryRow[]>([]);
+  readonly allHistory = signal<LeadHistoryRow[]>([]);
+  readonly period = signal<Period>('day');
+  readonly anchor = signal(pacificIsoDate(pacificToday()));
+  /** Past leads submitted inside the selected period; the inbox backlog is never filtered. */
+  readonly history = computed(() => inPeriod(this.allHistory(), this.period(), this.anchor()));
   readonly loading = signal(true);
 
   readonly firstName = computed(() => this.auth.user()?.name?.split(' ')[0] ?? '');
@@ -63,11 +69,10 @@ export class CloserDashboard implements OnInit {
       waiting: waiting.length,
       stale: waiting.filter((l) => this.ageInDays(l.createdAt) >= STALE_AFTER_DAYS).length,
       submitted: past.length,
-      thisMonth: past.filter((l) => isThisMonth(l.createdAt)).length,
       accepted,
       acceptRate: decided ? Math.round((accepted / decided) * 100) : null,
       // A sale a client accepted and paid for, then clawed back later — still theirs in
-      // history (closerId never changes), just flagged separately from the accept/reject split.
+      // history (closerId never changes), just flagged separately from the approve/decline split.
       chargedBack: past.filter((l) => l.status === 'CHARGED_BACK').length,
     };
   });
@@ -92,7 +97,7 @@ export class CloserDashboard implements OnInit {
         this.leadService.closerHistory(),
       ]);
       this.inbox.set(inbox);
-      this.history.set(history);
+      this.allHistory.set(history);
     } finally {
       this.loading.set(false);
     }

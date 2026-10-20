@@ -1,0 +1,101 @@
+/* Source colours — one per lead type, shared by the chart, legend and table. */
+.src--cpa { background: #b8952c; }
+.src--cpl { background: #2f5d8a; }
+.src--ret { background: #6aa58a; }
+.src-sw { display: inline-block; width: 0.6rem; height: 0.6rem; border-radius: 3px; }
+
+.ao-tone--good { color: var(--success-700); }
+.ao-tone--mid { color: #a16207; }
+.ao-tone--bad { color: var(--danger-700); }
+
+/* KPIs */
+.ao-kpis {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.1rem;
+}
+.ao-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+  padding: 0.9rem 1.05rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+.ao-kpi--warn { border-color: #f1d9a0; }
+.ao-kpi--warn .ao-kpi-v { color: #a16207; }
+.ao-kpi-l { font-size: 0.76rem; font-weight: 600; color: var(--gray-500); }
+.ao-kpi-v { font-size: 1.7rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.ao-kpi-sub { font-size: 0.76rem; color: var(--gray-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ao-kpi-sub .delta { font-size: 0.76rem; }
+.ao-kpi-sub a { font-weight: 600; }
+@media (max-width: 1100px) { .ao-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .ao-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Two-thirds / one-third row */
+.ao-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; margin-bottom: 1rem; align-items: start; }
+.ao-grid > .card { margin-bottom: 0; min-width: 0; }
+.ao-span2 { grid-column: span 2; }
+@media (max-width: 1000px) { .ao-grid { grid-template-columns: 1fr; } .ao-span2 { grid-column: auto; } }
+
+/* Weekly stacked bars */
+.ao-weeks { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 0.5rem; height: 15rem; }
+.ao-week { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
+.ao-week-plot { flex: 1; min-height: 0; display: flex; align-items: flex-end; justify-content: center; padding-top: 1.2rem; }
+.ao-week-stack {
+  position: relative;
+  width: 100%;
+  max-width: 2rem;
+  min-height: 3px;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 1px;
+  border-radius: 4px;
+  overflow: visible;
+}
+.ao-seg { display: block; width: 100%; }
+.ao-week-stack .ao-seg:first-of-type { border-radius: 0 0 4px 4px; }
+.ao-week-stack .ao-seg:last-of-type { border-radius: 4px 4px 0 0; }
+.ao-week-stack .ao-seg:only-of-type { border-radius: 4px; }
+.ao-week-n {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  margin-bottom: 0.2rem;
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.ao-week-l { text-align: center; font-size: 0.68rem; color: var(--gray-500); white-space: nowrap; }
+
+/* Pipeline stages */
+.ao-stages { display: flex; flex-direction: column; gap: 0.85rem; }
+.ao-stage { display: flex; flex-direction: column; gap: 0.3rem; }
+.ao-stage-top { display: flex; justify-content: space-between; font-size: 0.86rem; font-weight: 600; }
+.ao-stage-d { font-size: 0.74rem; color: var(--gray-500); }
+.ao-track { display: block; height: 0.45rem; border-radius: 999px; background: var(--gray-100); overflow: hidden; }
+.ao-track i { display: block; height: 100%; border-radius: 999px; background: currentColor; }
+.ao-track--sm { width: 4.5rem; height: 0.35rem; }
+.stage--idle { background: var(--gray-400) !important; }
+.stage--wait { background: var(--gold-500) !important; }
+.stage--good { background: var(--success-600) !important; }
+.stage--bad { background: var(--danger-600) !important; }
+
+/* By-source table */
+.ao-pad { padding: 1rem 1.2rem 0.6rem; }
+.ao-src { display: inline-flex; align-items: center; gap: 0.5rem; }
+.ao-rate { display: inline-flex; align-items: center; gap: 0.6rem; }
+.ao-dim td { opacity: 0.45; }
+
+/* Team strip */
+.ao-team { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem 1.25rem; flex-wrap: wrap; padding: 0.9rem 1.2rem; }
+.ao-team h2 { margin: 0; font-size: 0.95rem; font-weight: 700; }
+.ao-team-list { display: flex; flex-wrap: wrap; gap: 0.4rem 1.1rem; font-size: 0.84rem; color: var(--gray-500); }
+.ao-team-list b { color: var(--text); font-variant-numeric: tabular-nums; }
+.ao-team a { font-size: 0.84rem; font-weight: 600; }

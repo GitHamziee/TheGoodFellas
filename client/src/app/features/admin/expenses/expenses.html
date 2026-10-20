@@ -1,26 +1,57 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <p class="sub">What the business spends, and the PKR received from leads marked paid — tracked side by side.</p>
-    </div>
-    <div class="page-head-actions">
+  <section class="money-hero">
+    <div class="mh-top">
+      <div>
+        <span class="phero-eyebrow"><svg lucideScale></svg> Money</span>
+        <h1>Expenses</h1>
+      </div>
       <button type="button" class="btn" (click)="openCreate()">
         <svg lucidePlus></svg> New expense
       </button>
     </div>
-  </div>
 
-  <div class="stats-row">
-    <app-stat-tile [value]="formatPkr(totals().incomeTotal)" label="Income received" tone="tone-success">
-      <svg lucidePiggyBank></svg>
-    </app-stat-tile>
-    <app-stat-tile [value]="formatPkr(totals().expenseTotal)" label="Total expenses" tone="tone-danger">
-      <svg lucideTrendingDown></svg>
-    </app-stat-tile>
-    <app-stat-tile [value]="formatPkr(totals().net)" label="Net" [tone]="totals().net >= 0 ? 'tone-gold' : 'tone-danger'">
-      <svg lucideScale></svg>
-    </app-stat-tile>
-  </div>
+    <div class="mh-body">
+      <div class="mh-figures">
+        <div class="mh-net">
+          <span class="mh-l">Net · {{ thisMonth().longLabel }}</span>
+          <span class="mh-v mh-v--lg" [class.mh-v--neg]="thisMonth().net < 0">{{ signedPkr(thisMonth().net) }}</span>
+          <span class="mh-sub"><span [class]="thisMonth().netDelta.cls">{{ thisMonth().netDelta.text }}</span> vs {{ thisMonth().prevLabel }}</span>
+        </div>
+        <div class="mh-pair">
+          <div>
+            <span class="mh-l"><i class="mh-sw mh-sw--in"></i> Income</span>
+            <span class="mh-v">{{ formatPkr(thisMonth().income) }}</span>
+            <span class="mh-sub"><span [class]="thisMonth().incomeDelta.cls">{{ thisMonth().incomeDelta.text }}</span></span>
+          </div>
+          <div>
+            <span class="mh-l"><i class="mh-sw mh-sw--out"></i> Expenses</span>
+            <span class="mh-v">{{ formatPkr(thisMonth().expense) }}</span>
+            <span class="mh-sub"><span [class]="thisMonth().expenseDelta.cls">{{ thisMonth().expenseDelta.text }}</span></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="mh-chart">
+        <div class="mh-bars">
+          @for (m of months(); track m.key; let last = $last) {
+            <div class="mh-month" [class.mh-month--now]="last" [title]="m.longLabel + ' — in ' + formatPkr(m.income) + ', out ' + formatPkr(m.expense)">
+              <div class="mh-plot">
+                <span class="mh-bar mh-bar--in" [style.height.%]="m.incomePct"></span>
+                <span class="mh-bar mh-bar--out" [style.height.%]="m.expensePct"></span>
+              </div>
+              <span class="mh-month-l">{{ m.label }}</span>
+            </div>
+          }
+        </div>
+        <div class="mh-alltime">
+          <span>All time</span>
+          <span>In <b>{{ formatPkr(totals().incomeTotal) }}</b></span>
+          <span>Out <b>{{ formatPkr(totals().expenseTotal) }}</b></span>
+          <span>Net <b [class.mh-neg]="totals().net < 0">{{ signedPkr(totals().net) }}</b></span>
+        </div>
+      </div>
+    </div>
+  </section>
 
   @if (error() && !showCreate()) {
     <div class="error">{{ error() }}</div>
@@ -32,37 +63,69 @@
   @if (loading()) {
     <div class="card"><app-skeleton-rows [count]="5" /></div>
   } @else {
-    <div class="card card--flush">
-      <div class="inline-head" style="padding: 1rem 1.1rem 0;">
-        <h2>Expenses</h2>
-        <span class="count">{{ pluralize(expenses().length, 'entry', 'entries') }}</span>
+    <section class="card card--flush ledger">
+      <div class="ledger-head">
+        <h2>Ledger</h2>
+        <div class="ledger-tools">
+          <div class="pills" role="group" aria-label="Show">
+            <button type="button" class="pill" [class.active]="kind() === 'all'" (click)="kind.set('all')">
+              All <span class="n">{{ expenses().length + income().length }}</span>
+            </button>
+            <button type="button" class="pill" [class.active]="kind() === 'in'" (click)="kind.set('in')">
+              Income <span class="n">{{ income().length }}</span>
+            </button>
+            <button type="button" class="pill" [class.active]="kind() === 'out'" (click)="kind.set('out')">
+              Expenses <span class="n">{{ expenses().length }}</span>
+            </button>
+          </div>
+          <app-search-box [value]="search()" placeholder="Search description, customer or note…" (valueChange)="search.set($event)" />
+        </div>
       </div>
 
-      @if (expenses().length === 0) {
-        <app-empty-state title="No expenses logged" hint="Add what the business spends money on to start tracking it.">
-          <svg lucideReceipt></svg>
-        </app-empty-state>
+      @if (ledger().length === 0) {
+        @if (search() || kind() !== 'all') {
+          <app-empty-state title="Nothing matches" hint="Try a different search or filter.">
+            <svg lucideReceipt></svg>
+          </app-empty-state>
+        } @else {
+          <app-empty-state title="No money movements yet" hint="Add an expense, or batch-mark leads paid from the Leads page.">
+            <svg lucideBanknote></svg>
+          </app-empty-state>
+        }
       } @else {
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Description</th>
-                <th class="right">Amount</th>
-                <th class="right hide-sm">Date</th>
-                <th class="right">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (expense of expenses(); track expense.id) {
-                <tr>
-                  <td><span class="cell-main">{{ expense.description }}</span></td>
-                  <td class="right num">{{ formatPkr(expense.amount) }}</td>
-                  <td class="right hide-sm">{{ formatDate(expense.date) }}</td>
-                  <td class="right">
+        @for (group of ledger(); track group.key) {
+          <div class="ledger-month">
+            <div class="ledger-month-head">
+              <span class="ledger-month-name">{{ group.label }}</span>
+              <span class="ledger-month-sum">
+                @if (group.income) {
+                  <span class="in">+{{ formatPkr(group.income) }}</span>
+                }
+                @if (group.expense) {
+                  <span class="out">−{{ formatPkr(group.expense) }}</span>
+                }
+                @if (group.income && group.expense) {
+                  <b [class.out]="group.income - group.expense < 0">Net {{ signedPkr(group.income - group.expense) }}</b>
+                }
+              </span>
+            </div>
+            @for (row of group.rows; track row.id) {
+              <div class="ledger-row" [class.ledger-row--out]="row.kind === 'out'">
+                <span class="ledger-day">
+                  <b>{{ row.day }}</b>
+                  <span>{{ row.dow }}</span>
+                </span>
+                <div class="ledger-main">
+                  <span class="ledger-title" [title]="row.title">{{ row.title }}</span>
+                  <span class="ledger-sub" [title]="row.sub">{{ row.sub }}</span>
+                </div>
+                <span class="ledger-amt num" [class.in]="row.kind === 'in'">{{ row.kind === 'in' ? '+' : '−' }}{{ formatPkr(row.amount) }}</span>
+                <span class="ledger-act">
+                  @if (row.expense; as expense) {
                     <button
                       type="button"
-                      class="btn btn--sm btn--ghost"
+                      class="btn btn--sm btn--ghost btn--icon"
+                      [attr.aria-label]="'Delete ' + expense.description"
                       [disabled]="deletingId() === expense.id"
                       (click)="deleteExpense(expense)"
                     >
@@ -72,53 +135,14 @@
                         <svg lucideTrash2></svg>
                       }
                     </button>
-                  </td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        </div>
+                  }
+                </span>
+              </div>
+            }
+          </div>
+        }
       }
-    </div>
-
-    <div class="card card--flush">
-      <div class="inline-head" style="padding: 1rem 1.1rem 0;">
-        <h2>Income</h2>
-        <span class="count">{{ pluralize(income().length, 'payment') }}</span>
-      </div>
-
-      @if (income().length === 0) {
-        <app-empty-state title="No income recorded yet" hint="Batch-mark leads paid from the Leads page to record PKR received.">
-          <svg lucideBanknote></svg>
-        </app-empty-state>
-      } @else {
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Leads covered</th>
-                <th class="hide-sm">Note</th>
-                <th class="right">Amount</th>
-                <th class="right hide-sm">Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (payment of income(); track payment.id) {
-                <tr>
-                  <td>
-                    <span class="cell-main">{{ payment.leads.length }} lead{{ payment.leads.length === 1 ? '' : 's' }}</span>
-                    <div class="cell-sub">{{ payment.leads.map(l => l.customerName).join(', ') }}</div>
-                  </td>
-                  <td class="hide-sm">{{ payment.note || '—' }}</td>
-                  <td class="right num">{{ formatPkr(payment.pkrAmount) }}</td>
-                  <td class="right hide-sm">{{ formatDate(payment.createdAt) }}</td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        </div>
-      }
-    </div>
+    </section>
   }
 </div>
 
@@ -139,7 +163,7 @@
       </label>
       <label>
         Date
-        <input type="date" min="2000-01-01" max="2100-12-31" [(ngModel)]="date" name="date" />
+        <app-date-input min="2000-01-01" max="2100-12-31" [(ngModel)]="date" name="date"></app-date-input>
       </label>
     </div>
 
