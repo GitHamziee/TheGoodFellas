@@ -19,4 +19,14 @@ export const env = {
   // this wrong breaks IP whitelisting either by always seeing the proxy's IP or by trusting
   // a spoofable header.
   trustProxy: process.env.TRUST_PROXY,
+  // Retention lead sheet sync — all three of ID, email and key must be set or the sync stays off.
+  googleSheetId: process.env.GOOGLE_SHEET_ID ?? "",
+  googleSheetTab: process.env.GOOGLE_SHEET_TAB ?? "",
+  googleServiceAccountEmail: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL ?? "",
+  // The key's newlines arrive as literal "\n" when it's pasted into a single-line .env value.
+  googlePrivateKey: (process.env.GOOGLE_PRIVATE_KEY ?? "").replace(/\\n/g, "\n"),
+  // Date blocks older than this (yyyy-mm-dd) are ignored, so the first sync doesn't pull the
+  // sheet's whole history into Admin's queue.
+  googleSheetImportFrom: process.env.GOOGLE_SHEET_IMPORT_FROM ?? "",
+  googleSheetSyncMinutes: Number(process.env.GOOGLE_SHEET_SYNC_MINUTES ?? 5),
 };
