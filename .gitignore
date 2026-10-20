@@ -31,3 +31,6 @@ Thumbs.db
 .claude/
 .mcp.json
 .playwright-mcp/
+
+# Go-live secrets sheet
+.env.production
