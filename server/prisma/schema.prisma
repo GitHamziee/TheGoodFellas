@@ -219,6 +219,10 @@ model User {
   clientChargeBacks    ChargeBack[]  @relation("ClientChargeBacks")
   chatMessages         ChatMessage[]
   chatReads            ChatRead[]
+  chatGroupsCreated    ChatGroup[]       @relation("ChatGroupCreator")
+  chatGroupMemberships ChatGroupMember[]
+  chatRoomOverrides    ChatRoomOverride[]
+  notifications        Notification[]
   leadReviews          LeadReview[]
   callReviewsGiven     CallReview[]  @relation("CallReviewsGiven")
   callReviewsReceived  CallReview[]  @relation("CallReviewsReceived")
@@ -254,6 +258,9 @@ model Lead {
   // Set only for RETENTION leads — who Admin handed a form-submitted lead to. Null while an
   // imported lead is still sitting unassigned in the admin retention-import queue.
   retentionId       String?
+  // Set only for RETENTION leads pulled in by the Google Sheet sync — a hash of name + phone +
+  // DOB, so re-reading the same sheet row never creates the lead twice.
+  sheetKey          String?       @unique
   // Non-binding hint a Closer or Retention person can set on a lead they build/enrich
   // themselves — "I think this fits Client X" — so Admin has a heads-up in the queue.
   // Never gates or performs the actual assignment; Admin still explicitly assigns via
@@ -383,6 +390,13 @@ model Lead {
   @@index([status])
   @@index([createdAt])
   @@index([incomePaymentId])
+  // Composite indexes for the list queries: each filters by an owner/type + status and
+  // sorts by updatedAt.
+  @@index([juniorCloserId, status])
+  @@index([closerId, status])
+  @@index([clientId, status])
+  @@index([leadType, status])
+  @@index([status, updatedAt])
 }
 
 // A QA reviewer's pass/fail verdict on the data a Junior Closer or Closer submitted on
@@ -542,7 +556,9 @@ model ExternalClientStateCarrier {
 // the timeline keeps its shape for anyone with the thread already open.
 model ChatMessage {
   id        String    @id @default(cuid())
-  room      ChatRoom
+  // Built-in ChatRoom name (CLOSERS, ...) or `g_<ChatGroup.id>` for an admin-created group.
+  // A plain string rather than the enum so custom groups can share the same table.
+  room      String
   senderId  String
   // May be empty when the message is a bare file upload with no caption typed alongside it.
   body      String
@@ -569,10 +585,72 @@ model ChatMessage {
 // Read cursor per person per room — drives the unread badge in the sidebar.
 model ChatRead {
   userId     String
-  room       ChatRoom
+  room       String
   lastReadAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([userId, room])
+}
+
+// Admin-created group chat (WhatsApp-style). Membership is an explicit list, unlike the
+// built-in role-derived channels. Its chat room key is `g_<id>` — see lib/chat-rooms.ts.
+model ChatGroup {
+  id          String   @id @default(cuid())
+  name        String
+  createdById String
+  createdAt   DateTime @default(now())
+
+  createdBy User              @relation("ChatGroupCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  members   ChatGroupMember[]
+}
+
+model ChatGroupMember {
+  groupId String
+  userId  String
+  addedAt DateTime @default(now())
+
+  group ChatGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, userId])
+  @@index([userId])
+}
+
+// Admin overrides on the built-in role-derived channels. A label row renames one; an override
+// row adds (allowed=true) or removes (allowed=false) a single person on top of the role rule.
+model ChatRoomLabel {
+  room  String @id
+  label String
+}
+
+model ChatRoomOverride {
+  room    String
+  userId  String
+  allowed Boolean
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([room, userId])
+  @@index([userId])
+}
+
+// Per-user inbox of "something happened to you" events (lead received, sent back, assigned,
+// decided...). Persisted so a person who was offline still sees what they missed; also pushed
+// live over the socket as a toast. `link` is the portal page the recipient should open — it is
+// resolved server-side from the recipient's role so the client never has to guess.
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  kind      String
+  title     String
+  message   String
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
 }
