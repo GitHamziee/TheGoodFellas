@@ -10,6 +10,11 @@
   <aside class="wa-list">
     <div class="wa-list-head">
       <span class="wa-list-title">Chats</span>
+      @if (isAdmin()) {
+        <button type="button" class="wa-head-btn" title="New group" aria-label="New group" (click)="openGroupModal(null)">
+          <svg lucidePlus></svg>
+        </button>
+      }
       <span class="wa-conn" [class.wa-conn--live]="connected()" [title]="connected() ? 'Connected' : 'Reconnecting'">
         <span class="wa-dot"></span>
         {{ connected() ? 'Online' : 'Connecting…' }}
@@ -23,17 +28,22 @@
 
           <span class="wa-chat-main">
             <span class="wa-chat-top">
-              <span class="wa-chat-name">{{ roomLabel[room] }}</span>
+              <span class="wa-chat-name">{{ roomLabel(room) }}</span>
               <span class="wa-chat-time">{{ previewTimeFor(room) }}</span>
             </span>
             <span class="wa-chat-bottom">
               <span class="wa-chat-preview">{{ previewFor(room) }}</span>
+              @if (isMuted(room)) {
+                <svg lucideBellOff class="wa-chat-muted" aria-label="Muted"></svg>
+              }
               @if (unreadFor(room); as count) {
                 <span class="wa-chat-unread">{{ count }}</span>
               }
             </span>
           </span>
         </button>
+      } @empty {
+        <div class="wa-search-note">No conversations yet</div>
       }
     </div>
   </aside>
@@ -46,24 +56,103 @@
       </button>
       <span class="wa-chat-avatar wa-chat-avatar--sm"><svg lucideUsers></svg></span>
       <div class="wa-thread-id">
-        <div class="wa-thread-name">{{ activeRoom() ? roomLabel[activeRoom()!] : 'Chat' }}</div>
+        <div class="wa-thread-name">{{ activeRoom() ? roomLabel(activeRoom()!) : 'Chat' }}</div>
         <div class="wa-thread-members">
           @if (typingLabel()) {
             <span class="wa-typing">{{ typingLabel() }}</span>
           } @else if (activeRoom()) {
-            {{ roomMembers[activeRoom()!] }}
+            {{ membersFor(activeRoom()!) }}
           }
         </div>
       </div>
+      <button
+        type="button"
+        class="wa-head-btn"
+        [class.wa-head-btn--on]="searchOpen()"
+        aria-label="Search in this chat"
+        title="Search in this chat"
+        [disabled]="!activeRoom()"
+        (click)="toggleSearch()"
+      >
+        <svg lucideSearch></svg>
+      </button>
+      @if (isAdmin() && activeRoom()) {
+        <button
+          type="button"
+          class="wa-head-btn"
+          title="Edit chat"
+          aria-label="Edit chat"
+          (click)="openGroupModal(activeRoom())"
+        >
+          <svg lucideSettings></svg>
+        </button>
+      }
+      @if (canMute() && activeRoom(); as room) {
+        <button
+          type="button"
+          class="wa-mute"
+          [class.wa-mute--on]="isMuted(room)"
+          [attr.aria-pressed]="isMuted(room)"
+          [title]="isMuted(room) ? 'Unmute popup notifications' : 'Mute popup notifications'"
+          (click)="toggleMute(room)"
+        >
+          @if (isMuted(room)) {
+            <svg lucideBellOff></svg> Muted
+          } @else {
+            <svg lucideBell></svg> Mute
+          }
+        </button>
+      }
     </header>
 
-    <div class="wa-canvas" #scroller (scroll)="onScroll()">
+    @if (searchOpen()) {
+      <div class="wa-search">
+        <svg lucideSearch class="wa-search-icon"></svg>
+        <input
+          #searchInput
+          type="search"
+          class="wa-search-input"
+          [placeholder]="'Search in ' + (activeRoom() ? roomLabel(activeRoom()!) : 'chat')"
+          autocomplete="off"
+          aria-label="Search in this chat"
+          [ngModel]="searchQuery()"
+          (ngModelChange)="onSearchInput($event)"
+          (keydown.escape)="closeSearch()"
+        />
+        <button type="button" class="wa-search-clear" aria-label="Close search" (click)="closeSearch()">
+          <svg lucideX></svg>
+        </button>
+      </div>
+    }
+
+    @if (searchOpen() && searchQuery().trim().length >= 2) {
+      <div class="wa-search-panel">
+        @if (searching()) {
+          <div class="wa-search-note">Searching…</div>
+        } @else {
+          @for (result of searchResults(); track result.id) {
+            <button type="button" class="wa-result" (click)="openResult(result)">
+              <span class="wa-result-top">
+                <span class="wa-result-name">{{ result.sender.name }}</span>
+                <span class="wa-result-time">{{ listTimeOf(result) }}</span>
+              </span>
+              @let s = snippet(result);
+              <span class="wa-result-text">{{ s.pre }}@if (s.hit) {<mark>{{ s.hit }}</mark>}{{ s.post }}</span>
+            </button>
+          } @empty {
+            <div class="wa-search-note">No messages found</div>
+          }
+        }
+      </div>
+    }
+
+    <div class="wa-canvas" [class.wa-canvas--hidden]="searchResultsShown()" #scroller (scroll)="onScroll()">
       @if (loading()) {
         <div class="wa-status">Loading messages…</div>
       } @else {
         @if (hasMore()) {
           <div class="wa-load-older">
-            <button type="button" (click)="loadOlder()">Load earlier messages</button>
+            <span>{{ loadingOlder() ? 'Loading earlier messages…' : 'Scroll up for earlier messages' }}</span>
           </div>
         }
 
@@ -72,7 +161,13 @@
             <div class="wa-day"><span>{{ item.daySeparator }}</span></div>
           }
 
-          <div class="wa-row" [class.wa-row--own]="item.own" [class.wa-row--tail]="item.startsBlock">
+          <div
+            class="wa-row"
+            [attr.data-mid]="item.message.id"
+            [class.wa-row--own]="item.own"
+            [class.wa-row--tail]="item.startsBlock"
+            [class.wa-row--hit]="highlightId() === item.message.id"
+          >
             <div class="wa-bubble" [class.wa-bubble--deleted]="item.message.deleted">
               @if (item.startsBlock && !item.own && !item.message.deleted) {
                 <div class="wa-sender" [style.color]="nameColor(item.message.sender.id)">
@@ -104,7 +199,7 @@
                     @if (isImage(attachment)) {
                       <button type="button" class="wa-image" (click)="downloadAttachment(attachment)">
                         @if (previewUrlFor(item.message); as src) {
-                          <img [src]="src" [alt]="attachment.name" />
+                          <img [src]="src" [alt]="attachment.name" (load)="onMediaLoad()" />
                         } @else {
                           <span class="wa-image-loading"><svg lucideLoaderCircle></svg></span>
                         }
@@ -170,6 +265,12 @@
       }
     </div>
 
+    @if (hasNewer()) {
+      <button type="button" class="wa-latest" (click)="jumpToLatest()">
+        <svg lucideChevronDown></svg> Jump to latest messages
+      </button>
+    }
+
     <footer class="wa-composer">
       <input
         #fileInput
@@ -208,5 +309,85 @@
   <!-- Click-away target for the open message menu. -->
   @if (openMenuId()) {
     <div class="wa-scrim" (click)="closeMenu()"></div>
+  }
+
+  @if (groupOpen()) {
+    <app-modal [title]="editingRoom() ? (editingCustomGroup() ? 'Edit group' : 'Edit channel') : 'New group'" subtitle="Changes apply instantly for everyone." (close)="groupOpen.set(false)">
+      <div class="ng">
+        <div class="ng-name">
+          <span class="ng-avatar"><svg lucideUsers></svg></span>
+          <input
+            type="text"
+            class="ng-name-input"
+            placeholder="Group name"
+            maxlength="60"
+            [ngModel]="groupName()"
+            (ngModelChange)="groupName.set($event)"
+          />
+        </div>
+
+        @if (selectedPeople().length) {
+          <div class="ng-chips">
+            @for (p of selectedPeople(); track p.id) {
+              <button type="button" class="ng-chip" (click)="toggleCandidate(p.id)" [title]="'Remove ' + p.name">
+                <span class="ng-chip-av {{ avatarTone(p.id) }}">{{ getInitials(p.name) }}</span>
+                {{ p.name }}
+                <svg lucideX></svg>
+              </button>
+            }
+          </div>
+        }
+
+        <div class="ng-search">
+          <svg lucideSearch></svg>
+          <input
+            type="search"
+            placeholder="Search people"
+            [ngModel]="groupFilter()"
+            (ngModelChange)="groupFilter.set($event)"
+          />
+        </div>
+
+        <div class="ng-list">
+          @for (section of candidateSections(); track section.role) {
+            <div class="ng-section">
+              <span>{{ section.title }} <em>{{ section.people.length }}</em></span>
+              <button type="button" (click)="toggleSection(section.people)">
+                {{ sectionAllOn(section.people) ? 'Clear' : 'Select all' }}
+              </button>
+            </div>
+            @for (c of section.people; track c.id) {
+              <button
+                type="button"
+                class="ng-row"
+                [class.ng-row--on]="selectedIds().has(c.id)"
+                (click)="toggleCandidate(c.id)"
+              >
+                <span class="ng-av {{ avatarTone(c.id) }}">{{ getInitials(c.name) }}</span>
+                <span class="ng-row-name">{{ c.name }}</span>
+                <span class="ng-check"><svg lucideCheck></svg></span>
+              </button>
+            }
+          } @empty {
+            <div class="ng-empty">No people found</div>
+          }
+        </div>
+
+        @if (groupError()) {
+          <div class="ng-error">{{ groupError() }}</div>
+        }
+      </div>
+      @if (editingCustomGroup()) {
+        <button footer type="button" class="ng-delete" [disabled]="creatingGroup()" (click)="deleteGroup()">
+          <svg lucideTrash2></svg> Delete group
+        </button>
+      }
+      <button footer type="button" class="ng-create" [disabled]="!canCreateGroup()" (click)="saveGroup()">
+        {{ creatingGroup() ? 'Saving…' : editingRoom() ? 'Save changes' : 'Create group' }}
+        @if (selectedIds().size) {
+          <span class="ng-count">{{ selectedIds().size }}</span>
+        }
+      </button>
+    </app-modal>
   }
 </div>

@@ -1,22 +1,22 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
+import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { io, Socket } from 'socket.io-client';
 import { API_BASE_URL } from '../config';
+import { NAV_BY_ROLE } from '../nav-config';
 import {
-  CHAT_ROOMS_BY_ROLE,
+  CHAT_ROOM_LABEL,
   ChatAttachment,
   ChatMessage,
   ChatRoomKey,
   ChatRoomSummary,
+  GroupCandidate,
   TypingUser,
 } from '../models/chat.model';
 import { AuthService } from './auth.service';
-
-interface ApiSuccess<T> {
-  data: T;
-  message?: string;
-}
+import { NotificationService } from './notification.service';
+import type { ApiSuccess } from '../api';
 
 const BASE = `${API_BASE_URL}/chat`;
 /** The socket connects to the server origin, not the /api path — also used to resolve an
@@ -36,6 +36,8 @@ const TYPING_TTL_MS = 4000;
 export class ChatService {
   private readonly http = inject(HttpClient);
   private readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
+  private readonly notifications = inject(NotificationService);
 
   private socket: Socket | null = null;
   private readonly typingTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -56,12 +58,58 @@ export class ChatService {
   readonly connected = this._connected.asReadonly();
   readonly loading = this._loading.asReadonly();
   readonly hasMore = this._hasMore.asReadonly();
+  /** True after a jump-to-message window that doesn't reach the newest messages. */
+  private readonly _hasNewer = signal(false);
+  readonly hasNewer = this._hasNewer.asReadonly();
+  /** Message the view should scroll to once the window renders; cleared by the component. */
+  private readonly _jumpTarget = signal<string | null>(null);
+  readonly jumpTarget = this._jumpTarget.asReadonly();
+
+  clearJumpTarget(): void {
+    this._jumpTarget.set(null);
+  }
 
   /** Rooms the signed-in role can open — drives the admin's channel switcher. */
-  readonly availableRooms = computed<ChatRoomKey[]>(() => {
-    const role = this.auth.role();
-    return role ? CHAT_ROOMS_BY_ROLE[role] : [];
-  });
+  readonly availableRooms = computed<ChatRoomKey[]>(() => this._rooms().map((r) => r.room));
+
+  labelFor(room: ChatRoomKey): string {
+    return this._rooms().find((r) => r.room === room)?.label ?? CHAT_ROOM_LABEL[room] ?? 'Group';
+  }
+
+  /** Only admins can mute a channel's popups. Unread badges still count — mute is toast-only. */
+  readonly canMute = computed(() => this.auth.role() === 'ADMIN');
+  private readonly _muted = signal<ReadonlySet<ChatRoomKey>>(new Set());
+  readonly muted = this._muted.asReadonly();
+
+  isMuted(room: ChatRoomKey): boolean {
+    return this.canMute() && this._muted().has(room);
+  }
+
+  toggleMute(room: ChatRoomKey): void {
+    if (!this.canMute()) return;
+    const next = new Set(this._muted());
+    if (!next.delete(room)) next.add(room);
+    this._muted.set(next);
+    try {
+      localStorage.setItem(this.muteKey(), JSON.stringify([...next]));
+    } catch {
+      // Storage blocked — the mute still holds for this session.
+    }
+  }
+
+  private muteKey(): string {
+    return `chat-muted:${this.auth.user()?.id ?? ''}`;
+  }
+
+  private loadMuted(): void {
+    try {
+      const raw = localStorage.getItem(this.muteKey());
+      const parsed: unknown = raw ? JSON.parse(raw) : [];
+      this._muted.set(new Set(Array.isArray(parsed) ? (parsed as ChatRoomKey[]) : []));
+    } catch {
+      this._muted.set(new Set());
+    }
+  }
 
   readonly totalUnread = computed(() => this._rooms().reduce((sum, r) => sum + r.unread, 0));
 
@@ -70,8 +118,10 @@ export class ChatService {
     // and the interceptor's forced logout on 401 without each caller remembering to clean up.
     effect(() => {
       const user = this.auth.user();
-      if (user && CHAT_ROOMS_BY_ROLE[user.role].length > 0) {
+      // Every role connects: even a Client (no built-in channel) can be added to a group.
+      if (user) {
         this.connect();
+        this.loadMuted();
         // Loaded here rather than in the chat page so the sidebar badge is populated
         // from the moment you sign in, not only after you first open the channel.
         void this.loadRooms().catch(() => undefined);
@@ -101,6 +151,8 @@ export class ChatService {
 
     socket.on('chat:message', (message: ChatMessage) => this.onIncoming(message));
     socket.on('chat:message-updated', (message: ChatMessage) => this.onUpdated(message));
+    // Added to a new group: refresh the channel list so it appears without a reload.
+    socket.on('chat:rooms-changed', () => void this.loadRooms().catch(() => undefined));
     socket.on('chat:typing', (payload: { room: ChatRoomKey; userId: string; name: string; isTyping: boolean }) =>
       this.onTyping(payload)
     );
@@ -121,7 +173,8 @@ export class ChatService {
   }
 
   private onIncoming(message: ChatMessage): void {
-    if (message.room === this._activeRoom()) {
+    // While viewing an older search window, appending the newest message would leave a gap.
+    if (message.room === this._activeRoom() && !this._hasNewer()) {
       this.upsert(message);
       // Reading it as it arrives keeps the badge from flashing for a room you're staring at.
       void this.markRead(message.room);
@@ -129,13 +182,34 @@ export class ChatService {
       this._rooms.update((rooms) => {
         const known = rooms.some((r) => r.room === message.room);
         // The summary can be missing if a message lands before loadRooms() resolves.
-        if (!known) return [...rooms, { room: message.room, unread: 1, lastMessage: message }];
+        if (!known) return [...rooms, { room: message.room, label: this.labelFor(message.room), members: null, unread: 1, lastMessage: message }];
         return rooms.map((r) =>
           r.room === message.room ? { ...r, unread: r.unread + 1, lastMessage: message } : r
         );
       });
     }
     this.clearTyping(message.sender.id);
+    this.toastIncoming(message);
+  }
+
+  /** Popup for a message that arrives while you're elsewhere in the app. Toast only — chat
+   * already has its own unread badge, so it is deliberately kept out of the bell. */
+  private toastIncoming(message: ChatMessage): void {
+    const user = this.auth.user();
+    if (!user || message.sender.id === user.id || message.deleted) return;
+    if (this.isMuted(message.room)) return;
+    // Anywhere inside the chat section the message list / room switcher is already on screen.
+    if (/\/chat(\/|$|\?)/.test(this.router.url)) return;
+
+    const link = NAV_BY_ROLE[user.role].find((item) => item.badge === 'chat')?.path ?? null;
+    this.notifications.showToast({
+      id: `chat:${message.id}`,
+      kind: 'info',
+      title: `${message.sender.name} · ${this.labelFor(message.room)}`,
+      message: message.body || (message.attachment ? `Sent a file: ${message.attachment.name}` : 'New message'),
+      link,
+      createdAt: message.createdAt,
+    });
   }
 
   private onUpdated(message: ChatMessage): void {
@@ -209,23 +283,93 @@ export class ChatService {
   async loadRooms(): Promise<void> {
     const res = await firstValueFrom(this.http.get<ApiSuccess<{ rooms: ChatRoomSummary[] }>>(`${BASE}/rooms`));
     this._rooms.set(res.data.rooms);
+    // The open room vanished (group deleted, or you were removed): drop back to a blank state.
+    const active = this._activeRoom();
+    if (active && !res.data.rooms.some((r) => r.room === active)) {
+      this._activeRoom.set(null);
+      this._messages.set([]);
+      this._typing.set([]);
+    }
   }
 
-  async openRoom(room: ChatRoomKey): Promise<void> {
+  /** Admin only: people who can be added to a custom group. */
+  async groupCandidates(everyone = false): Promise<GroupCandidate[]> {
+    const res = await firstValueFrom(
+      this.http.get<ApiSuccess<{ users: GroupCandidate[] }>>(`${BASE}/group-candidates`, {
+        params: everyone ? { all: '1' } : {},
+      })
+    );
+    return res.data.users;
+  }
+
+  /** Current roster of a built-in channel (role rule plus admin overrides) — admin only. */
+  async builtinRoster(room: ChatRoomKey): Promise<{ label: string; members: GroupCandidate[] }> {
+    const res = await firstValueFrom(
+      this.http.get<ApiSuccess<{ label: string; members: GroupCandidate[] }>>(`${BASE}/builtin/${room}/roster`)
+    );
+    return res.data;
+  }
+
+  /** Admin only: creates a group; the chosen members are added immediately. */
+  async createGroup(name: string, memberIds: string[]): Promise<ChatRoomKey> {
+    const res = await firstValueFrom(
+      this.http.post<ApiSuccess<{ room: ChatRoomKey }>>(`${BASE}/groups`, { name, memberIds })
+    );
+    await this.loadRooms();
+    return res.data.room;
+  }
+
+  /** Admin only: rename and/or set the full member list (the server diffs it). */
+  async updateGroup(room: ChatRoomKey, name: string, memberIds: string[]): Promise<void> {
+    // Custom groups are `g_<id>`; anything else is a built-in channel with its own endpoint.
+    const url = room.startsWith('g_') ? `${BASE}/groups/${room.slice(2)}` : `${BASE}/builtin/${room}`;
+    await firstValueFrom(this.http.patch<ApiSuccess<unknown>>(url, { name, memberIds }));
+    await this.loadRooms();
+  }
+
+  /** Admin only: deletes the group and its whole history for everyone. */
+  async deleteGroup(room: ChatRoomKey): Promise<void> {
+    await firstValueFrom(this.http.delete<ApiSuccess<unknown>>(`${BASE}/groups/${room.slice(2)}`));
+    await this.loadRooms();
+  }
+
+  /** Searches one channel's messages (the server re-checks the caller may read it). */
+  async search(room: ChatRoomKey, query: string): Promise<ChatMessage[]> {
+    const res = await firstValueFrom(
+      this.http.get<ApiSuccess<{ results: ChatMessage[] }>>(`${BASE}/search`, { params: { q: query, room } })
+    );
+    return res.data.results;
+  }
+
+  /** Asks the open conversation to scroll to a message it already holds. */
+  requestJump(id: string): void {
+    this._jumpTarget.set(id);
+  }
+
+  /** Opens a room on its newest page, or — with `aroundId` — on a window centred on that message. */
+  async openRoom(room: ChatRoomKey, aroundId?: string): Promise<void> {
     this._activeRoom.set(room);
     this._typing.set([]);
     this._loading.set(true);
     this._messages.set([]);
+    this._hasNewer.set(false);
+    this._jumpTarget.set(null);
 
     try {
       const res = await firstValueFrom(
-        this.http.get<ApiSuccess<{ messages: ChatMessage[]; hasMore: boolean }>>(`${BASE}/${room}/messages`)
+        this.http.get<ApiSuccess<{ messages: ChatMessage[]; hasMore: boolean; hasNewer: boolean }>>(
+          `${BASE}/${room}/messages`,
+          { params: aroundId ? { around: aroundId } : {} }
+        )
       );
       // Guard against a fast room switch landing an older response on the newer room.
       if (this._activeRoom() !== room) return;
       this._messages.set(res.data.messages);
       this._hasMore.set(res.data.hasMore);
-      await this.markRead(room);
+      this._hasNewer.set(res.data.hasNewer);
+      if (aroundId) this._jumpTarget.set(aroundId);
+      // A window that stops short of the newest messages must not clear the unread badge.
+      if (!res.data.hasNewer) await this.markRead(room);
     } finally {
       this._loading.set(false);
     }
@@ -237,6 +381,8 @@ export class ChatService {
    * marked read instead of raising the sidebar badge.
    */
   closeRoom(): void {
+    this._hasNewer.set(false);
+    this._jumpTarget.set(null);
     this._activeRoom.set(null);
     this._messages.set([]);
     this._typing.set([]);

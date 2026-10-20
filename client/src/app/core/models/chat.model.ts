@@ -1,6 +1,7 @@
 import { Role } from './user.model';
 
-export type ChatRoomKey = 'CLOSERS' | 'JUNIOR_CLOSERS' | 'TEAM_LEADS' | 'RETENTION';
+/** A built-in channel name, or `g_<id>` for an admin-created group. */
+export type ChatRoomKey = string;
 
 export interface ChatSender {
   id: string;
@@ -33,6 +34,9 @@ export interface ChatMessage {
 
 export interface ChatRoomSummary {
   room: ChatRoomKey;
+  label: string;
+  /** Explicit roster for custom groups; null for the built-in role-derived channels. */
+  members: ChatSender[] | null;
   unread: number;
   lastMessage: ChatMessage | null;
 }
@@ -44,30 +48,16 @@ export interface TypingUser {
 
 // Display names only — mirrors server/src/lib/chat-rooms.ts's ROOM_LABEL. The ChatRoomKey
 // values themselves stay TEAM_LEADS/RETENTION; only what's shown to the user changed.
-export const CHAT_ROOM_LABEL: Record<ChatRoomKey, string> = {
+export const CHAT_ROOM_LABEL: Record<string, string> = {
   CLOSERS: 'Closers',
   JUNIOR_CLOSERS: 'Junior Closers',
   TEAM_LEADS: 'Management',
   RETENTION: 'Retention Department',
 };
 
-/**
- * Mirrors `roomsFor()` on the server — used only to decide what to render (nav item,
- * room switcher). The server re-checks every read and write; this is not the boundary.
- */
-export const CHAT_ROOMS_BY_ROLE: Record<Role, ChatRoomKey[]> = {
-  CLOSER: ['CLOSERS'],
-  JUNIOR_CLOSER: ['JUNIOR_CLOSERS'],
-  // Oversees both roles, so it sits in both of their channels (Closer, Junior Closer, and
-  // Admin) plus its own channel for team-lead-to-team-lead + admin.
-  TEAM_LEAD: ['CLOSERS', 'JUNIOR_CLOSERS', 'TEAM_LEADS'],
-  RETENTION: ['RETENTION'],
-  ADMIN: ['CLOSERS', 'JUNIOR_CLOSERS', 'TEAM_LEADS', 'RETENTION'],
-  // Same access as ADMIN — the Clients/Team/External Clients/Expenses exclusion is
-  // page-level, not a chat restriction.
-  MANAGER: ['CLOSERS', 'JUNIOR_CLOSERS', 'TEAM_LEADS', 'RETENTION'],
-  CLIENT: [],
-  // Internal metrics roles, not part of team chat — see server/src/lib/chat-rooms.ts.
-  QA_JUNIOR_CLOSER: [],
-  QA_CLOSER: [],
-};
+/** Roles an admin cannot add to a custom group — mirrors GROUP_EXCLUDED_ROLES on the server. */
+export interface GroupCandidate {
+  id: string;
+  name: string;
+  role: Role;
+}

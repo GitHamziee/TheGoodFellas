@@ -61,6 +61,227 @@
   justify-content: space-between;
 }
 
+.wa-search {
+  position: relative;
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.wa-search-icon {
+  position: absolute;
+  left: 1.35rem;
+  top: 50%;
+  width: 15px;
+  height: 15px;
+  transform: translateY(-50%);
+  color: var(--gray-400);
+  pointer-events: none;
+}
+
+.wa-search-input {
+  width: 100%;
+  padding: 0.5rem 2rem 0.5rem 2.1rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-muted);
+  font-family: inherit;
+  font-size: 0.8rem;
+  outline: none;
+}
+
+.wa-search-input:focus {
+  border-color: var(--gold-400);
+  background: var(--surface);
+}
+
+.wa-search-clear {
+  position: absolute;
+  right: 1.25rem;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--gray-500);
+  cursor: pointer;
+}
+
+.wa-search-clear svg {
+  width: 14px;
+  height: 14px;
+}
+
+.wa-search-note {
+  padding: 1.5rem 1rem;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--gray-500);
+}
+
+.wa-search-panel {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--surface);
+}
+
+.wa-result {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  width: 100%;
+  padding: 0.7rem 1rem;
+  border: 0;
+  border-bottom: 1px solid var(--gray-100);
+  background: transparent;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.wa-result:hover {
+  background: var(--surface-muted);
+}
+
+.wa-result-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.wa-result-name {
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.wa-result-time {
+  font-size: 0.68rem;
+  color: var(--gray-400);
+  flex-shrink: 0;
+}
+
+.wa-result-text {
+  font-size: 0.78rem;
+  color: var(--gray-600);
+  overflow-wrap: anywhere;
+}
+
+/* Collapsed rather than removed so the scroll position survives while results are showing. */
+.wa-canvas--hidden {
+  flex: 0 0 0;
+  height: 0;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0;
+}
+
+.wa-result mark {
+  background: var(--gold-100);
+  color: inherit;
+  font-weight: 700;
+  border-radius: 2px;
+}
+
+.wa-row--hit .wa-bubble {
+  animation: wa-hit 2.2s ease-out;
+}
+
+@keyframes wa-hit {
+  0%,
+  60% {
+    box-shadow: 0 0 0 3px var(--gold-400);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+.wa-latest {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.5rem;
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: var(--gold-50);
+  color: var(--gold-700);
+  font-family: inherit;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.wa-latest svg {
+  width: 14px;
+  height: 14px;
+}
+
+.wa-head-btn {
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--gray-600);
+  cursor: pointer;
+}
+
+.wa-head-btn svg {
+  width: 17px;
+  height: 17px;
+}
+
+.wa-head-btn:hover:not(:disabled),
+.wa-head-btn--on {
+  background: var(--gold-50);
+  color: var(--gold-700);
+}
+
+.wa-head-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.wa-mute {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--gray-600);
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.wa-mute svg {
+  width: 14px;
+  height: 14px;
+}
+
+.wa-mute:hover {
+  border-color: var(--gold-400);
+}
+
+.wa-mute--on {
+  background: var(--gold-50);
+  border-color: var(--gold-400);
+  color: var(--gold-700);
+}
+
 .wa-list-title {
   font-size: 1rem;
   font-weight: 800;
@@ -171,6 +392,14 @@
   flex-shrink: 0;
 }
 
+.wa-chat-muted {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  margin-left: auto;
+  color: var(--gray-400);
+}
+
 .wa-chat-unread {
   min-width: 1.2rem;
   padding: 0.05rem 0.35rem;
@@ -263,7 +492,7 @@
   padding-bottom: 0.75rem;
 }
 
-.wa-load-older button,
+.wa-load-older span,
 .wa-day span {
   padding: 0.3rem 0.85rem;
   border: none;
@@ -274,10 +503,6 @@
   font-size: 0.7rem;
   font-weight: 700;
   box-shadow: var(--shadow-sm);
-}
-
-.wa-load-older button {
-  cursor: pointer;
 }
 
 /* Centred date pill, the way messengers break up a long scrollback. */
@@ -736,3 +961,95 @@
     max-width: 85%;
   }
 }
+
+/* ── New group modal ── */
+.ng { display: flex; flex-direction: column; gap: 0.85rem; }
+
+.ng-name { display: flex; align-items: center; gap: 0.85rem; }
+.ng-avatar {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 3.2rem; height: 3.2rem; border-radius: 999px; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--gold-400), var(--gold-600));
+  color: var(--ink-950);
+}
+.ng-avatar svg { width: 22px; height: 22px; }
+.ng-name-input {
+  flex: 1; padding: 0.5rem 0.1rem; border: 0; border-bottom: 2px solid var(--border);
+  border-radius: 0; background: transparent; font-size: 1.05rem; font-weight: 700; box-shadow: none;
+}
+.ng-name-input:focus-visible { border-bottom-color: var(--gold-500); box-shadow: none; }
+
+.ng-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.ng-chip {
+  display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.2rem 0.5rem 0.2rem 0.25rem;
+  border: 1px solid var(--gold-200); border-radius: 999px; background: var(--gold-50);
+  color: var(--gold-800); font: inherit; font-size: 0.78rem; font-weight: 700; cursor: pointer;
+}
+.ng-chip:hover { background: var(--gold-100); }
+.ng-chip svg { width: 12px; height: 12px; opacity: 0.6; }
+.ng-chip-av, .ng-av {
+  display: inline-flex; align-items: center; justify-content: center; border-radius: 999px;
+  font-weight: 800; flex-shrink: 0;
+}
+.ng-chip-av { width: 1.35rem; height: 1.35rem; font-size: 0.55rem; }
+.ng-av { width: 2.3rem; height: 2.3rem; font-size: 0.75rem; }
+
+.ng-search { position: relative; display: flex; align-items: center; }
+.ng-search svg { position: absolute; left: 0.85rem; width: 16px; height: 16px; color: var(--gray-400); pointer-events: none; }
+.ng-search input {
+  width: 100%; padding: 0.6rem 0.9rem 0.6rem 2.4rem; border: 0; border-radius: 999px;
+  background: var(--gray-100); font-size: 0.88rem;
+}
+.ng-search input:focus-visible { background: var(--surface); box-shadow: 0 0 0 2px var(--gold-300); }
+
+.ng-list { max-height: 320px; overflow-y: auto; margin: 0 -0.5rem; padding: 0 0.5rem; }
+.ng-section {
+  position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between;
+  padding: 0.55rem 0.4rem 0.3rem; background: var(--surface);
+  color: var(--gray-500); font-size: 0.68rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
+}
+.ng-section em { font-style: normal; color: var(--gray-400); margin-left: 0.2rem; }
+.ng-section button {
+  border: 0; background: none; color: var(--gold-700); font: inherit; font-size: 0.72rem; font-weight: 700;
+  letter-spacing: 0; text-transform: none; cursor: pointer;
+}
+.ng-section button:hover { text-decoration: underline; }
+
+.ng-row {
+  display: flex; align-items: center; gap: 0.75rem; width: 100%; padding: 0.45rem 0.5rem;
+  border: 0; border-radius: var(--radius-sm); background: transparent; font: inherit; text-align: left; cursor: pointer;
+  transition: background 0.12s ease;
+}
+.ng-row:hover { background: var(--gray-50); }
+.ng-row--on, .ng-row--on:hover { background: var(--gold-50); }
+.ng-row-name { flex: 1; font-weight: 600; font-size: 0.92rem; color: var(--text); }
+.ng-check {
+  display: inline-flex; align-items: center; justify-content: center; width: 1.35rem; height: 1.35rem;
+  border: 2px solid var(--gray-300); border-radius: 999px; color: transparent; transition: all 0.12s ease;
+}
+.ng-check svg { width: 12px; height: 12px; stroke-width: 3; }
+.ng-row--on .ng-check { background: var(--gold-500); border-color: var(--gold-500); color: var(--ink-950); }
+
+.ng-empty { padding: 1.5rem; text-align: center; color: var(--gray-400); font-size: 0.85rem; }
+.ng-error { padding: 0.5rem 0.7rem; border-radius: var(--radius-sm); background: var(--danger-50); color: var(--danger-700); font-size: 0.82rem; }
+
+.ng-create {
+  display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.2rem; border: 0; border-radius: 999px;
+  background: linear-gradient(135deg, var(--gold-400), var(--gold-600)); color: var(--ink-950);
+  font: inherit; font-weight: 800; font-size: 0.88rem; cursor: pointer; transition: filter 0.12s ease, opacity 0.12s ease;
+}
+.ng-create:hover:not(:disabled) { filter: brightness(1.06); }
+.ng-create:disabled { opacity: 0.45; cursor: not-allowed; }
+.ng-count {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 1.35rem; height: 1.35rem;
+  padding: 0 0.3rem; border-radius: 999px; background: var(--ink-950); color: var(--gold-300); font-size: 0.72rem;
+}
+
+.ng-delete {
+  display: inline-flex; align-items: center; gap: 0.4rem; margin-right: auto; padding: 0.55rem 0.9rem;
+  border: 1px solid var(--danger-600); border-radius: 999px; background: transparent; color: var(--danger-700);
+  font: inherit; font-weight: 700; font-size: 0.85rem; cursor: pointer;
+}
+.ng-delete svg { width: 14px; height: 14px; }
+.ng-delete:hover:not(:disabled) { background: var(--danger-50); }
+.ng-delete:disabled { opacity: 0.5; cursor: not-allowed; }

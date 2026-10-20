@@ -4,12 +4,15 @@ import crypto from "crypto";
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 import multer from "multer";
-import { apiError, apiSuccess } from "../lib/api-response";
+import { apiError, apiSuccess, sendResult } from "../lib/api-response";
+import prisma from "../lib/prisma";
 import { asyncHandler } from "../lib/async-handler";
-import { authenticate } from "../middleware/auth";
-import { parseRoom, ROOM_LABEL } from "../lib/chat-rooms";
-import { emitMessageCreated, emitMessageUpdated } from "../realtime/chat-gateway";
+import { authenticate, requireRole } from "../middleware/auth";
+import { canAccessRoom, parseRoom } from "../lib/chat-rooms";
+import { emitGroupChanged, emitGroupCreated, emitGroupDeleted, emitMessageCreated, emitMessageUpdated } from "../realtime/chat-gateway";
 import * as chatService from "../services/chat.service";
+import * as chatGroupService from "../services/chat-group.service";
+import * as chatBuiltinService from "../services/chat-builtin.service";
 
 const router = Router();
 router.use(authenticate);
@@ -55,8 +58,20 @@ function handleUpload(field: string) {
   };
 }
 
+/** Same channel check sendFileMessage makes, but run before multer so a request for a room
+ * the caller can't post in is refused without its file ever being written to disk. */
+const requireRoomAccess = asyncHandler(async (req, res, next) => {
+  const room = parseRoom(req.params.room);
+  if (!room) return apiError(res, "Unknown channel", 404);
+  if (!(await canAccessRoom(req.user!, room))) {
+    return apiError(res, "You do not have access to this channel", 403);
+  }
+  return next();
+});
+
 router.post(
   "/:room/messages/file",
+  requireRoomAccess,
   handleUpload("file"),
   asyncHandler(async (req, res) => {
     const room = parseRoom(req.params.room);
@@ -105,6 +120,105 @@ router.get(
   })
 );
 
+// Admin-only: who can be added to a custom group, and creating one.
+router.get(
+  "/group-candidates",
+  requireRole("ADMIN"),
+  asyncHandler(async (req, res) => apiSuccess(res, await chatGroupService.listGroupCandidates(req.user!.id, req.query.all === "1")))
+);
+
+router.post(
+  "/groups",
+  requireRole("ADMIN"),
+  asyncHandler(async (req, res) => {
+    const me = await prisma.user.findUniqueOrThrow({
+      where: { id: req.user!.id },
+      select: { id: true, name: true, role: true },
+    });
+    const result = await chatGroupService.createGroup(me, {
+      name: req.body?.name,
+      memberIds: req.body?.memberIds,
+    });
+    if ("error" in result) return apiError(res, result.error, result.status);
+
+    emitGroupCreated(result.data.room, result.data.memberIds);
+    return apiSuccess(res, { room: result.data.room, name: result.data.name }, undefined, 201);
+  })
+);
+
+const adminIdentity = (id: string) =>
+  prisma.user.findUniqueOrThrow({ where: { id }, select: { id: true, name: true, role: true } });
+
+router.patch(
+  "/groups/:id",
+  requireRole("ADMIN"),
+  asyncHandler(async (req, res) => {
+    const me = await adminIdentity(req.user!.id);
+    const result = await chatGroupService.updateGroup(me, req.params.id, {
+      name: req.body?.name,
+      memberIds: req.body?.memberIds,
+    });
+    if ("error" in result) return apiError(res, result.error, result.status);
+
+    const { room, addedIds, removedIds, keptIds } = result.data;
+    emitGroupChanged(room, addedIds, removedIds, keptIds);
+    return apiSuccess(res, { room });
+  })
+);
+router.get(
+  "/builtin/:room/roster",
+  requireRole("ADMIN"),
+  asyncHandler(async (req, res) => {
+    const result = await chatBuiltinService.getBuiltinRoster(req.params.room);
+    return sendResult(res, result);
+  })
+);
+
+router.patch(
+  "/builtin/:room",
+  requireRole("ADMIN"),
+  asyncHandler(async (req, res) => {
+    const me = await adminIdentity(req.user!.id);
+    const result = await chatBuiltinService.updateBuiltin(me, req.params.room, {
+      name: req.body?.name,
+      memberIds: req.body?.memberIds,
+    });
+    if ("error" in result) return apiError(res, result.error, result.status);
+
+    const { room, addedIds, removedIds, keptIds } = result.data;
+    emitGroupChanged(room, addedIds, removedIds, keptIds);
+    return apiSuccess(res, { room });
+  })
+);
+
+
+router.delete(
+  "/groups/:id",
+  requireRole("ADMIN"),
+  asyncHandler(async (req, res) => {
+    const me = await adminIdentity(req.user!.id);
+    const result = await chatGroupService.deleteGroup(me, req.params.id);
+    if ("error" in result) return apiError(res, result.error, result.status);
+
+    emitGroupDeleted(result.data.room, result.data.memberIds);
+    // Rows are gone; clear the uploaded files too, ignoring any already missing.
+    for (const file of result.data.files) fs.promises.unlink(path.join(UPLOAD_DIR, file)).catch(() => undefined);
+    return apiSuccess(res, { room: result.data.room });
+  })
+);
+
+router.get(
+  "/search",
+  asyncHandler(async (req, res) => {
+    // Optional ?room= scopes the search to one channel (the in-conversation search box).
+    const room = req.query.room === undefined ? undefined : parseRoom(String(req.query.room));
+    if (req.query.room !== undefined && !room) return apiError(res, "Unknown channel", 404);
+
+    const result = await chatService.searchMessages(req.user!, req.query.q, room ?? undefined);
+    return sendResult(res, result);
+  })
+);
+
 router.get(
   "/:room/messages",
   asyncHandler(async (req, res) => {
@@ -114,9 +228,10 @@ router.get(
     const result = await chatService.listMessages(room, req.user!, {
       before: req.query.before,
       limit: req.query.limit,
+      around: req.query.around,
     });
     if ("error" in result) return apiError(res, result.error, result.status);
-    return apiSuccess(res, { ...result.data, room, label: ROOM_LABEL[room] });
+    return apiSuccess(res, { ...result.data, room, label: await chatService.labelFor(room) });
   })
 );
 
@@ -163,8 +278,7 @@ router.post(
     if (!room) return apiError(res, "Unknown channel", 404);
 
     const result = await chatService.markRead(room, req.user!);
-    if ("error" in result) return apiError(res, result.error, result.status);
-    return apiSuccess(res, result.data);
+    return sendResult(res, result);
   })
 );
 
