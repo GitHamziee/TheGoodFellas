@@ -138,6 +138,10 @@
           </button>
           @if (userMenuOpen()) {
             <div class="user-dropdown" role="menu">
+              <div class="user-dropdown-head">
+                <span class="user-dropdown-name">{{ user()?.name }}</span>
+                <span class="user-dropdown-email">{{ user()?.email }}</span>
+              </div>
               <button class="user-dropdown-item" type="button" role="menuitem" (click)="logout()">
                 <svg lucideLogOut></svg> Log out
               </button>
