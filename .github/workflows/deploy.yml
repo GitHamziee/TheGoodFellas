@@ -1,0 +1,29 @@
+# Every push to main goes live: SSH into the VPS and run ~/deploy.sh (pull, build,
+# prisma db push, pm2 reload). The key in DEPLOY_SSH_KEY is pinned on the server with
+# command="/home/deploy/deploy.sh", so it can trigger a deploy and nothing else.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# One deploy at a time; a newer push waits rather than racing the running build.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          printf '%s\n' "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
+
+      - name: Deploy to VPS
+        run: ssh -i ~/.ssh/deploy_key -o BatchMode=yes deploy@${{ secrets.DEPLOY_HOST }}
