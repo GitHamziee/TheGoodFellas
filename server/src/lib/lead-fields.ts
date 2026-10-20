@@ -2,7 +2,10 @@
 // Runtime type/shape checks matter here (request bodies are `unknown`), not full
 // business-rule validation — see REQUIREMENTS.md for what's still being defined.
 
-type FieldType = 'string' | 'int' | 'boolean' | 'date' | 'ssn' | 'routing' | 'accountNumber' | 'cardNumber' | 'cardExpiry';
+import type { Prisma } from '@prisma/client';
+import { normalizeUsPhone, INVALID_PHONE_MESSAGE, INVALID_RETENTION_PHONE_MESSAGE, isValidZip, INVALID_ZIP_MESSAGE } from './validation';
+
+type FieldType = 'string' | 'int' | 'boolean' | 'date' | 'ssn' | 'phone' | 'zip' | 'routing' | 'accountNumber' | 'cardNumber' | 'cardExpiry';
 
 interface FieldSpec {
   type: FieldType;
@@ -42,9 +45,9 @@ const FIELD_SCHEMA: Record<string, FieldSpec> = {
   // shared — set by Junior Closer, editable by Closer
   customerName: { type: 'string' },
   maritalStatus: { type: 'string' },
-  phone: { type: 'string' },
+  phone: { type: 'phone' },
   state: { type: 'string' },
-  zipcode: { type: 'string' },
+  zipcode: { type: 'zip' },
   birthState: { type: 'string' },
   gender: { type: 'string', enumValues: ['Male', 'Female'] },
   smoker: { type: 'boolean' },
@@ -158,15 +161,19 @@ export const RETENTION_INTAKE_FIELDS = [
   'routingNumber', 'accountNumber', 'cardType', 'cardNumber', 'cardExpiry',
 ] as const;
 
-export type SanitizedLeadFields = Record<string, string | number | boolean | Date>;
+/** Typed against Prisma's own Lead input so callers can spread it into create/update data
+ * without casting. The cast happens once, below: every key comes from FIELD_SCHEMA and has
+ * already been type-checked (and enum-checked) against it. */
+export type SanitizedLeadFields = Partial<Prisma.LeadUncheckedCreateInput>;
 
 export function sanitizeLeadFields(
   body: unknown,
-  allowedKeys: readonly string[]
+  allowedKeys: readonly string[],
+  opts: { retention?: boolean } = {}
 ): { data: SanitizedLeadFields } | { error: string } {
   if (typeof body !== 'object' || body === null) return { error: 'Invalid request body' };
   const input = body as Record<string, unknown>;
-  const data: SanitizedLeadFields = {};
+  const data: Record<string, string | number | boolean | Date> = {};
 
   for (const key of allowedKeys) {
     const raw = input[key];
@@ -207,6 +214,18 @@ export function sanitizeLeadFields(
         data[key] = normalizeSSN(raw);
         break;
       }
+      case 'phone': {
+        // Retention leads come from US sheets, so they take a 10-digit number (9 still accepted).
+        const phone = normalizeUsPhone(raw, opts.retention ? [9, 10] : [9]);
+        if (!phone) return { error: opts.retention ? INVALID_RETENTION_PHONE_MESSAGE : INVALID_PHONE_MESSAGE };
+        data[key] = phone;
+        break;
+      }
+      case 'zip': {
+        if (!isValidZip(raw)) return { error: INVALID_ZIP_MESSAGE };
+        data[key] = raw.trim();
+        break;
+      }
       case 'routing': {
         if (typeof raw !== 'string' || !ROUTING_PATTERN.test(raw)) return { error: `Invalid ${key} — must be exactly 9 digits` };
         data[key] = raw;
@@ -230,5 +249,5 @@ export function sanitizeLeadFields(
     }
   }
 
-  return { data };
+  return { data: data as SanitizedLeadFields };
 }

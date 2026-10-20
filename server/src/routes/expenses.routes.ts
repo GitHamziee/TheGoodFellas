@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { apiError, apiSuccess } from '../lib/api-response';
+import { apiSuccess, sendResult } from '../lib/api-response';
 import { asyncHandler } from '../lib/async-handler';
 import { authenticate, requireRole } from '../middleware/auth';
 import * as expenseService from '../services/expense.service';
@@ -20,8 +20,7 @@ router.post(
   '/',
   asyncHandler(async (req, res) => {
     const result = await expenseService.createExpense(req.body ?? {});
-    if ('error' in result) return apiError(res, result.error, result.status);
-    return apiSuccess(res, result.data, 'Expense added', 201);
+    return sendResult(res, result, 'Expense added', 201);
   })
 );
 
@@ -29,8 +28,7 @@ router.delete(
   '/:id',
   asyncHandler(async (req, res) => {
     const result = await expenseService.deleteExpense(req.params.id);
-    if ('error' in result) return apiError(res, result.error, result.status);
-    return apiSuccess(res, result.data, 'Expense deleted');
+    return sendResult(res, result, 'Expense deleted');
   })
 );
 

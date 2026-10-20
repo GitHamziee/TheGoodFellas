@@ -15,25 +15,122 @@ const PLAN_COST_FIELD: Record<PlanType, 'levelCost' | 'gradedCost' | 'modifiedCo
 
 async function perUserOutcome(
   role: 'JUNIOR_CLOSER' | 'CLOSER' | 'RETENTION',
-  groupField: 'juniorCloserId' | 'closerId' | 'retentionId'
+  groupField: 'juniorCloserId' | 'closerId' | 'retentionId',
+  range?: { from: Date; to: Date }
 ) {
   const users = await prisma.user.findMany({ where: { role }, select: { id: true, name: true, email: true } });
   const grouped = await prisma.lead.groupBy({
-    by: [groupField, 'status'],
+    by: [groupField, 'status', 'leadType'],
+    where: range ? { createdAt: { gte: range.from, lt: range.to } } : undefined,
     _count: { _all: true },
   });
 
   return users.map((user) => {
-    const rows = grouped.filter((g) => (g as any)[groupField] === user.id);
+    const rows = grouped.filter((g) => (g as Record<string, unknown>)[groupField] === user.id);
     const total = rows.reduce((sum, r) => sum + r._count._all, 0);
-    const accepted = rows.find((r) => r.status === 'ACCEPTED')?._count._all ?? 0;
-    const rejected = rows.find((r) => r.status === 'REJECTED')?._count._all ?? 0;
+    const count = (statuses: string[], leadType?: string) =>
+      rows
+        .filter((r) => statuses.includes(r.status) && (!leadType || r.leadType === leadType))
+        .reduce((sum, r) => sum + r._count._all, 0);
+    // Junior Closers are judged on their own hand-off: a CPA lead counts as accepted once it
+    // has reached the admin (past NEW, not sent back to them), but a CPL only once a Client
+    // accepts it. Rejected = the admin sent it back for correction. Everyone else is judged
+    // on the client's accept/reject.
+    const cpaTotal = rows.filter((r) => r.leadType === 'CPA').reduce((sum, r) => sum + r._count._all, 0);
+    const accepted =
+      role === 'JUNIOR_CLOSER'
+        ? cpaTotal - count(['NEW', 'DRAFT', 'RETURNED_TO_JUNIOR'], 'CPA') + count(['ACCEPTED'], 'CPL')
+        : count(['ACCEPTED']);
+    const rejected = role === 'JUNIOR_CLOSER' ? count(['RETURNED_TO_JUNIOR']) : count(['REJECTED']);
     return { id: user.id, name: user.name, email: user.email, total, accepted, rejected };
   });
 }
 
-export function juniorCloserAnalytics() {
-  return perUserOutcome('JUNIOR_CLOSER', 'juniorCloserId');
+/** Optional `range` limits the counts to leads created in [from, to). */
+export function juniorCloserAnalytics(range?: { from: Date; to: Date }) {
+  return perUserOutcome('JUNIOR_CLOSER', 'juniorCloserId', range);
+}
+
+/**
+ * Drill-down for one Junior Closer: every lead they submitted (masked — no phone/SSN/bank),
+ * the QA verdicts on their intake, the live-call issues flagged against them, and the team
+ * baseline to compare against. The client derives the breakdowns (trend, states, closers,
+ * outcomes) in memory from these rows, same convention as the QA reports. Null if the id
+ * isn't a Junior Closer.
+ */
+export async function juniorCloserDetail(id: string) {
+  const person = await prisma.user.findFirst({
+    where: { id, role: 'JUNIOR_CLOSER' },
+    select: { id: true, name: true, email: true, createdAt: true },
+  });
+  if (!person) return null;
+
+  const [leads, reviews, callIssues, teamRows] = await Promise.all([
+    prisma.lead.findMany({
+      where: { juniorCloserId: id },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        customerName: true,
+        leadType: true,
+        dCode: true,
+        state: true,
+        status: true,
+        planType: true,
+        paymentStatus: true,
+        returnReason: true,
+        createdAt: true,
+        updatedAt: true,
+        closer: { select: { id: true, name: true, email: true } },
+        client: { select: { id: true, name: true } },
+        externalClient: { select: { id: true, name: true } },
+      },
+    }),
+    prisma.leadReview.findMany({
+      where: { role: 'QA_JUNIOR_CLOSER', lead: { juniorCloserId: id } },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        leadId: true,
+        outcome: true,
+        comment: true,
+        createdAt: true,
+        reviewer: { select: { id: true, name: true, email: true } },
+        lead: { select: { customerName: true } },
+      },
+    }),
+    prisma.callReview.findMany({
+      where: { revieweeId: id },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        comment: true,
+        createdAt: true,
+        reviewer: { select: { id: true, name: true, email: true } },
+        lead: { select: { id: true, customerName: true } },
+      },
+    }),
+    juniorCloserAnalytics(),
+  ]);
+
+  const teamTotal = teamRows.reduce((s, r) => s + r.total, 0);
+  const teamAccepted = teamRows.reduce((s, r) => s + r.accepted, 0);
+  const teamRejected = teamRows.reduce((s, r) => s + r.rejected, 0);
+  const decided = teamAccepted + teamRejected;
+  const ranked = [...teamRows].sort((a, b) => b.total - a.total);
+
+  return {
+    person,
+    leads,
+    reviews,
+    callIssues,
+    team: {
+      people: teamRows.length,
+      avgTotal: teamRows.length ? Math.round((teamTotal / teamRows.length) * 10) / 10 : 0,
+      acceptRate: decided ? Math.round((teamAccepted / decided) * 100) : null,
+      volumeRank: ranked.findIndex((r) => r.id === id) + 1,
+    },
+  };
 }
 
 export function closerAnalytics() {
@@ -250,78 +347,31 @@ export async function clientPlanAnalytics() {
 }
 
 export async function overallAnalytics() {
-  const [totalLeads, byStatus, closedCount, unpaidAcceptedCount, staffCounts] = await Promise.all([
+  const [totalLeads, byStatus, closedCount, unpaidAcceptedCount, staffCounts, leads, chargeBacks] = await Promise.all([
     prisma.lead.count(),
     prisma.lead.groupBy({ by: ['status'], _count: { _all: true } }),
     prisma.lead.count({ where: { paymentStatus: 'PAID' } }),
     prisma.lead.count({ where: { status: 'ACCEPTED', paymentStatus: 'UNPAID' } }),
     prisma.user.groupBy({ by: ['role'], _count: { _all: true } }),
+    // One light row per lead — status, source, payment and dates only, no customer fields —
+    // so the page can slice by period and source in memory (same approach as the QA reports).
+    prisma.lead.findMany({ select: { status: true, leadType: true, paymentStatus: true, createdAt: true } }),
+    // The ChargeBack table is the audit trail: a charged-back lead's status moves on once it's
+    // reassigned, so counting CHARGED_BACK statuses would undercount.
+    prisma.chargeBack.findMany({ select: { createdAt: true, lead: { select: { leadType: true } } } }),
   ]);
 
   const statusCounts = Object.fromEntries(byStatus.map((s) => [s.status, s._count._all]));
   const roleCounts = Object.fromEntries(staffCounts.map((s) => [s.role, s._count._all]));
 
-  return { totalLeads, statusCounts, closedCount, unpaidAcceptedCount, roleCounts };
-}
-
-// ─── Drafts ─────────────────────────────────────────────────────
-// Counts/aging of parked (DRAFT) leads, per closer and per reason — helps admin spot
-// drafts that have gone stale. Aging is measured off updatedAt (last time the closer
-// touched it), not createdAt.
-export async function draftsAnalytics() {
-  // DRAFT is only reachable via saveLeadAsDraft, which requires a real closerId — a CPL
-  // lead (closerId null) can never become DRAFT, so `closer` below is always non-null.
-  const drafts = await prisma.lead.findMany({
-    where: { status: 'DRAFT' },
-    select: {
-      id: true,
-      customerName: true,
-      draftReason: true,
-      draftReasonNote: true,
-      createdAt: true,
-      updatedAt: true,
-      closer: { select: { id: true, name: true, email: true } },
-      // Null when the closer built the lead from scratch (self- or AI-sourced) — a CPA
-      // draft that started with a Junior Closer intake still carries it.
-      juniorCloser: { select: { id: true, name: true, email: true } },
-    },
-    orderBy: { updatedAt: 'asc' },
-  });
-
-  const now = Date.now();
-  const ageDays = (updatedAt: Date) => Math.floor((now - updatedAt.getTime()) / 86400000);
-
-  const byCloser = new Map<string, { id: string; name: string; email: string; count: number }>();
-  const byReason: Record<string, number> = {};
-  for (const d of drafts) {
-    // See the comment above — a DRAFT lead always has a closer, this is just the type guard.
-    if (!d.closer) continue;
-    const entry = byCloser.get(d.closer.id) ?? { id: d.closer.id, name: d.closer.name, email: d.closer.email, count: 0 };
-    entry.count += 1;
-    byCloser.set(d.closer.id, entry);
-    if (d.draftReason) byReason[d.draftReason] = (byReason[d.draftReason] ?? 0) + 1;
-  }
-
-  const ages = drafts.map((d) => ageDays(d.updatedAt));
-
   return {
-    total: drafts.length,
-    oldestDays: ages.length ? Math.max(...ages) : 0,
-    avgAgeDays: ages.length ? Math.round(ages.reduce((sum, n) => sum + n, 0) / ages.length) : 0,
-    byCloser: Array.from(byCloser.values()).sort((a, b) => b.count - a.count),
-    byReason,
-    drafts: drafts.map((d) => ({
-      id: d.id,
-      customerName: d.customerName,
-      draftReason: d.draftReason,
-      draftReasonNote: d.draftReasonNote,
-      createdAt: d.createdAt,
-      updatedAt: d.updatedAt,
-      ageDays: ageDays(d.updatedAt),
-      // Guaranteed non-null per the comment at the top of this function.
-      closer: { id: d.closer!.id, name: d.closer!.name },
-      juniorCloser: d.juniorCloser ? { id: d.juniorCloser.id, name: d.juniorCloser.name } : null,
-    })),
+    totalLeads,
+    statusCounts,
+    closedCount,
+    unpaidAcceptedCount,
+    roleCounts,
+    leads,
+    chargeBacks: chargeBacks.map((c) => ({ createdAt: c.createdAt, leadType: c.lead.leadType })),
   };
 }
 
@@ -341,7 +391,15 @@ export async function chargeBackAnalytics() {
       lead: {
         select: {
           customerName: true,
+          phone: true,
+          state: true,
+          planType: true,
+          status: true,
           closer: { select: { id: true, name: true, email: true } },
+          juniorCloser: { select: { id: true, name: true, email: true } },
+          // Who holds the lead now — only set once an admin has reassigned it.
+          client: { select: { id: true, name: true } },
+          externalClient: { select: { id: true, name: true } },
         },
       },
     },
@@ -377,6 +435,14 @@ export async function chargeBackAnalytics() {
       id: cb.id,
       leadId: cb.leadId,
       customerName: cb.lead.customerName,
+      phone: cb.lead.phone,
+      state: cb.lead.state,
+      planType: cb.lead.planType,
+      juniorCloser: cb.lead.juniorCloser,
+      // Null while the lead is still waiting for a new client.
+      reassignedTo: cb.lead.client?.name ?? cb.lead.externalClient?.name ?? null,
+      // CHARGED_BACK = still awaiting reassignment; anything else was reassigned since.
+      awaitingReassignment: cb.lead.status === 'CHARGED_BACK',
       client: cb.client,
       closer: cb.lead.closer,
       pkrAmount: cb.pkrAmount,

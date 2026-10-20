@@ -2,11 +2,11 @@ import bcrypt from "bcrypt";
 import type { Role } from "@prisma/client";
 import prisma from "../lib/prisma";
 import { signToken } from "../lib/jwt";
-import { isNonEmptyString, isValidEmail, isValidPassword } from "../lib/validation";
+import { INVALID_PHONE_MESSAGE, isNonEmptyString, isValidEmail, isValidPassword, normalizeUsPhone } from "../lib/validation";
 import { parseCarriers, parseStates } from "../lib/client-coverage";
 import { IP_EXEMPT_ROLES, isIpWhitelisted } from "../lib/ip-whitelist";
+import type { ServiceResult } from "../lib/service-result";
 
-type ServiceResult<T> = { data: T; status?: never; code?: never } | { error: string; status: number; code?: string };
 
 const SALT_ROUNDS = 10;
 
@@ -107,7 +107,12 @@ export async function createStaffUser(input: {
   if (!isValidEmail(email)) return { error: "Invalid email", status: 400 };
   if (!isValidPassword(password)) return { error: "Password must be at least 8 characters with an uppercase letter and a number", status: 400 };
   if (typeof role !== "string" || !STAFF_ROLES.includes(role as Role)) return { error: "Invalid role", status: 400 };
-  if (phone !== undefined && typeof phone !== "string") return { error: "Invalid phone", status: 400 };
+  let normalizedPhone: string | undefined;
+  if (phone !== undefined && phone !== null && phone !== "") {
+    const n = normalizeUsPhone(phone);
+    if (!n) return { error: INVALID_PHONE_MESSAGE, status: 400 };
+    normalizedPhone = n;
+  }
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) return { error: "An account with this email already exists", status: 409 };
@@ -160,7 +165,7 @@ export async function createStaffUser(input: {
       name,
       email,
       password: hashed,
-      phone,
+      phone: normalizedPhone,
       role: role as Role,
       ...coverage,
       ...(stateCarriersNested && stateCarriersNested.length

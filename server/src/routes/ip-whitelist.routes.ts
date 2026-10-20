@@ -1,9 +1,9 @@
 import { Router } from 'express';
-import { apiError, apiSuccess } from '../lib/api-response';
+import { apiError, apiSuccess, sendResult } from '../lib/api-response';
 import { asyncHandler } from '../lib/async-handler';
 import { authenticate, requireRole } from '../middleware/auth';
 import { getClientIp } from '../lib/client-ip';
-import { suggestWhitelistEntry } from '../lib/ip-whitelist';
+import { isNonRoutableIp, suggestWhitelistEntry } from '../lib/ip-whitelist';
 import * as ipWhitelistService from '../services/ip-whitelist.service';
 
 const router = Router();
@@ -26,6 +26,9 @@ router.get(
   '/detect',
   asyncHandler(async (req, res) => {
     const ip = getClientIp(req);
+    if (isNonRoutableIp(ip)) {
+      return apiError(res, `Could not detect your public IP (the server saw "${ip || 'unknown'}"). Open the app through its public address, or type your IP in manually.`, 422);
+    }
     return apiSuccess(res, { ip, suggested: suggestWhitelistEntry(ip) });
   })
 );
@@ -34,8 +37,7 @@ router.post(
   '/',
   asyncHandler(async (req, res) => {
     const result = await ipWhitelistService.addWhitelistedIp(req.body ?? {});
-    if ('error' in result) return apiError(res, result.error, result.status);
-    return apiSuccess(res, result.data, 'IP whitelisted', 201);
+    return sendResult(res, result, 'IP whitelisted', 201);
   })
 );
 
@@ -43,8 +45,7 @@ router.delete(
   '/:id',
   asyncHandler(async (req, res) => {
     const result = await ipWhitelistService.deleteWhitelistedIp(req.params.id);
-    if ('error' in result) return apiError(res, result.error, result.status);
-    return apiSuccess(res, result.data, 'IP removed');
+    return sendResult(res, result, 'IP removed');
   })
 );
 

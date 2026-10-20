@@ -1,8 +1,8 @@
 import prisma from '../lib/prisma';
-import { isNonEmptyString, isValidEmail } from '../lib/validation';
+import { INVALID_PHONE_MESSAGE, isNonEmptyString, isValidEmail, normalizeUsPhone } from '../lib/validation';
 import { parseCarriers, parseStates } from '../lib/client-coverage';
+import type { ServiceResult } from '../lib/service-result';
 
-type ServiceResult<T> = { data: T; status?: never } | { error: string; status: number };
 
 const SELECT = {
   id: true,
@@ -70,8 +70,13 @@ function validate(input: ExternalClientInput, requireName: boolean): { error: st
     data.email = input.email || null;
   }
   if (input.phone !== undefined) {
-    if (input.phone !== null && typeof input.phone !== 'string') return { error: 'Invalid phone' };
-    data.phone = input.phone;
+    if (input.phone === null || input.phone === '') {
+      data.phone = null;
+    } else {
+      const phone = normalizeUsPhone(input.phone);
+      if (!phone) return { error: INVALID_PHONE_MESSAGE };
+      data.phone = phone;
+    }
   }
   if (input.notes !== undefined) {
     if (input.notes !== null && typeof input.notes !== 'string') return { error: 'Invalid notes' };

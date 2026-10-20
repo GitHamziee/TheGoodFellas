@@ -13,9 +13,22 @@ router.use(authenticate);
 router.get(
   '/junior-closers',
   requireRole('ADMIN', 'MANAGER', 'TEAM_LEAD'),
-  asyncHandler(async (_req, res) => {
-    const rows = await analyticsService.juniorCloserAnalytics();
+  asyncHandler(async (req, res) => {
+    const from = new Date(String(req.query.from ?? ''));
+    const to = new Date(String(req.query.to ?? ''));
+    const range = !isNaN(from.getTime()) && !isNaN(to.getTime()) ? { from, to } : undefined;
+    const rows = await analyticsService.juniorCloserAnalytics(range);
     return apiSuccess(res, { rows });
+  })
+);
+
+router.get(
+  '/junior-closers/:id',
+  requireRole('ADMIN', 'MANAGER', 'TEAM_LEAD'),
+  asyncHandler(async (req, res) => {
+    const detail = await analyticsService.juniorCloserDetail(String(req.params.id));
+    if (!detail) return apiError(res, 'Junior closer not found', 404);
+    return apiSuccess(res, { detail });
   })
 );
 
@@ -66,16 +79,6 @@ router.get(
   asyncHandler(async (_req, res) => {
     const overall = await analyticsService.overallAnalytics();
     return apiSuccess(res, { overall });
-  })
-);
-
-// Admin-only — visibility into parked closer drafts, not part of Team Lead's oversight scope.
-router.get(
-  '/drafts',
-  requireRole('ADMIN', 'MANAGER'),
-  asyncHandler(async (_req, res) => {
-    const drafts = await analyticsService.draftsAnalytics();
-    return apiSuccess(res, { drafts });
   })
 );
 

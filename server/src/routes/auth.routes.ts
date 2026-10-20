@@ -18,17 +18,7 @@ router.post(
 
     const clientIp = getClientIp(req);
     const result = await authService.login(email, password, clientIp);
-    if ("error" in result) {
-      // TEMP DEBUG — remove once IP whitelisting is confirmed working end-to-end.
-      if (result.code === "IP_NOT_WHITELISTED") {
-        console.log("[ip-whitelist] login blocked", {
-          detectedIp: clientIp,
-          xForwardedFor: req.headers["x-forwarded-for"],
-          rawSocketIp: req.socket.remoteAddress,
-        });
-      }
-      return apiError(res, result.error, result.status, result.code);
-    }
+    if ("error" in result) return apiError(res, result.error, result.status, result.code);
     return apiSuccess(res, result.data);
   })
 );

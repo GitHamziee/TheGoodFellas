@@ -95,3 +95,16 @@ export function suggestWhitelistEntry(ip: string): string {
   if (!ip || isIpv4(ip)) return ip;
   return `${ipv6NetworkPrefix(ip, 64)}/64`;
 }
+
+/** True for addresses that can never identify a real remote network — loopback, unspecified,
+ * link-local and private ranges. Seeing one means the server is looking at its own proxy (or
+ * the admin's own machine) rather than the visitor, so there is nothing sensible to whitelist. */
+export function isNonRoutableIp(ip: string): boolean {
+  if (!ip) return true;
+  if (isIpv4(ip)) {
+    const [a, b] = ip.split(".").map(Number);
+    return a === 0 || a === 10 || a === 127 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127);
+  }
+  const lower = ip.toLowerCase();
+  return lower === "::" || lower === "::1" || /^f[cd]/.test(lower) || /^fe[89ab]/.test(lower);
+}

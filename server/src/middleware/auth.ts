@@ -31,12 +31,6 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
     }
 
     if (!IP_EXEMPT_ROLES.includes(user.role) && !(await isIpWhitelisted(getClientIp(req)))) {
-      // TEMP DEBUG — remove once IP whitelisting is confirmed working end-to-end.
-      console.log("[ip-whitelist] blocked", {
-        detectedIp: getClientIp(req),
-        xForwardedFor: req.headers["x-forwarded-for"],
-        rawSocketIp: req.socket.remoteAddress,
-      });
       return apiError(
         res,
         "This network is not authorized to use the app. Contact your admin to whitelist your IP.",

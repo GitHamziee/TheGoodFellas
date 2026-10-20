@@ -1,6 +1,9 @@
 import { Router } from "express";
-import type { Role } from "@prisma/client";
-import { apiError, apiSuccess } from "../lib/api-response";
+import { Role } from "@prisma/client";
+
+const isRole = (value: unknown): value is Role =>
+  typeof value === "string" && (Object.values(Role) as string[]).includes(value);
+import { apiError, apiSuccess, sendResult } from "../lib/api-response";
 import { asyncHandler } from "../lib/async-handler";
 import { authenticate, requireRole } from "../middleware/auth";
 import * as authService from "../services/auth.service";
@@ -69,7 +72,8 @@ router.get(
   "/",
   requireRole("ADMIN"),
   asyncHandler(async (req, res) => {
-    const role = req.query.role as Role | undefined;
+    const role = req.query.role;
+    if (role !== undefined && !isRole(role)) return apiError(res, "Invalid role", 400);
     const users = await userService.listUsers(role);
     return apiSuccess(res, { users });
   })
@@ -93,8 +97,7 @@ router.patch(
   asyncHandler(async (req, res) => {
     const { name, email, phone } = req.body ?? {};
     const result = await userService.updateUserProfile(req.params.id, { name, email, phone });
-    if ("error" in result) return apiError(res, result.error, result.status);
-    return apiSuccess(res, result.data, "Account updated");
+    return sendResult(res, result, "Account updated");
   })
 );
 
@@ -136,8 +139,7 @@ router.post(
       carriers,
       stateCarriers,
     });
-    if ("error" in result) return apiError(res, result.error, result.status);
-    return apiSuccess(res, result.data, "User created", 201);
+    return sendResult(res, result, "User created", 201);
   })
 );
 
@@ -147,6 +149,8 @@ router.patch(
   asyncHandler(async (req, res) => {
     const { role } = req.body ?? {};
     if (!role) return apiError(res, "Role is required", 400);
+    if (!isRole(role)) return apiError(res, "Invalid role", 400);
+    if (!(await userService.getUserById(req.params.id))) return apiError(res, "User not found", 404);
 
     const user = await userService.updateUserRole(req.params.id, role);
     return apiSuccess(res, { user }, "Role updated");
@@ -160,8 +164,7 @@ router.patch(
   requireRole("ADMIN"),
   asyncHandler(async (req, res) => {
     const result = await userService.updateClientPricing(req.params.id, req.body ?? {});
-    if ("error" in result) return apiError(res, result.error, result.status);
-    return apiSuccess(res, result.data, "Pricing updated");
+    return sendResult(res, result, "Pricing updated");
   })
 );
 
@@ -173,8 +176,7 @@ router.patch(
   requireRole("ADMIN"),
   asyncHandler(async (req, res) => {
     const result = await userService.updateClientCoverage(req.params.id, req.body ?? {});
-    if ("error" in result) return apiError(res, result.error, result.status);
-    return apiSuccess(res, result.data, "Coverage updated");
+    return sendResult(res, result, "Coverage updated");
   })
 );
 
@@ -185,8 +187,7 @@ router.patch(
   requireRole("ADMIN"),
   asyncHandler(async (req, res) => {
     const result = await userService.updateClientStateCarriers(req.params.id, req.body ?? {});
-    if ("error" in result) return apiError(res, result.error, result.status);
-    return apiSuccess(res, result.data, "Carrier availability updated");
+    return sendResult(res, result, "Carrier availability updated");
   })
 );
 
@@ -197,8 +198,7 @@ router.patch(
   asyncHandler(async (req, res) => {
     const { newPassword } = req.body ?? {};
     const result = await authService.resetPassword(req.params.id, newPassword);
-    if ("error" in result) return apiError(res, result.error, result.status);
-    return apiSuccess(res, result.data, "Password reset");
+    return sendResult(res, result, "Password reset");
   })
 );
 

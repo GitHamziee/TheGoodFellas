@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { apiError, apiSuccess } from '../lib/api-response';
+import { apiSuccess, sendResult } from '../lib/api-response';
 import { asyncHandler } from '../lib/async-handler';
 import { authenticate, requireRole } from '../middleware/auth';
 import * as callReviewService from '../services/call-review.service';
@@ -15,8 +15,7 @@ router.post(
       req.user! as { id: string; role: 'QA_JUNIOR_CLOSER' | 'QA_CLOSER' },
       req.body ?? {}
     );
-    if ('error' in result) return apiError(res, result.error, result.status);
-    return apiSuccess(res, result.data, 'Review recorded', 201);
+    return sendResult(res, result, 'Review recorded', 201);
   })
 );
 
@@ -28,8 +27,7 @@ router.get(
       req.user! as { id: string; role: 'QA_JUNIOR_CLOSER' | 'QA_CLOSER' },
       req.query.revieweeId
     );
-    if ('error' in result) return apiError(res, result.error, result.status);
-    return apiSuccess(res, result.data);
+    return sendResult(res, result);
   })
 );
 

@@ -1,7 +1,7 @@
 import prisma from '../lib/prisma';
 import { isNonEmptyString } from '../lib/validation';
+import type { ServiceResult } from '../lib/service-result';
 
-type ServiceResult<T> = { data: T; status?: never } | { error: string; status: number };
 
 const EXPENSE_SELECT = {
   id: true,

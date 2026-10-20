@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { apiError, apiSuccess } from '../lib/api-response';
+import { apiSuccess, sendResult } from '../lib/api-response';
 import { asyncHandler } from '../lib/async-handler';
 import { authenticate, requireRole } from '../middleware/auth';
 import * as externalClientService from '../services/external-client.service';
@@ -25,8 +25,7 @@ router.post(
   '/',
   asyncHandler(async (req, res) => {
     const result = await externalClientService.createExternalClient(req.body ?? {});
-    if ('error' in result) return apiError(res, result.error, result.status);
-    return apiSuccess(res, result.data, 'External client created', 201);
+    return sendResult(res, result, 'External client created', 201);
   })
 );
 
@@ -34,8 +33,7 @@ router.patch(
   '/:id',
   asyncHandler(async (req, res) => {
     const result = await externalClientService.updateExternalClient(req.params.id, req.body ?? {});
-    if ('error' in result) return apiError(res, result.error, result.status);
-    return apiSuccess(res, result.data, 'External client updated');
+    return sendResult(res, result, 'External client updated');
   })
 );
 

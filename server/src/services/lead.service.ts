@@ -1,4 +1,5 @@
 import prisma from '../lib/prisma';
+import { Prisma } from '@prisma/client';
 import { isNonEmptyString } from '../lib/validation';
 import {
   ADMIN_EDIT_FIELDS,
@@ -16,7 +17,31 @@ import {
 // CPL lead, and the junior needs to see/edit whichever field set they originally filled in.
 const JUNIOR_EDIT_FIELDS = Array.from(new Set<string>([...JUNIOR_INTAKE_FIELDS, ...CPL_INTAKE_FIELDS]));
 
-type ServiceResult<T> = { data: T; status?: never } | { error: string; status: number };
+import { notifyRoles, notifyUsers } from './notification.service';
+import type { ServiceResult } from '../lib/service-result';
+
+const ADMIN_TEAM = ['ADMIN', 'MANAGER'] as ('ADMIN' | 'MANAGER')[];
+const who = (name: string | null | undefined) => (name && name.trim() ? name.trim() : 'a customer');
+
+
+/** Thrown inside a guarded transaction when the status-guarded update moved fewer rows than expected. */
+class StaleTransitionError extends Error {}
+
+const STALE_TRANSITION_ERROR = {
+  error: 'Some of these leads were just changed by someone else. Refresh and try again.',
+  status: 409,
+} as const;
+
+/** Runs fn in an interactive transaction; resolves false (rolled back) on StaleTransitionError. */
+async function runGuardedTransaction(fn: (tx: Prisma.TransactionClient) => Promise<void>): Promise<boolean> {
+  try {
+    await prisma.$transaction(fn);
+    return true;
+  } catch (err) {
+    if (err instanceof StaleTransitionError) return false;
+    throw err;
+  }
+}
 
 // ─── Select fragments ────────────────────────────────────────────
 // Full detail — everyone with a legitimate reason to see everything (active work, admin, post-accept client).
@@ -60,6 +85,8 @@ const JUNIOR_VIEW_SELECT = {
   updatedAt: true,
   leadType: true,
   closer: { select: { id: true, name: true } },
+  // Only the verdict — never the reviewer or comment — so the junior can see their own QA pass rate.
+  qaReviews: { where: { role: 'QA_JUNIOR_CLOSER' }, select: { outcome: true } },
 } as const;
 
 // Closer's OWN history (leads no longer actively theirs to work, i.e. status != NEW) — same masking
@@ -133,32 +160,34 @@ export async function leadsInManagerScope(leadIds: string[]): Promise<boolean> {
   return outOfScope === 0;
 }
 
-// Client preview for an ASSIGNED-but-not-yet-accepted lead — enough to decide accept/reject,
-// none of the sensitive underwriting/financial/identity fields (SSN, bank/routing, DOB, etc.).
-const CLIENT_PREVIEW_SELECT = {
-  id: true,
-  customerName: true,
-  state: true,
-  zipcode: true,
-  need: true,
-  maritalStatus: true,
-  status: true,
-  createdAt: true,
-  updatedAt: true,
-  closer: { select: { id: true, name: true } },
-} as const;
-
-// Retention team's shared history list — just the columns the table shows. Details of a
-// submitted lead are for Clients only, so nothing beyond these is ever sent.
+// Retention team's shared history list — same anti-data-theft shape as CLOSER_HISTORY_SELECT:
+// name, outcome, dates and who worked it. No phone/state/carrier once a lead has left the
+// queue, and details of a submitted lead are for Clients only.
 const RETENTION_HISTORY_SELECT = {
   id: true,
   customerName: true,
-  phone: true,
-  state: true,
-  carrierName: true,
   status: true,
   createdAt: true,
   updatedAt: true,
+  retention: { select: { id: true, name: true } },
+  client: { select: { id: true, name: true } },
+} as const;
+
+// Retention's queue LIST — masked like CLOSER_INBOX_PREVIEW_SELECT (no phone, no carrier, no
+// PII/financial fields). Full detail only opens via getLeadById once a lead is actually
+// opened to work. The draft/return reasons are workflow notes, not customer data — the list
+// shows them so a sent-back lead says what to fix and a draft says why it was parked.
+const RETENTION_QUEUE_PREVIEW_SELECT = {
+  id: true,
+  customerName: true,
+  state: true,
+  status: true,
+  leadType: true,
+  createdAt: true,
+  updatedAt: true,
+  draftReason: true,
+  draftReasonNote: true,
+  returnReason: true,
   retention: { select: { id: true, name: true } },
 } as const;
 
@@ -181,8 +210,15 @@ export async function submitLead(
   if (!closer || closer.role !== 'CLOSER') return { error: 'Selected closer is invalid', status: 400 };
 
   const lead = await prisma.lead.create({
-    data: { juniorCloserId, closerId: input.closerId, ...data } as any,
+    data: { juniorCloserId, closerId: input.closerId, ...data } as Prisma.LeadUncheckedCreateInput,
     include: FULL_INCLUDE,
+  });
+
+  void notifyUsers([input.closerId], {
+    kind: 'info',
+    title: 'New lead assigned to you',
+    message: `${who(lead.customerName)} was sent to you by ${lead.juniorCloser?.name ?? 'a junior closer'}.`,
+    page: 'INBOX',
   });
 
   return { data: { lead } };
@@ -206,8 +242,15 @@ export async function submitCplLead(
   if (!isNonEmptyString(data.state)) return { error: 'State is required', status: 400 };
 
   const lead = await prisma.lead.create({
-    data: { juniorCloserId, leadType: 'CPL', status: 'SUBMITTED', ...data } as any,
+    data: { juniorCloserId, leadType: 'CPL', status: 'SUBMITTED', ...data } as Prisma.LeadUncheckedCreateInput,
     include: FULL_INCLUDE,
+  });
+
+  void notifyRoles(ADMIN_TEAM, {
+    kind: 'info',
+    title: 'New CPL lead submitted',
+    message: `${who(lead.customerName)} is waiting in the CPL queue.`,
+    page: 'ADMIN_CPL',
   });
 
   return { data: { lead } };
@@ -252,9 +295,16 @@ export async function resubmitByJuniorCloser(
 
   const updated = await prisma.lead.updateMany({
     where: { id: leadId, status: 'RETURNED_TO_JUNIOR', juniorCloserId },
-    data: { ...data, status: 'SUBMITTED', returnReason: null } as any,
+    data: { ...data, status: 'SUBMITTED', returnReason: null },
   });
   if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
+
+  void notifyRoles(ADMIN_TEAM, {
+    kind: 'success',
+    title: 'Lead corrected and resubmitted',
+    message: `${who(data.customerName as string)} was fixed by the junior closer and is back in your queue.`,
+    page: 'ADMIN_LEADS',
+  });
 
   // Deliberately the masked view — correcting a lead doesn't earn ongoing visibility.
   const result = await prisma.lead.findUnique({ where: { id: leadId }, select: JUNIOR_VIEW_SELECT });
@@ -336,7 +386,7 @@ export async function saveLeadAsDraft(
 
   const updated = await prisma.lead.updateMany({
     where: { id: leadId, status: lead.status, closerId },
-    data: { ...data, ...suggested, status: 'DRAFT' } as any,
+    data: { ...data, ...suggested, status: 'DRAFT' },
   });
   if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
 
@@ -369,9 +419,16 @@ export async function enrichAndSubmitLead(
 
   const updated = await prisma.lead.updateMany({
     where: { id: leadId, status: lead.status, closerId },
-    data: { ...sanitized.data, ...suggested, status: 'SUBMITTED', draftReason: null, draftReasonNote: null } as any,
+    data: { ...sanitized.data, ...suggested, status: 'SUBMITTED', draftReason: null, draftReasonNote: null },
   });
   if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
+
+  void notifyRoles(ADMIN_TEAM, {
+    kind: 'info',
+    title: 'Lead submitted by a closer',
+    message: `${who(lead.customerName)} is ready for you to assign.`,
+    page: 'ADMIN_LEADS',
+  });
 
   const result = await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE });
   return { data: { lead: result } };
@@ -407,9 +464,16 @@ export async function resubmitByCloser(
 
   const updated = await prisma.lead.updateMany({
     where: { id: leadId, status: 'RETURNED_TO_CLOSER', closerId },
-    data: { ...sanitized.data, ...suggested, status: 'SUBMITTED', returnReason: null } as any,
+    data: { ...sanitized.data, ...suggested, status: 'SUBMITTED', returnReason: null },
   });
   if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
+
+  void notifyRoles(ADMIN_TEAM, {
+    kind: 'success',
+    title: 'Lead corrected and resubmitted',
+    message: `${who(lead.customerName)} was re-written by the closer and is back in your queue.`,
+    page: 'ADMIN_LEADS',
+  });
 
   const result = await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE });
   return { data: { lead: result } };
@@ -437,8 +501,15 @@ export async function createLeadByCloser(
   if ('error' in suggested) return { error: suggested.error, status: 400 };
 
   const lead = await prisma.lead.create({
-    data: { closerId, status: 'SUBMITTED', ...data, ...suggested } as any,
+    data: { closerId, status: 'SUBMITTED', ...data, ...suggested } as Prisma.LeadUncheckedCreateInput,
     include: FULL_INCLUDE,
+  });
+
+  void notifyRoles(ADMIN_TEAM, {
+    kind: 'info',
+    title: 'Lead submitted by a closer',
+    message: `${who(lead.customerName)} is ready for you to assign.`,
+    page: 'ADMIN_LEADS',
   });
 
   return { data: { lead } };
@@ -468,7 +539,7 @@ export async function createDraftByCloser(
   if ('error' in suggested) return { error: suggested.error, status: 400 };
 
   const lead = await prisma.lead.create({
-    data: { closerId, status: 'DRAFT', ...data, ...suggested } as any,
+    data: { closerId, status: 'DRAFT', ...data, ...suggested } as Prisma.LeadUncheckedCreateInput,
     include: FULL_INCLUDE,
   });
 
@@ -510,6 +581,13 @@ export async function assignLeadToClient(leadId: string, clientId: string): Prom
   });
   if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
 
+  void notifyUsers([clientId], {
+    kind: 'success',
+    title: 'New lead for you',
+    message: `${who(lead.customerName)} has been assigned to you — review and accept or reject.`,
+    page: lead.leadType === 'CPL' ? 'CLIENT_CPL' : 'CLIENT_CPA',
+  });
+
   const result = await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE });
   return { data: { lead: result } };
 }
@@ -546,8 +624,12 @@ export async function assignLeadToExternalClient(
  * for admin to hand out via assignLeadToRetention below — mirrors what the old sheet
  * import used to produce.
  */
-export async function submitRetentionIntake(input: Record<string, unknown>): Promise<ServiceResult<{ lead: unknown }>> {
-  const sanitized = sanitizeLeadFields(input, RETENTION_INTAKE_FIELDS);
+export async function submitRetentionIntake(
+  input: Record<string, unknown>,
+  // Set only by the Google Sheet sync: its dedupe key, and the sheet's date block as createdAt.
+  sheet?: { sheetKey: string; createdAt: Date }
+): Promise<ServiceResult<{ lead: unknown }>> {
+  const sanitized = sanitizeLeadFields(input, RETENTION_INTAKE_FIELDS, { retention: true });
   if ('error' in sanitized) return { error: sanitized.error, status: 400 };
   const { data } = sanitized;
 
@@ -556,7 +638,7 @@ export async function submitRetentionIntake(input: Record<string, unknown>): Pro
   if (!isNonEmptyString(data.state as string | undefined)) return { error: 'State is required', status: 400 };
 
   const lead = await prisma.lead.create({
-    data: { leadType: 'RETENTION', status: 'NEW', ...data } as any,
+    data: { leadType: 'RETENTION', status: 'NEW', ...data, ...sheet } as Prisma.LeadUncheckedCreateInput,
     include: FULL_INCLUDE,
   });
   return { data: { lead } };
@@ -602,8 +684,48 @@ export async function assignLeadToRetention(leadId: string, retentionId: string)
   });
   if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
 
+  void notifyUsers([retentionId], {
+    kind: 'info',
+    title: 'New retention lead',
+    message: `${who(lead.customerName)} was assigned to the retention team.`,
+    page: 'INBOX',
+  });
+
   const result = await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE });
   return { data: { lead: result } };
+}
+
+/**
+ * Batch form of assignLeadToRetention — admin ticks many unworked RETENTION leads and hands
+ * them all to one Retention person. Same eligibility (RETENTION + NEW); ineligible ids are
+ * silently skipped, like batchDecideAsAdmin. One summary notification, not one per lead.
+ */
+export async function batchAssignToRetention(
+  leadIds: unknown,
+  retentionId: unknown
+): Promise<ServiceResult<{ count: number }>> {
+  if (!Array.isArray(leadIds) || leadIds.length === 0 || !leadIds.every((id) => typeof id === 'string')) {
+    return { error: 'Select at least one lead', status: 400 };
+  }
+  if (!isNonEmptyString(retentionId)) return { error: 'retentionId is required', status: 400 };
+
+  const person = await prisma.user.findUnique({ where: { id: retentionId } });
+  if (!person || person.role !== 'RETENTION') return { error: 'Selected retention person is invalid', status: 400 };
+
+  const updated = await prisma.lead.updateMany({
+    where: { id: { in: leadIds }, leadType: 'RETENTION', status: 'NEW' },
+    data: { retentionId },
+  });
+  if (updated.count === 0) return { error: 'None of the selected leads are available for assignment', status: 400 };
+
+  void notifyUsers([retentionId], {
+    kind: 'info',
+    title: updated.count === 1 ? 'New retention lead' : 'New retention leads',
+    message: `${updated.count} ${updated.count === 1 ? 'lead was' : 'leads were'} assigned to you.`,
+    page: 'INBOX',
+  });
+
+  return { data: { count: updated.count } };
 }
 
 const EDITABLE_STATUSES = ['REJECTED', 'CHARGED_BACK'] as const;
@@ -613,20 +735,24 @@ export async function editLead(leadId: string, input: Record<string, unknown>): 
   const lead = await prisma.lead.findUnique({ where: { id: leadId } });
   if (!lead) return { error: 'Lead not found', status: 404 };
   if (!EDITABLE_STATUSES.includes(lead.status as (typeof EDITABLE_STATUSES)[number])) {
-    return { error: 'Only rejected or charged-back leads can be edited', status: 400 };
+    return { error: 'Only declined or charged-back leads can be edited', status: 400 };
   }
 
   // A CPL lead never acquires Closer-only fields — not even Admin fills those in.
-  const sanitized = sanitizeLeadFields(input, lead.leadType === 'CPL' ? CPL_INTAKE_FIELDS : ADMIN_EDIT_FIELDS);
+  const sanitized = sanitizeLeadFields(input, lead.leadType === 'CPL' ? CPL_INTAKE_FIELDS : ADMIN_EDIT_FIELDS, { retention: lead.leadType === 'RETENTION' });
   if ('error' in sanitized) return { error: sanitized.error, status: 400 };
 
-  const updated = await prisma.lead.update({
-    where: { id: leadId },
-    data: sanitized.data as any,
-    include: FULL_INCLUDE,
-  });
+  // An empty edit is a no-op save, not a conflict — skip the write rather than read its count.
+  if (Object.keys(sanitized.data).length > 0) {
+    const updated = await prisma.lead.updateMany({
+      where: { id: leadId, status: lead.status },
+      data: sanitized.data,
+    });
+    if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
+  }
 
-  return { data: { lead: updated } };
+  const result = await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE });
+  return { data: { lead: result } };
 }
 
 /**
@@ -676,6 +802,14 @@ export async function returnLeadForEdit(
   });
   if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
 
+  const returnedTo = target === 'JUNIOR_CLOSER' ? lead.juniorCloserId : target === 'CLOSER' ? lead.closerId : lead.retentionId;
+  void notifyUsers([returnedTo], {
+    kind: 'warning',
+    title: 'Lead sent back for correction',
+    message: `${who(lead.customerName)}: ${reason.trim()}`,
+    page: 'RETURNED',
+  });
+
   const result = await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE });
   return { data: { lead: result } };
 }
@@ -690,16 +824,17 @@ export async function setLeadPaymentStatus(leadId: string): Promise<ServiceResul
   const lead = await prisma.lead.findUnique({ where: { id: leadId } });
   if (!lead) return { error: 'Lead not found', status: 404 };
   if (lead.status !== 'ACCEPTED' && lead.status !== 'ASSIGNED_EXTERNAL') {
-    return { error: 'Only accepted or externally-assigned leads can be marked paid/unpaid', status: 400 };
+    return { error: 'Only approved or externally-assigned leads can be marked paid/unpaid', status: 400 };
   }
 
-  const updated = await prisma.lead.update({
-    where: { id: leadId },
+  const updated = await prisma.lead.updateMany({
+    where: { id: leadId, status: lead.status },
     data: { paymentStatus: 'UNPAID', closedAt: null },
-    include: FULL_INCLUDE,
   });
+  if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
 
-  return { data: { lead: updated } };
+  const result = await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE });
+  return { data: { lead: result } };
 }
 
 /**
@@ -731,19 +866,24 @@ export async function batchMarkPaid(
 
   const eligibleIds = eligible.map((l) => l.id);
 
-  await prisma.$transaction([
-    prisma.incomePayment.create({
+  // Guarded update first: if a concurrent batch already paid any of these leads, the row lock
+  // makes this updateMany see them as PAID, the count comes up short, and the whole
+  // transaction rolls back — so income is never recorded twice for the same lead.
+  const applied = await runGuardedTransaction(async (tx) => {
+    const updated = await tx.lead.updateMany({
+      where: { id: { in: eligibleIds }, status: { in: ['ACCEPTED', 'ASSIGNED_EXTERNAL'] }, paymentStatus: 'UNPAID' },
+      data: { paymentStatus: 'PAID', closedAt: new Date() },
+    });
+    if (updated.count !== eligibleIds.length) throw new StaleTransitionError();
+    await tx.incomePayment.create({
       data: {
         pkrAmount: Math.trunc(amountNum),
         note: isNonEmptyString(note) ? note.trim() : null,
         leads: { connect: eligibleIds.map((id) => ({ id })) },
       },
-    }),
-    prisma.lead.updateMany({
-      where: { id: { in: eligibleIds } },
-      data: { paymentStatus: 'PAID', closedAt: new Date() },
-    }),
-  ]);
+    });
+  });
+  if (!applied) return STALE_TRANSITION_ERROR;
 
   return { data: { count: eligibleIds.length } };
 }
@@ -777,27 +917,28 @@ export async function markLeadChargedBack(
   const lead = await prisma.lead.findUnique({ where: { id: leadId } });
   if (!lead) return { error: 'Lead not found', status: 404 };
   if (lead.status !== 'ACCEPTED' || lead.paymentStatus !== 'PAID') {
-    return { error: 'Only an accepted, paid lead can be charged back', status: 400 };
+    return { error: 'Only an approved, paid lead can be charged back', status: 400 };
   }
   if (!lead.clientId) return { error: 'Lead has no client on record', status: 400 };
 
   const pkr = Math.trunc(amountNum);
 
-  await prisma.$transaction([
-    prisma.chargeBack.create({
-      data: { leadId, clientId: lead.clientId, pkrAmount: pkr, reason: reason.trim() },
-    }),
-    // Mirror the chargeback into the Expenses ledger as a negative entry so the books
-    // reflect it without a second manual step. Expense has no edit/link by design, so the
-    // description carries the lead + reason.
-    prisma.expense.create({
-      data: { description: `Charge-back: ${lead.customerName} — ${reason.trim()}`, amount: -pkr },
-    }),
-    prisma.lead.updateMany({
+  const clientId = lead.clientId;
+  // Guarded update first, ChargeBack row only if it actually moved the lead — a concurrent
+  // charge-back of the same lead rolls back instead of recording the money twice.
+  const applied = await runGuardedTransaction(async (tx) => {
+    const updated = await tx.lead.updateMany({
       where: { id: leadId, status: 'ACCEPTED', paymentStatus: 'PAID' },
       data: { status: 'CHARGED_BACK', clientId: null, paymentStatus: 'UNPAID', closedAt: null },
-    }),
-  ]);
+    });
+    if (updated.count !== 1) throw new StaleTransitionError();
+    // Deliberately NOT mirrored into Expenses: a charge-back is made good by a replacement
+    // lead, so it doesn't count as money lost.
+    await tx.chargeBack.create({
+      data: { leadId, clientId, pkrAmount: pkr, reason: reason.trim() },
+    });
+  });
+  if (!applied) return STALE_TRANSITION_ERROR;
 
   const result = await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE });
   return { data: { lead: result } };
@@ -808,7 +949,7 @@ export async function markLeadChargedBack(
  * one reason for however many selected leads are actually eligible (ACCEPTED + PAID with
  * a client on record — ineligible ids are silently skipped). The total is split evenly
  * across the leads (remainder on the first) so per-lead ChargeBack rows still sum to what
- * the admin entered; the Expenses ledger gets a single negative entry for the batch.
+ * the admin entered. Nothing is written to the Expenses ledger (replacements cover it).
  */
 export async function batchChargeBack(
   leadIds: unknown,
@@ -833,22 +974,24 @@ export async function batchChargeBack(
   const share = Math.floor(total / eligible.length);
   const remainder = total - share * eligible.length;
   const trimmedReason = reason.trim();
-  const names = eligible.map((l) => l.customerName).join(', ');
 
-  await prisma.$transaction([
-    ...eligible.map((l, i) =>
-      prisma.chargeBack.create({
-        data: { leadId: l.id, clientId: l.clientId!, pkrAmount: share + (i === 0 ? remainder : 0), reason: trimmedReason },
-      })
-    ),
-    prisma.expense.create({
-      data: { description: `Charge-back: ${names} — ${trimmedReason}`, amount: -total },
-    }),
-    prisma.lead.updateMany({
-      where: { id: { in: eligible.map((l) => l.id) }, status: 'ACCEPTED', paymentStatus: 'PAID' },
+  // Same guard as batchMarkPaid: update first, abort the whole batch if any lead moved.
+  const applied = await runGuardedTransaction(async (tx) => {
+    const updated = await tx.lead.updateMany({
+      where: { id: { in: eligible.map((l) => l.id) }, status: 'ACCEPTED', paymentStatus: 'PAID', clientId: { not: null } },
       data: { status: 'CHARGED_BACK', clientId: null, paymentStatus: 'UNPAID', closedAt: null },
-    }),
-  ]);
+    });
+    if (updated.count !== eligible.length) throw new StaleTransitionError();
+    await tx.chargeBack.createMany({
+      data: eligible.map((l, i) => ({
+        leadId: l.id,
+        clientId: l.clientId!,
+        pkrAmount: share + (i === 0 ? remainder : 0),
+        reason: trimmedReason,
+      })),
+    });
+  });
+  if (!applied) return STALE_TRANSITION_ERROR;
 
   return { data: { count: eligible.length } };
 }
@@ -911,7 +1054,7 @@ export async function createLeadByRetention(
   retentionId: string,
   input: Record<string, unknown>
 ): Promise<ServiceResult<{ lead: unknown }>> {
-  const sanitized = sanitizeLeadFields(input, FULL_LEAD_FIELDS);
+  const sanitized = sanitizeLeadFields(input, FULL_LEAD_FIELDS, { retention: true });
   if ('error' in sanitized) return { error: sanitized.error, status: 400 };
   const { data } = sanitized;
 
@@ -923,8 +1066,15 @@ export async function createLeadByRetention(
   if ('error' in suggested) return { error: suggested.error, status: 400 };
 
   const lead = await prisma.lead.create({
-    data: { retentionId, leadType: 'RETENTION', status: 'SUBMITTED', ...data, ...suggested } as any,
+    data: { retentionId, leadType: 'RETENTION', status: 'SUBMITTED', ...data, ...suggested } as Prisma.LeadUncheckedCreateInput,
     include: FULL_INCLUDE,
+  });
+
+  void notifyRoles(ADMIN_TEAM, {
+    kind: 'info',
+    title: 'Retention lead submitted',
+    message: `${who(lead.customerName)} is ready for you to assign.`,
+    page: 'ADMIN_LEADS',
   });
 
   return { data: { lead } };
@@ -940,7 +1090,7 @@ export async function createDraftByRetention(
   retentionId: string,
   input: Record<string, unknown>
 ): Promise<ServiceResult<{ lead: unknown }>> {
-  const sanitized = sanitizeLeadFields(input, FULL_LEAD_DRAFT_FIELDS);
+  const sanitized = sanitizeLeadFields(input, FULL_LEAD_DRAFT_FIELDS, { retention: true });
   if ('error' in sanitized) return { error: sanitized.error, status: 400 };
   const { data } = sanitized;
 
@@ -954,7 +1104,7 @@ export async function createDraftByRetention(
   if ('error' in suggested) return { error: suggested.error, status: 400 };
 
   const lead = await prisma.lead.create({
-    data: { retentionId, leadType: 'RETENTION', status: 'DRAFT', ...data, ...suggested } as any,
+    data: { retentionId, leadType: 'RETENTION', status: 'DRAFT', ...data, ...suggested } as Prisma.LeadUncheckedCreateInput,
     include: FULL_INCLUDE,
   });
 
@@ -970,16 +1120,19 @@ export async function createDraftByRetention(
 export async function listRetentionQueue() {
   return prisma.lead.findMany({
     where: { leadType: 'RETENTION', retentionId: { not: null }, status: { in: ['NEW', 'DRAFT', 'RETURNED_TO_RETENTION'] } },
-    include: FULL_INCLUDE,
+    select: RETENTION_QUEUE_PREVIEW_SELECT,
     orderBy: { updatedAt: 'desc' },
   });
 }
 
 /** Any Retention teammate may edit and submit any other's lead — confirmed, no ownership check.
+ * Whoever submits becomes the lead's retention person (retentionId), so the admin sees who
+ * actually did the work rather than who it was first assigned to.
  * Also the resubmit path once admin sends a lead back (RETURNED_TO_RETENTION) — clears
  * returnReason the same way resubmitByCloser/resubmitByJuniorCloser do. */
 export async function enrichAndSubmitRetentionLead(
   leadId: string,
+  submitterId: string,
   input: Record<string, unknown>
 ): Promise<ServiceResult<{ lead: unknown }>> {
   const lead = await prisma.lead.findUnique({ where: { id: leadId } });
@@ -989,7 +1142,7 @@ export async function enrichAndSubmitRetentionLead(
     return { error: 'Lead has already been submitted', status: 400 };
   }
 
-  const sanitized = sanitizeLeadFields(input, FULL_LEAD_FIELDS);
+  const sanitized = sanitizeLeadFields(input, FULL_LEAD_FIELDS, { retention: true });
   if ('error' in sanitized) return { error: sanitized.error, status: 400 };
 
   const suggested = await resolveSuggestedClientId((input as Record<string, unknown>).suggestedClientId);
@@ -997,9 +1150,16 @@ export async function enrichAndSubmitRetentionLead(
 
   const updated = await prisma.lead.updateMany({
     where: { id: leadId, status: lead.status },
-    data: { ...sanitized.data, ...suggested, status: 'SUBMITTED', draftReason: null, draftReasonNote: null, returnReason: null } as any,
+    data: { ...sanitized.data, ...suggested, retentionId: submitterId, status: 'SUBMITTED', draftReason: null, draftReasonNote: null, returnReason: null },
   });
   if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
+
+  void notifyRoles(ADMIN_TEAM, {
+    kind: 'info',
+    title: 'Retention lead submitted',
+    message: `${who(lead.customerName)} is ready for you to assign.`,
+    page: 'ADMIN_LEADS',
+  });
 
   const result = await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE });
   return { data: { lead: result } };
@@ -1020,7 +1180,7 @@ export async function saveRetentionLeadAsDraft(
     return { error: 'Only a lead still in the queue can be saved as a draft', status: 400 };
   }
 
-  const sanitized = sanitizeLeadFields(input, FULL_LEAD_DRAFT_FIELDS);
+  const sanitized = sanitizeLeadFields(input, FULL_LEAD_DRAFT_FIELDS, { retention: true });
   if ('error' in sanitized) return { error: sanitized.error, status: 400 };
   const { data } = sanitized;
 
@@ -1032,7 +1192,7 @@ export async function saveRetentionLeadAsDraft(
 
   const updated = await prisma.lead.updateMany({
     where: { id: leadId, status: lead.status },
-    data: { ...data, ...suggested, status: 'DRAFT' } as any,
+    data: { ...data, ...suggested, status: 'DRAFT' },
   });
   if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
 
@@ -1160,9 +1320,13 @@ export async function submitQaReview(
       },
     });
     return { data: { review } };
-  } catch {
+  } catch (err) {
     // Unique (leadId, role) violation — someone on the same QA lane already reviewed this lead.
-    return { error: 'This lead has already been reviewed', status: 409 };
+    // Anything else is a real failure and goes to the error middleware.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      return { error: 'This lead has already been reviewed', status: 409 };
+    }
+    throw err;
   }
 }
 
@@ -1185,6 +1349,49 @@ export async function listHistoryForClient(clientId: string) {
   });
 }
 
+/**
+ * Client corrects an offered lead before deciding on it. Only while it's ASSIGNED to them;
+ * status stays ASSIGNED (editing is not a decision). Same per-type allowlists as the admin's
+ * edit — a CPL lead never acquires CPA-only fields.
+ */
+export async function editAssignedLeadByClient(
+  leadId: string,
+  clientId: string,
+  input: Record<string, unknown>
+): Promise<ServiceResult<{ lead: unknown }>> {
+  const lead = await prisma.lead.findUnique({ where: { id: leadId } });
+  if (!lead) return { error: 'Lead not found', status: 404 };
+  if (lead.clientId !== clientId) return { error: 'Lead is not assigned to you', status: 403 };
+  if (lead.status !== 'ASSIGNED') return { error: 'Only leads awaiting your decision can be edited', status: 400 };
+
+  const allowed: readonly string[] = lead.leadType === 'CPL' ? CPL_INTAKE_FIELDS : ADMIN_EDIT_FIELDS;
+  const sanitized = sanitizeLeadFields(input, allowed, { retention: lead.leadType === 'RETENTION' });
+  if ('error' in sanitized) return { error: sanitized.error, status: 400 };
+  const data: Record<string, unknown> = { ...sanitized.data };
+
+  // The client form shows every field, so a field sent blank means "clear it" (the generic
+  // sanitizer skips blanks, which would make a wrong value impossible to remove).
+  const REQUIRED = ['customerName', 'phone', 'state'];
+  for (const key of allowed) {
+    if (!(key in data) && key in input && (input[key] === '' || input[key] === null) && !REQUIRED.includes(key)) {
+      data[key] = null;
+    }
+  }
+
+  if (!isNonEmptyString(data.customerName ?? lead.customerName)) return { error: "Customer's name is required", status: 400 };
+  if (!isNonEmptyString(data.phone ?? lead.phone)) return { error: 'Phone number is required', status: 400 };
+  if (!isNonEmptyString(data.state ?? lead.state)) return { error: 'State is required', status: 400 };
+
+  const updated = await prisma.lead.updateMany({
+    where: { id: leadId, status: 'ASSIGNED', clientId },
+    data: data,
+  });
+  if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
+
+  const result = await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE });
+  return { data: { lead: result } };
+}
+
 export async function acceptLead(leadId: string, clientId: string): Promise<ServiceResult<{ lead: unknown }>> {
   const lead = await prisma.lead.findUnique({ where: { id: leadId } });
   if (!lead) return { error: 'Lead not found', status: 404 };
@@ -1197,6 +1404,19 @@ export async function acceptLead(leadId: string, clientId: string): Promise<Serv
   });
   if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
 
+  void notifyRoles(ADMIN_TEAM, {
+    kind: 'success',
+    title: 'Lead accepted',
+    message: `A client accepted ${who(lead.customerName)}.`,
+    page: 'ADMIN_LEADS',
+  });
+  void notifyUsers([lead.closerId, lead.juniorCloserId], {
+    kind: 'success',
+    title: 'Your lead was accepted',
+    message: `${who(lead.customerName)} was accepted by the client.`,
+    page: 'HISTORY',
+  });
+
   const result = await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE });
   return { data: { lead: result } };
 }
@@ -1207,11 +1427,45 @@ export async function rejectLead(leadId: string, clientId: string, reason?: stri
   if (lead.clientId !== clientId) return { error: 'Lead is not assigned to you', status: 403 };
   if (lead.status !== 'ASSIGNED') return { error: 'Lead is not awaiting a response', status: 400 };
 
+  // A CPA lead with a closer goes straight back to them for a re-write, carrying the reason.
+  // A CPL lead (no closer) goes back to its junior closer the same way.
+  const toCloser = lead.leadType === 'CPA' && !!lead.closerId;
+  const toJunior = lead.leadType === 'CPL' && !!lead.juniorCloserId;
+  const trimmed = isNonEmptyString(reason) ? reason.trim() : null;
+
   const updated = await prisma.lead.updateMany({
     where: { id: leadId, status: 'ASSIGNED', clientId },
-    data: { status: 'REJECTED', clientId: null, rejectionReason: reason ?? null },
+    data: toCloser
+      ? { status: 'RETURNED_TO_CLOSER', clientId: null, rejectionReason: trimmed, returnReason: trimmed ?? 'Rejected by client' }
+      : toJunior
+      ? { status: 'RETURNED_TO_JUNIOR', clientId: null, rejectionReason: trimmed, returnReason: trimmed ?? 'Rejected by client' }
+      : { status: 'REJECTED', clientId: null, rejectionReason: reason ?? null },
   });
   if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
+
+  const why = trimmed ? ` Reason: ${trimmed}` : '';
+  if (toCloser) {
+    void notifyUsers([lead.closerId], {
+      kind: 'warning',
+      title: 'Client rejected your lead',
+      message: `${who(lead.customerName)} needs a re-write.${why}`,
+      page: 'RETURNED',
+    });
+  }
+  if (toJunior) {
+    void notifyUsers([lead.juniorCloserId], {
+      kind: 'warning',
+      title: 'Client rejected your lead',
+      message: `${who(lead.customerName)} needs a re-write.${why}`,
+      page: 'RETURNED',
+    });
+  }
+  void notifyRoles(ADMIN_TEAM, {
+    kind: 'danger',
+    title: 'Lead rejected by client',
+    message: `${who(lead.customerName)} was rejected.${why}`,
+    page: 'ADMIN_LEADS',
+  });
 
   const result = await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE });
   return { data: { lead: result } };
@@ -1222,20 +1476,100 @@ export async function rejectLead(leadId: string, clientId: string, reason?: stri
 // practice the decision is often made over a phone call — the admin needs to record it
 // without waiting for the client to log in. No ownership check (unlike acceptLead above):
 // the admin isn't the client, they're recording the client's decision on their behalf.
-export async function approveLeadAsAdmin(leadId: string): Promise<ServiceResult<{ lead: unknown }>> {
-  const lead = await prisma.lead.findUnique({ where: { id: leadId } });
-  if (!lead) return { error: 'Lead not found', status: 404 };
-  if (lead.status !== 'ASSIGNED') return { error: 'Lead is not awaiting a response', status: 400 };
-  if (!lead.clientId) return { error: 'Lead is not assigned to a client', status: 400 };
+//
+// Batch, like batchMarkPaid: the admin ticks leads and picks Accept or Reject. Covers both
+// ASSIGNED (a CLIENT account) and ASSIGNED_EXTERNAL (an ExternalClient, who has no login and
+// so can only ever be decided for by the admin). Accept → ACCEPTED, keeping whichever
+// client/externalClient it was assigned to. Reject → REJECTED, clearing both so it lands
+// back in the admin queue for reassignment. Ineligible ids are silently skipped.
+export async function batchDecideAsAdmin(
+  leadIds: unknown,
+  decision: unknown,
+  reason: unknown
+): Promise<ServiceResult<{ count: number }>> {
+  if (!Array.isArray(leadIds) || leadIds.length === 0 || !leadIds.every((id) => typeof id === 'string')) {
+    return { error: 'Select at least one lead', status: 400 };
+  }
+  if (decision !== 'ACCEPT' && decision !== 'REJECT') return { error: 'decision must be ACCEPT or REJECT', status: 400 };
+  if (reason !== undefined && reason !== null && typeof reason !== 'string') return { error: 'Invalid reason', status: 400 };
 
-  const updated = await prisma.lead.updateMany({
-    where: { id: leadId, status: 'ASSIGNED' },
-    data: { status: 'ACCEPTED' },
+  const eligible = await prisma.lead.findMany({
+    where: {
+      id: { in: leadIds },
+      OR: [
+        { status: 'ASSIGNED', clientId: { not: null } },
+        { status: 'ASSIGNED_EXTERNAL', externalClientId: { not: null } },
+      ],
+    },
+    select: { id: true, leadType: true, closerId: true, juniorCloserId: true, customerName: true },
   });
-  if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
+  if (eligible.length === 0) return { error: 'None of the selected leads are awaiting a response', status: 400 };
 
-  const result = await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE });
-  return { data: { lead: result } };
+  const awaiting = { status: { in: ['ASSIGNED', 'ASSIGNED_EXTERNAL'] as ('ASSIGNED' | 'ASSIGNED_EXTERNAL')[] } };
+
+  if (decision === 'ACCEPT') {
+    const updated = await prisma.lead.updateMany({
+      where: { id: { in: eligible.map((l) => l.id) }, ...awaiting },
+      data: { status: 'ACCEPTED' },
+    });
+    if (updated.count === 0) return { error: 'Leads were already updated', status: 409 };
+    for (const l of eligible) {
+      void notifyUsers([l.closerId, l.juniorCloserId], {
+        kind: 'success',
+        title: 'Your lead was accepted',
+        message: `${who(l.customerName)} was accepted.`,
+        page: 'HISTORY',
+      });
+    }
+    return { data: { count: updated.count } };
+  }
+
+  // REJECT: CPA leads with a closer go back to that closer for a re-write (reason carried
+  // in returnReason); everything else lands REJECTED in the admin queue as before.
+  const trimmed = isNonEmptyString(reason) ? reason.trim() : null;
+  const cleared = { clientId: null, externalClientId: null, rejectionReason: trimmed };
+  const isCpaToCloser = (l: (typeof eligible)[number]) => l.leadType === 'CPA' && !!l.closerId;
+  const isCplToJunior = (l: (typeof eligible)[number]) => l.leadType === 'CPL' && !!l.juniorCloserId;
+  const toCloserIds = eligible.filter(isCpaToCloser).map((l) => l.id);
+  const toJuniorIds = eligible.filter(isCplToJunior).map((l) => l.id);
+  const toAdminIds = eligible.filter((l) => !isCpaToCloser(l) && !isCplToJunior(l)).map((l) => l.id);
+
+  const [toCloser, toJunior, toAdmin] = await prisma.$transaction([
+    prisma.lead.updateMany({
+      where: { id: { in: toCloserIds }, ...awaiting },
+      data: { ...cleared, status: 'RETURNED_TO_CLOSER', returnReason: trimmed ?? 'Rejected by admin' },
+    }),
+    prisma.lead.updateMany({
+      where: { id: { in: toJuniorIds }, ...awaiting },
+      data: { ...cleared, status: 'RETURNED_TO_JUNIOR', returnReason: trimmed ?? 'Rejected by admin' },
+    }),
+    prisma.lead.updateMany({
+      where: { id: { in: toAdminIds }, ...awaiting },
+      data: { ...cleared, status: 'REJECTED' },
+    }),
+  ]);
+  const count = toCloser.count + toJunior.count + toAdmin.count;
+  if (count === 0) return { error: 'Leads were already updated', status: 409 };
+
+  for (const l of eligible.filter(isCpaToCloser)) {
+    void notifyUsers([l.closerId], {
+      kind: 'warning',
+      title: 'Lead rejected — needs a re-write',
+      message: `${who(l.customerName)}: ${trimmed ?? 'Rejected by admin'}`,
+      page: 'RETURNED',
+    });
+  }
+
+  for (const l of eligible.filter(isCplToJunior)) {
+    void notifyUsers([l.juniorCloserId], {
+      kind: 'warning',
+      title: 'Lead rejected — needs a re-write',
+      message: `${who(l.customerName)}: ${trimmed ?? 'Rejected by admin'}`,
+      page: 'RETURNED',
+    });
+  }
+
+  return { data: { count } };
 }
 
 // ─── Shared ─────────────────────────────────────────────────────
@@ -1255,7 +1589,9 @@ type Requester = {
 
 /** Fetches a lead, scoped to what the requesting role/status combination is allowed to see. */
 export async function getLeadById(leadId: string, requester: Requester): Promise<ServiceResult<{ lead: unknown }>> {
-  const lead = await prisma.lead.findUnique({ where: { id: leadId } });
+  // Loaded once with the full include: the unmasked branches return it as-is, and only the
+  // masked branches go back to the DB for their narrower select.
+  const lead = await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE });
   if (!lead) return { error: 'Lead not found', status: 404 };
 
   // MANAGER gets the same full, unmasked view ADMIN does, but only of Closer/Retention leads
@@ -1263,7 +1599,7 @@ export async function getLeadById(leadId: string, requester: Requester): Promise
   // (Clients/Team/External Clients/Expenses) are page-level, not lead-detail masking.
   if (requester.role === 'MANAGER' && lead.juniorCloserId) return { error: 'Forbidden', status: 403 };
   if (requester.role === 'ADMIN' || requester.role === 'MANAGER') {
-    return { data: { lead: await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE }) } };
+    return { data: { lead } };
   }
 
   if (requester.role === 'JUNIOR_CLOSER') {
@@ -1280,7 +1616,7 @@ export async function getLeadById(leadId: string, requester: Requester): Promise
   if (requester.role === 'CLOSER') {
     if (lead.closerId !== requester.id) return { error: 'Forbidden', status: 403 };
     if (lead.status === 'NEW' || lead.status === 'RETURNED_TO_CLOSER' || lead.status === 'DRAFT') {
-      return { data: { lead: await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE } ) } };
+      return { data: { lead } };
     }
     const masked = await prisma.lead.findUnique({ where: { id: leadId }, select: CLOSER_HISTORY_SELECT });
     return { data: { lead: masked } };
@@ -1296,23 +1632,22 @@ export async function getLeadById(leadId: string, requester: Requester): Promise
 
   if (requester.role === 'QA_JUNIOR_CLOSER') {
     if (!lead.juniorCloserId) return { error: 'Forbidden', status: 403 };
-    const full = await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE });
-    return { data: { lead: full } };
+    return { data: { lead } };
   }
 
   if (requester.role === 'QA_CLOSER') {
     if (!lead.closerId) return { error: 'Forbidden', status: 403 };
-    return { data: { lead: await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE }) } };
+    return { data: { lead } };
   }
 
   if (requester.role === 'RETENTION') {
     // No masking, and deliberately no ownership check against requester.id — any Retention
     // teammate can view/edit any RETENTION lead, confirmed shared-queue behavior.
     if (lead.leadType !== 'RETENTION') return { error: 'Forbidden', status: 403 };
-    return { data: { lead: await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE }) } };
+    return { data: { lead } };
   }
 
   // CLIENT
   if (lead.clientId !== requester.id) return { error: 'Forbidden', status: 403 };
-  return { data: { lead: await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE }) } };
+  return { data: { lead } };
 }

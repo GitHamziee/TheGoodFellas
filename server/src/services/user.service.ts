@@ -1,7 +1,7 @@
 import type { PlanType, Role } from "@prisma/client";
 import prisma from "../lib/prisma";
 import { isValidState, parseCarriers, parseStates } from "../lib/client-coverage";
-import { isNonEmptyString, isValidEmail } from "../lib/validation";
+import { INVALID_PHONE_MESSAGE, isNonEmptyString, isValidEmail, normalizeUsPhone } from "../lib/validation";
 
 const PUBLIC_SELECT = {
   id: true,
@@ -153,8 +153,13 @@ export async function updateUserProfile(
   }
 
   if (input.phone !== undefined) {
-    if (input.phone !== null && typeof input.phone !== "string") return { error: "Invalid phone", status: 400 };
-    data.phone = (input.phone as string | null) || null;
+    if (input.phone === null || input.phone === "") {
+      data.phone = null;
+    } else {
+      const phone = normalizeUsPhone(input.phone);
+      if (!phone) return { error: INVALID_PHONE_MESSAGE, status: 400 };
+      data.phone = phone;
+    }
   }
 
   const updated = await prisma.user.update({ where: { id }, data, select: PUBLIC_SELECT });
