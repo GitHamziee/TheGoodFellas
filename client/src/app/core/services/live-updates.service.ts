@@ -1,4 +1,5 @@
 import { Injectable, effect, inject, signal } from '@angular/core';
+import { Subject } from 'rxjs';
 import { io, Socket } from 'socket.io-client';
 import { API_BASE_URL } from '../config';
 import { AuthService } from './auth.service';
@@ -22,6 +23,9 @@ export class LiveUpdatesService {
   private readonly _version = signal(0);
   readonly version = this._version.asReadonly();
 
+  /** Targeted `notification:new` pushes — consumed by NotificationService, which owns the state. */
+  readonly notifications$ = new Subject<unknown>();
+
   constructor() {
     effect(() => {
       if (this.auth.user()) this.connect();
@@ -39,6 +43,7 @@ export class LiveUpdatesService {
       if (this.timer) clearTimeout(this.timer);
       this.timer = setTimeout(() => this._version.update((v) => v + 1), DEBOUNCE_MS);
     });
+    socket.on('notification:new', (n: unknown) => this.notifications$.next(n));
     // After a dropped connection we may have missed nudges — refetch once on reconnect.
     socket.io.on('reconnect', () => this._version.update((v) => v + 1));
     this.socket = socket;

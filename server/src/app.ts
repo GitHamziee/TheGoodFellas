@@ -11,6 +11,7 @@ import externalClientRoutes from "./routes/external-clients.routes";
 import expenseRoutes from "./routes/expenses.routes";
 import callReviewRoutes from "./routes/call-reviews.routes";
 import ipWhitelistRoutes from "./routes/ip-whitelist.routes";
+import notificationRoutes from "./routes/notifications.routes";
 import { emitDataChanged } from "./realtime/chat-gateway";
 
 const app = express();
@@ -29,7 +30,7 @@ app.use(express.json());
 // service has to remember to broadcast. Chat has its own message-level events; auth writes
 // (login, password change) change nothing a list page shows.
 app.use("/api", (req, res, next) => {
-  if (!["GET", "HEAD", "OPTIONS"].includes(req.method) && !/^\/(chat|auth)(\/|$)/.test(req.path)) {
+  if (!["GET", "HEAD", "OPTIONS"].includes(req.method) && !/^\/(chat|auth|notifications)(\/|$)/.test(req.path)) {
     res.on("finish", () => {
       if (res.statusCode < 400) emitDataChanged();
     });
@@ -44,6 +45,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/leads", leadRoutes);
 app.use("/api/admin/analytics", analyticsRoutes);
 app.use("/api/chat", chatRoutes);
+app.use("/api/notifications", notificationRoutes);
 app.use("/api/external-clients", externalClientRoutes);
 app.use("/api/expenses", expenseRoutes);
 app.use("/api/call-reviews", callReviewRoutes);
