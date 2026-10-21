@@ -1,5 +1,5 @@
 import bcrypt from "bcrypt";
-import type { Role } from "@prisma/client";
+import { Role } from "@prisma/client";
 import prisma from "../lib/prisma";
 import { signToken } from "../lib/jwt";
 import { INVALID_PHONE_MESSAGE, isNonEmptyString, isValidEmail, isValidPassword, normalizeUsPhone } from "../lib/validation";
@@ -68,7 +68,8 @@ export async function login(email: unknown, password: unknown, ip: string): Prom
   return { data: { token, user: publicUser(user) } };
 }
 
-const STAFF_ROLES: Role[] = ["JUNIOR_CLOSER", "CLOSER", "ADMIN", "CLIENT", "TEAM_LEAD", "MANAGER"];
+// Every role is creatable — same rule as the role-switch route, so a newly added role can't be missed here.
+const STAFF_ROLES = Object.values(Role) as Role[];
 // minimumPremium isn't a plan cost, but shares the same nullable-non-negative-whole-dollar
 // validation, so it rides the same parse loop as the four plan costs below.
 const PLAN_COST_KEYS = ["levelCost", "gradedCost", "modifiedCost", "giCost", "minimumPremium"] as const;
