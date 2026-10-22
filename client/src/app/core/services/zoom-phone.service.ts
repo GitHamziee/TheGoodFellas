@@ -30,6 +30,9 @@ export function toE164(phone: string): string | null {
   return null;
 }
 
+/** 'unavailable' = the OS has no mic or won't hand it to the browser (Windows privacy settings). */
+export type MicState = 'unknown' | 'prompt' | 'granted' | 'denied' | 'unavailable';
+
 /**
  * Root-scoped and stateful, like ChatService: the dialer iframe lives in PortalShell so a call
  * survives page navigation, and any page can ask it to dial. Clicking "Dial lead" sends the
@@ -39,6 +42,12 @@ export function toE164(phone: string): string | null {
 export class ZoomPhoneService {
   /** Only the minimize button / topbar toggle closes it — navigation and reloads don't. */
   readonly open = signal(readOpen());
+  /**
+   * The embed never triggers the browser's mic prompt itself — it enumerates devices, sees none
+   * (labels/ids are hidden until permission exists) and shows "No available device". So we ask
+   * from the top-level page; the iframe's `allow="microphone"` then inherits the grant.
+   */
+  readonly mic = signal<MicState>('unknown');
 
   private frame: HTMLIFrameElement | null = null;
   private loaded = false;
@@ -58,6 +67,37 @@ export class ZoomPhoneService {
         /* storage unavailable — the panel still works, it just won't survive a reload */
       }
     });
+    void this.watchMicPermission();
+  }
+
+  private async watchMicPermission(): Promise<void> {
+    try {
+      const status = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+      const sync = () => this.mic.set(status.state === 'granted' ? 'granted' : status.state === 'denied' ? 'denied' : 'prompt');
+      sync();
+      status.onchange = sync;
+    } catch {
+      this.mic.set('prompt'); // Permissions API can't query mic here — let the button try
+    }
+  }
+
+  /** Shows the browser's mic prompt, then reloads the embed so Zoom re-reads the device list. */
+  async enableMic(): Promise<void> {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((t) => t.stop());
+      this.mic.set('granted');
+      this.reloadFrame();
+    } catch (err) {
+      const name = (err as DOMException)?.name;
+      this.mic.set(name === 'NotAllowedError' || name === 'SecurityError' ? 'denied' : 'unavailable');
+    }
+  }
+
+  private reloadFrame(): void {
+    if (!this.frame) return;
+    this.loaded = false;
+    this.frame.src = ZOOM_EMBED_URL;
   }
 
   attach(frame: HTMLIFrameElement): void {

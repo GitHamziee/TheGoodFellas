@@ -1,17 +1,32 @@
 import { AfterViewInit, Component, ElementRef, OnDestroy, inject, viewChild } from '@angular/core';
 import { DomSanitizer } from '@angular/platform-browser';
-import { LucideMinus } from '@lucide/angular';
+import { LucideMicOff, LucideMinus } from '@lucide/angular';
 import { ZOOM_EMBED_URL, ZoomPhoneService } from '../../core/services/zoom-phone.service';
 
 /** Floating Zoom Phone panel. Closing only hides it — the iframe stays mounted so an
  * in-progress call isn't dropped. */
 @Component({
   selector: 'app-zoom-dialer',
-  imports: [LucideMinus],
+  imports: [LucideMicOff, LucideMinus],
   template: `
     <div class="dialer" [class.dialer--open]="zoom.open()" role="dialog" aria-label="Dialer">
       <div class="dialer-head">
         <span>Dialer</span>
+        @if (zoom.mic() !== 'granted' && zoom.mic() !== 'unknown') {
+          <button
+            type="button"
+            class="dialer-mic"
+            [class.dialer-mic--blocked]="zoom.mic() === 'denied' || zoom.mic() === 'unavailable'"
+            (click)="zoom.enableMic()"
+          >
+            <svg lucideMicOff></svg>
+            @switch (zoom.mic()) {
+              @case ('denied') { Mic blocked }
+              @case ('unavailable') { No mic found }
+              @default { Enable mic }
+            }
+          </button>
+        }
         <button type="button" class="dialer-min" (click)="zoom.open.set(false)" aria-label="Minimize dialer">
           <svg lucideMinus></svg>
         </button>
@@ -20,7 +35,7 @@ import { ZOOM_EMBED_URL, ZoomPhoneService } from '../../core/services/zoom-phone
         #frame
         [src]="src"
         title="Zoom Phone"
-        allow="microphone; autoplay; clipboard-read; clipboard-write"
+        allow="microphone; speaker-selection; autoplay; clipboard-read; clipboard-write"
         (load)="zoom.onFrameLoad()"
       ></iframe>
     </div>
@@ -75,6 +90,29 @@ import { ZOOM_EMBED_URL, ZoomPhoneService } from '../../core/services/zoom-phone
       background: transparent;
       color: inherit;
       cursor: pointer;
+    }
+    .dialer-mic {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      margin-left: auto;
+      margin-right: 0.4rem;
+      padding: 0.25rem 0.6rem;
+      border: 1px solid var(--gold-300);
+      border-radius: var(--radius-sm, 6px);
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      font-size: 0.72rem;
+      cursor: pointer;
+    }
+    .dialer-mic svg {
+      width: 14px;
+      height: 14px;
+    }
+    .dialer-mic--blocked {
+      border-color: #f87171;
+      color: #f87171;
     }
     .dialer-min:hover {
       background: rgba(255, 255, 255, 0.08);
