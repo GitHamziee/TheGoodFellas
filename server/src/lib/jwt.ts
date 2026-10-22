@@ -15,3 +15,8 @@ export function signToken(payload: JwtPayload): string {
 export function verifyToken(token: string): JwtPayload {
   return jwt.verify(token, env.jwtSecret) as JwtPayload;
 }
+
+/** True for a bad, expired or not-yet-valid token — an expected auth failure, not a bug. */
+export function isTokenError(err: unknown): boolean {
+  return err instanceof jwt.JsonWebTokenError;
+}

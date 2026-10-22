@@ -2,7 +2,8 @@ import type { Server as HttpServer } from "http";
 import { Server as IOServer, type Socket } from "socket.io";
 import type { Role } from "@prisma/client";
 import { env } from "../lib/env";
-import { verifyToken } from "../lib/jwt";
+import { isTokenError, verifyToken } from "../lib/jwt";
+import { reportError } from "../lib/rollbar";
 import prisma from "../lib/prisma";
 import { canAccessRoom, parseRoom, roomsForUser, socketRoom, type RoomKey } from "../lib/chat-rooms";
 import type { PublicMessage } from "../services/chat.service";
@@ -52,7 +53,8 @@ export function initChatGateway(httpServer: HttpServer): IOServer {
 
       socket.data.user = { id: user.id, name: user.name, role: user.role };
       next();
-    } catch {
+    } catch (err) {
+      if (!isTokenError(err)) reportError(err);
       next(new Error("Unauthorized"));
     }
   });

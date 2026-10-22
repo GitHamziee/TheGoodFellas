@@ -13,6 +13,7 @@ import callReviewRoutes from "./routes/call-reviews.routes";
 import ipWhitelistRoutes from "./routes/ip-whitelist.routes";
 import notificationRoutes from "./routes/notifications.routes";
 import { emitDataChanged } from "./realtime/chat-gateway";
+import { reportError } from "./lib/rollbar";
 
 const app = express();
 
@@ -58,8 +59,10 @@ app.use((_req, res) => {
 // Catch-all error handler — must be last and take 4 args for Express to treat it as one.
 // Without this, an error passed to next() (e.g. via asyncHandler) has nowhere to go but Express's
 // default HTML error page; with it we keep the API's { error } JSON contract on failure too.
-app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+app.use((err: unknown, req: Request, res: Response, _next: NextFunction) => {
   console.error(err);
+  // Passing req attaches the URL, method, route and req.user.id (as the Rollbar "person").
+  reportError(err, req);
   res.status(500).json({ error: "Internal server error" });
 });
 

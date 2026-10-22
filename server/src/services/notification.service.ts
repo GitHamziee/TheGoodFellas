@@ -1,6 +1,7 @@
 import type { Role } from "@prisma/client";
 import prisma from "../lib/prisma";
 import { emitNotification } from "../realtime/chat-gateway";
+import { reportError } from "../lib/rollbar";
 
 export type NotificationKind = "success" | "info" | "warning" | "danger";
 
@@ -78,6 +79,7 @@ export async function notifyUsers(
     }
   } catch (err) {
     console.error("[notifications] failed to send", err);
+    reportError(err);
   }
 }
 
@@ -88,6 +90,7 @@ export async function notifyRoles(roles: Role[], input: NotificationInput, excep
     await notifyUsers(users.map((u) => u.id), input, exceptUserId);
   } catch (err) {
     console.error("[notifications] failed to resolve recipients", err);
+    reportError(err);
   }
 }
 

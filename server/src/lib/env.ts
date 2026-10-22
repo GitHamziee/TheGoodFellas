@@ -29,4 +29,7 @@ export const env = {
   // sheet's whole history into Admin's queue.
   googleSheetImportFrom: process.env.GOOGLE_SHEET_IMPORT_FROM ?? "",
   googleSheetSyncMinutes: Number(process.env.GOOGLE_SHEET_SYNC_MINUTES ?? 5),
+  // Error reporting — leave the token blank to keep Rollbar off (see lib/rollbar.ts).
+  rollbarAccessToken: process.env.ROLLBAR_ACCESS_TOKEN ?? "",
+  rollbarEnvironment: process.env.ROLLBAR_ENVIRONMENT ?? "development",
 };

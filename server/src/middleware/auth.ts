@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import type { Role } from "@prisma/client";
-import { verifyToken } from "../lib/jwt";
+import { isTokenError, verifyToken } from "../lib/jwt";
+import { reportError } from "../lib/rollbar";
 import { apiError } from "../lib/api-response";
 import { getClientIp } from "../lib/client-ip";
 import { IP_EXEMPT_ROLES, isIpWhitelisted } from "../lib/ip-whitelist";
@@ -41,7 +42,9 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
 
     req.user = { id: user.id, role: user.role, tokenVersion: user.tokenVersion };
     next();
-  } catch {
+  } catch (err) {
+    // A bad token is routine; anything else (e.g. the DB lookup failing) is a real fault.
+    if (!isTokenError(err)) reportError(err, req);
     return apiError(res, "Unauthorized", 401);
   }
 }

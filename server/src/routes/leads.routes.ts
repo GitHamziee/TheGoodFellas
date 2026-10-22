@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response, Router } from 'express';
 import { apiError, apiSuccess, sendResult } from '../lib/api-response';
 import { asyncHandler } from '../lib/async-handler';
+import { reportError } from '../lib/rollbar';
 import { authenticate, requireRole } from '../middleware/auth';
 import * as leadService from '../services/lead.service';
 import * as sheetSync from '../services/retention-sheet-sync.service';
@@ -357,11 +358,12 @@ router.get(
 router.post(
   '/retention/sync',
   requireRole('ADMIN'),
-  asyncHandler(async (_req, res) => {
+  asyncHandler(async (req, res) => {
     if (!sheetSync.isSheetSyncConfigured()) return apiError(res, 'Google Sheet sync is not configured', 400);
     try {
       return apiSuccess(res, await sheetSync.syncRetentionSheet(), 'Sync complete');
     } catch (err) {
+      reportError(err, req);
       return apiError(res, err instanceof Error ? err.message : 'Sync failed', 502);
     }
   })

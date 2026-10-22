@@ -4,6 +4,7 @@ import { env } from "../lib/env";
 import { readSheetColumn } from "../lib/google-sheets";
 import { parseSheetLead } from "../lib/sheet-lead-parser";
 import { emitDataChanged } from "../realtime/chat-gateway";
+import { reportError } from "../lib/rollbar";
 import * as leadService from "./lead.service";
 
 export interface SheetSyncResult {
@@ -97,7 +98,10 @@ export function startSheetSyncTimer(): void {
   const run = () =>
     syncRetentionSheet()
       .then((r) => r.imported && console.log(`[sheet-sync] imported ${r.imported} lead(s)`))
-      .catch((err) => console.error("[sheet-sync] failed", err.message));
+      .catch((err) => {
+        console.error("[sheet-sync] failed", err.message);
+        reportError(err);
+      });
   setInterval(run, Math.max(1, env.googleSheetSyncMinutes) * 60_000).unref();
   void run();
 }
