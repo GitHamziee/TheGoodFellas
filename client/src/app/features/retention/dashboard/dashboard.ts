@@ -1,6 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
+  LucideBanknoteArrowUp,
   LucideCircleCheck,
   LucideClock,
   LucideSend,
@@ -30,6 +31,7 @@ import { reloadOnChange } from '../../../core/live-reload';
     EmptyState,
     SkeletonRows,
     LucideSend,
+    LucideBanknoteArrowUp,
     LucideClock,
     LucideCircleCheck,
     LucideTarget,
@@ -71,6 +73,7 @@ export class RetentionDashboard implements OnInit {
       submitted: past.length,
       accepted,
       acceptRate: decided ? Math.round((accepted / decided) * 100) : null,
+      chargedBack: past.filter((l) => l.status === 'CHARGED_BACK').length,
     };
   });
 
