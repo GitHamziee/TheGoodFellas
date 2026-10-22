@@ -1,5 +1,5 @@
 import prisma from '../lib/prisma';
-import { Prisma } from '@prisma/client';
+import { LeadStatus, Prisma } from '@prisma/client';
 import { isNonEmptyString } from '../lib/validation';
 import {
   ADMIN_EDIT_FIELDS,
@@ -188,6 +188,8 @@ const RETENTION_QUEUE_PREVIEW_SELECT = {
   draftReason: true,
   draftReasonNote: true,
   returnReason: true,
+  callbackById: true,
+  callbackAt: true,
   retention: { select: { id: true, name: true } },
 } as const;
 
@@ -1050,17 +1052,21 @@ function retentionWindowStart(): Date {
   return new Date(Date.now() - RETENTION_EXCLUSIVE_HOURS * 60 * 60 * 1000);
 }
 
-/** True while a lead is still inside its assignee's exclusive window and `requesterId` isn't them. */
+/** True when `requesterId` may not see the lead: someone else marked it as a Callback (only
+ * they see it, even over the assignee), or it is still inside its assignee's exclusive window. */
 function isHiddenFromRetentionTeammate(
-  lead: { retentionId: string | null; retentionAssignedAt: Date | null },
+  lead: { retentionId: string | null; retentionAssignedAt: Date | null; callbackById: string | null },
   requesterId: string
 ): boolean {
+  if (lead.callbackById) return lead.callbackById !== requesterId;
   return (
     lead.retentionId !== requesterId &&
     lead.retentionAssignedAt !== null &&
     lead.retentionAssignedAt > retentionWindowStart()
   );
 }
+
+const RETENTION_QUEUE_STATUSES: LeadStatus[] = ['NEW', 'DRAFT', 'RETURNED_TO_RETENTION'];
 
 /**
  * A Retention person builds a lead from scratch — same "self-/AI-sourced, no upstream role
@@ -1143,11 +1149,17 @@ export async function listRetentionQueue(requesterId: string) {
     where: {
       leadType: 'RETENTION',
       retentionId: { not: null },
-      status: { in: ['NEW', 'DRAFT', 'RETURNED_TO_RETENTION'] },
+      status: { in: RETENTION_QUEUE_STATUSES },
       OR: [
-        { retentionId: requesterId },
-        { retentionAssignedAt: null },
-        { retentionAssignedAt: { lte: retentionWindowStart() } },
+        { callbackById: requesterId },
+        {
+          callbackById: null,
+          OR: [
+            { retentionId: requesterId },
+            { retentionAssignedAt: null },
+            { retentionAssignedAt: { lte: retentionWindowStart() } },
+          ],
+        },
       ],
     },
     select: RETENTION_QUEUE_PREVIEW_SELECT,
@@ -1181,7 +1193,7 @@ export async function enrichAndSubmitRetentionLead(
 
   const updated = await prisma.lead.updateMany({
     where: { id: leadId, status: lead.status },
-    data: { ...sanitized.data, ...suggested, retentionId: submitterId, status: 'SUBMITTED', draftReason: null, draftReasonNote: null, returnReason: null },
+    data: { ...sanitized.data, ...suggested, retentionId: submitterId, status: 'SUBMITTED', draftReason: null, draftReasonNote: null, returnReason: null, callbackById: null, callbackAt: null },
   });
   if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
 
@@ -1228,6 +1240,48 @@ export async function saveRetentionLeadAsDraft(
     data: { ...data, ...suggested, status: 'DRAFT' },
   });
   if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
+
+  const result = await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE });
+  return { data: { lead: result } };
+}
+
+/** Marks a queue lead (NEW, DRAFT or RETURNED_TO_RETENTION) as a Callback for the requester —
+ * from then on only they see it. Status and assignee are left alone. The callbackById: null
+ * guard means a second teammate racing to claim the same lead gets a 409, not a takeover. */
+export async function markRetentionCallback(
+  leadId: string,
+  requesterId: string
+): Promise<ServiceResult<{ lead: unknown }>> {
+  const lead = await prisma.lead.findUnique({ where: { id: leadId } });
+  if (!lead) return { error: 'Lead not found', status: 404 };
+  if (lead.leadType !== 'RETENTION') return { error: 'Not a retention lead', status: 400 };
+  if (isHiddenFromRetentionTeammate(lead, requesterId)) return { error: 'Lead not found', status: 404 };
+  if (!RETENTION_QUEUE_STATUSES.includes(lead.status)) {
+    return { error: 'Only a lead still in the queue can be marked as a callback', status: 400 };
+  }
+  if (lead.callbackById) return { error: 'Lead is already marked as a callback', status: 400 };
+
+  const updated = await prisma.lead.updateMany({
+    where: { id: leadId, status: { in: RETENTION_QUEUE_STATUSES }, callbackById: null },
+    data: { callbackById: requesterId, callbackAt: new Date() },
+  });
+  if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
+
+  const result = await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE });
+  return { data: { lead: result } };
+}
+
+/** Clears the requester's own Callback — the lead reappears wherever its unchanged status
+ * and assignee put it. Only the person who marked it can, since nobody else can see it. */
+export async function removeRetentionCallback(
+  leadId: string,
+  requesterId: string
+): Promise<ServiceResult<{ lead: unknown }>> {
+  const updated = await prisma.lead.updateMany({
+    where: { id: leadId, leadType: 'RETENTION', callbackById: requesterId },
+    data: { callbackById: null, callbackAt: null },
+  });
+  if (updated.count === 0) return { error: 'Lead not found', status: 404 };
 
   const result = await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE });
   return { data: { lead: result } };

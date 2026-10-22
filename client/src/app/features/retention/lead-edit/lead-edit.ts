@@ -8,6 +8,7 @@ import {
   LucideHeartPulse,
   LucideNotebookPen,
   LucidePhoneCall,
+  LucidePhoneForwarded,
   LucideSend,
   LucideShieldCheck,
   LucideUser,
@@ -108,6 +109,7 @@ interface LookupUser {
     LucideCircleAlert,
     LucideArrowLeft,
     LucidePhoneCall,
+    LucidePhoneForwarded,
   ],
   templateUrl: './lead-edit.html',
 })
@@ -133,6 +135,9 @@ export class RetentionLeadEdit implements OnInit {
   readonly isMine = computed(() => this.lead()?.retention?.id === this.currentUserId());
   readonly isDraft = computed(() => this.lead()?.status === 'DRAFT');
   readonly isReturned = computed(() => this.lead()?.status === 'RETURNED_TO_RETENTION');
+  /** Only whoever marked it can open a callback lead, so this is always "my callback". */
+  readonly isCallback = computed(() => !!this.lead()?.callbackById);
+  readonly savingCallback = signal(false);
 
   readonly clients = signal<LookupUser[]>([]);
   readonly clientOptions = computed(() => this.clients().map((c) => ({ value: c.id, label: c.name })));
@@ -367,6 +372,22 @@ export class RetentionLeadEdit implements OnInit {
       this.error.set(apiErrorMessage(err, 'Could not save this as a draft.'));
     } finally {
       this.savingDraft.set(false);
+    }
+  }
+
+  /** Flips the Callback flag only — no form fields are sent, so unsaved edits stay on screen. */
+  async toggleCallback(): Promise<void> {
+    this.error.set(null);
+    this.savingCallback.set(true);
+    try {
+      const lead = this.isCallback()
+        ? await this.leadService.retentionRemoveCallback(this.leadId)
+        : await this.leadService.retentionMarkCallback(this.leadId);
+      this.lead.set(lead);
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not update the callback.'));
+    } finally {
+      this.savingCallback.set(false);
     }
   }
 }

@@ -27,6 +27,8 @@ import { apiErrorMessage } from '../../../core/api';
  * Retention person can open and submit a teammate's lead — and both are masked like the
  * Closer's: no phone or carrier, only the customer, who worked it, and the outcome.
  */
+type PendingTab = 'new' | 'drafts' | 'callbacks';
+
 @Component({
   selector: 'app-retention-leads',
   imports: [
@@ -95,14 +97,37 @@ export class RetentionLeads implements OnInit {
     })),
   ]);
 
-  private readonly pendingByTeammate = computed(() => {
+  readonly pendingTabs = [
+    { label: 'New Leads', value: 'new' },
+    { label: 'Drafts', value: 'drafts' },
+    { label: 'Callbacks', value: 'callbacks' },
+  ] as const;
+  readonly pendingTab = signal<PendingTab>('new');
+
+  /** The server only returns callbacks the caller marked, so any callbackById here is "mine". */
+  readonly pendingSplit = computed(() => {
     const filter = this.teammateFilter();
-    const rows = this.pending();
-    return filter ? rows.filter((l) => l.retention?.id === filter) : rows;
+    const split: Record<PendingTab, Lead[]> = { new: [], drafts: [], callbacks: [] };
+    for (const l of this.pending()) {
+      if (l.callbackById) {
+        // Callbacks ignore the teammate filter — they can sit on anyone's assignment.
+        split.callbacks.push(l);
+      } else if (!filter || l.retention?.id === filter) {
+        split[l.status === 'DRAFT' ? 'drafts' : 'new'].push(l);
+      }
+    }
+    return split;
   });
 
+  private readonly pendingRows = computed(() => this.pendingSplit()[this.pendingTab()]);
+
+  setPendingTab(tab: PendingTab): void {
+    this.pendingTab.set(tab);
+    this.pendingView.page.set(1);
+  }
+
   readonly pendingView = createListView<Lead>({
-    source: this.pendingByTeammate,
+    source: this.pendingRows,
     searchFields: (l) => [l.customerName, l.state, l.retention?.name],
     sorters: {
       customerName: (l) => l.customerName,

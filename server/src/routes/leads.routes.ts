@@ -440,6 +440,26 @@ router.patch(
   })
 );
 
+// Callback: only the person who marked it sees the lead until they remove it (see
+// markRetentionCallback in lead.service.ts).
+router.patch(
+  '/retention/:id/callback',
+  requireRole('RETENTION'),
+  asyncHandler(async (req, res) => {
+    const result = await leadService.markRetentionCallback(req.params.id, req.user!.id);
+    return sendResult(res, result, 'Lead marked as a callback');
+  })
+);
+
+router.delete(
+  '/retention/:id/callback',
+  requireRole('RETENTION'),
+  asyncHandler(async (req, res) => {
+    const result = await leadService.removeRetentionCallback(req.params.id, req.user!.id);
+    return sendResult(res, result, 'Callback removed');
+  })
+);
+
 router.get(
   '/retention/history',
   requireRole('RETENTION'),

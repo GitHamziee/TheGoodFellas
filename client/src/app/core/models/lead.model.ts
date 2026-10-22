@@ -76,6 +76,8 @@ export interface Lead {
   externalClientId: string | null;
   /** Set only for RETENTION leads — who Admin handed a form-submitted lead to. */
   retentionId: string | null;
+  /** When Admin last handed this lead to retentionId — null on leads a Retention person created themselves. */
+  retentionAssignedAt?: string | null;
   /** Non-binding hint from whoever built/enriched the lead — "I think this fits Client X".
    * Admin still explicitly assigns; this is just a heads-up shown in the queue. */
   suggestedClientId?: string | null;
@@ -147,6 +149,10 @@ export interface Lead {
   draftReason?: DraftReason | null;
   /** Typed reason, only present when draftReason is 'OTHER'. */
   draftReasonNote?: string | null;
+
+  /** RETENTION only — who marked this queue lead as a Callback. While set, only they see it. */
+  callbackById?: string | null;
+  callbackAt?: string | null;
 
   // admin
   rejectionReason?: string | null;

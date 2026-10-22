@@ -21,6 +21,8 @@ import {
   getLeadById,
   listRetentionQueue,
   markLeadChargedBack,
+  markRetentionCallback,
+  removeRetentionCallback,
 } from '../src/services/lead.service';
 
 const FULL_LEAD = {
@@ -114,13 +116,14 @@ describe('getLeadById masking', () => {
 
 describe('retention exclusive window', () => {
   const HOUR = 60 * 60 * 1000;
-  const retentionLead = (assignedAgoMs: number | null) => ({
+  const retentionLead = (assignedAgoMs: number | null, callbackById: string | null = null) => ({
     ...FULL_LEAD,
     leadType: 'RETENTION',
     juniorCloserId: null,
     closerId: null,
     retentionId: 'r-1',
     retentionAssignedAt: assignedAgoMs === null ? null : new Date(Date.now() - assignedAgoMs),
+    callbackById,
   });
 
   it('hides a freshly assigned lead from teammates', async () => {
@@ -152,10 +155,57 @@ describe('retention exclusive window', () => {
     await listRetentionQueue('r-2');
     const where = (db.lead.findMany.mock.calls[0][0] as { where: { OR: unknown[] } }).where;
     expect(where.OR).toEqual([
-      { retentionId: 'r-2' },
-      { retentionAssignedAt: null },
-      { retentionAssignedAt: { lte: expect.any(Date) } },
+      { callbackById: 'r-2' },
+      {
+        callbackById: null,
+        OR: [
+          { retentionId: 'r-2' },
+          { retentionAssignedAt: null },
+          { retentionAssignedAt: { lte: expect.any(Date) } },
+        ],
+      },
     ]);
+  });
+});
+
+describe('retention callback', () => {
+  const callbackLead = (callbackById: string | null) => ({
+    ...FULL_LEAD,
+    leadType: 'RETENTION',
+    juniorCloserId: null,
+    closerId: null,
+    retentionId: 'r-1',
+    retentionAssignedAt: null,
+    callbackById,
+  });
+
+  it('hides a callback from everyone but whoever marked it, the assignee included', async () => {
+    db.lead.findUnique.mockResolvedValueOnce(callbackLead('r-2'));
+    expect(await getLeadById('lead-1', { id: 'r-1', role: 'RETENTION' })).toEqual({ error: 'Lead not found', status: 404 });
+    const lead = callbackLead('r-2');
+    db.lead.findUnique.mockResolvedValueOnce(lead);
+    expect(await getLeadById('lead-1', { id: 'r-2', role: 'RETENTION' })).toEqual({ data: { lead } });
+  });
+
+  it('marks a DRAFT lead without touching its status', async () => {
+    db.lead.findUnique.mockResolvedValueOnce({ ...callbackLead(null), status: 'DRAFT' });
+    db.lead.updateMany.mockResolvedValueOnce({ count: 1 });
+    db.lead.findUnique.mockResolvedValueOnce({});
+    await markRetentionCallback('lead-1', 'r-2');
+    const { data } = db.lead.updateMany.mock.calls[0][0] as { data: Record<string, unknown> };
+    expect(data).toEqual({ callbackById: 'r-2', callbackAt: expect.any(Date) });
+  });
+
+  it('refuses a lead that already left the queue', async () => {
+    db.lead.findUnique.mockResolvedValueOnce({ ...callbackLead(null), status: 'SUBMITTED' });
+    expect(await markRetentionCallback('lead-1', 'r-2')).toMatchObject({ status: 400 });
+    expect(db.lead.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('only lets whoever marked it remove it', async () => {
+    db.lead.updateMany.mockResolvedValueOnce({ count: 0 });
+    expect(await removeRetentionCallback('lead-1', 'r-1')).toEqual({ error: 'Lead not found', status: 404 });
+    expect((db.lead.updateMany.mock.calls[0][0] as { where: unknown }).where).toMatchObject({ callbackById: 'r-1' });
   });
 });
 

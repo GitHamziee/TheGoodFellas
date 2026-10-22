@@ -347,6 +347,12 @@ export class LeadService {
     return res.data.leads;
   }
 
+  /** Every RETENTION lead, any status. */
+  async retentionAll(): Promise<Lead[]> {
+    const res = await firstValueFrom(this.http.get<ApiSuccess<{ leads: Lead[] }>>(`${BASE}/retention/all`));
+    return res.data.leads;
+  }
+
   /** Hands (or re-hands, to correct a misassignment) an unworked retention lead to a person. */
   async assignRetention(id: string, retentionId: string): Promise<Lead> {
     const res = await firstValueFrom(
@@ -399,6 +405,20 @@ export class LeadService {
     const res = await firstValueFrom(
       this.http.patch<ApiSuccess<{ lead: Lead }>>(`${BASE}/retention/${id}/draft`, input)
     );
+    return res.data.lead;
+  }
+
+  /** Marks a queue lead as a Callback — only the caller sees it until they remove it. */
+  async retentionMarkCallback(id: string): Promise<Lead> {
+    const res = await firstValueFrom(
+      this.http.patch<ApiSuccess<{ lead: Lead }>>(`${BASE}/retention/${id}/callback`, {})
+    );
+    return res.data.lead;
+  }
+
+  /** Clears the caller's own Callback; the lead goes back to its unchanged status and assignee. */
+  async retentionRemoveCallback(id: string): Promise<Lead> {
+    const res = await firstValueFrom(this.http.delete<ApiSuccess<{ lead: Lead }>>(`${BASE}/retention/${id}/callback`));
     return res.data.lead;
   }
 

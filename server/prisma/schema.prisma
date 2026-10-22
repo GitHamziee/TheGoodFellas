@@ -215,6 +215,7 @@ model User {
   closerLeads          Lead[]        @relation("CloserLeads")
   clientLeads          Lead[]        @relation("ClientLeads")
   retentionLeads       Lead[]        @relation("RetentionLeads")
+  callbackLeads        Lead[]        @relation("CallbackLeads")
   suggestedClientLeads Lead[]        @relation("SuggestedClientLeads")
   clientChargeBacks    ChargeBack[]  @relation("ClientChargeBacks")
   chatMessages         ChatMessage[]
@@ -262,6 +263,12 @@ model Lead {
   // only that person sees the lead in the shared queue (see lead.service.ts). Null on leads
   // a Retention person created themselves or assigned before this existed — no window.
   retentionAssignedAt DateTime?
+  // Set when a Retention person marks a queue lead as a Callback. While set, ONLY that person
+  // sees or works the lead — not the assignee, not teammates (see lead.service.ts). It's a
+  // flag, not a status: status and retentionId are untouched, so clearing it puts the lead
+  // back exactly where it was. Cleared on submit.
+  callbackById        String?
+  callbackAt          DateTime?
   // Set only for RETENTION leads pulled in by the Google Sheet sync — a hash of name + phone +
   // DOB, so re-reading the same sheet row never creates the lead twice.
   sheetKey          String?       @unique
@@ -379,6 +386,7 @@ model Lead {
   client          User?           @relation("ClientLeads", fields: [clientId], references: [id], onDelete: SetNull)
   externalClient  ExternalClient? @relation("ExternalClientLeads", fields: [externalClientId], references: [id], onDelete: SetNull)
   retention       User?           @relation("RetentionLeads", fields: [retentionId], references: [id], onDelete: Cascade)
+  callbackBy      User?           @relation("CallbackLeads", fields: [callbackById], references: [id], onDelete: SetNull)
   suggestedClient User?           @relation("SuggestedClientLeads", fields: [suggestedClientId], references: [id], onDelete: SetNull)
   incomePayment   IncomePayment?  @relation(fields: [incomePaymentId], references: [id], onDelete: SetNull)
   chargeBacks     ChargeBack[]
@@ -391,6 +399,7 @@ model Lead {
   @@index([externalClientId])
   @@index([suggestedClientId])
   @@index([retentionId])
+  @@index([callbackById])
   @@index([status])
   @@index([createdAt])
   @@index([incomePaymentId])
