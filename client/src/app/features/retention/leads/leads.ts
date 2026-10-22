@@ -2,22 +2,19 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import {
-  LucideCircleCheck,
-  LucideCircleX,
   LucideClock,
   LucidePhoneCall,
   LucideSend,
   LucideSquarePen,
-  LucideTarget,
 } from '@lucide/angular';
 import { LeadService } from '../../../core/services/lead.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { ZoomPhoneService } from '../../../core/services/zoom-phone.service';
 import { Lead } from '../../../core/models/lead.model';
 import { ListView, createListView } from '../../../core/list-view';
-import { getAvatarTone, getInitials, isThisMonth, pacificIsoDate, pacificToday, timeAgo } from '../../../core/format-utils';
+import { getAvatarTone, getInitials, pacificIsoDate, pacificToday, timeAgo } from '../../../core/format-utils';
 import { DRAFT_REASON_LABEL } from '../../../core/lead-options';
-import { EmptyState, Pagination, SearchBox, SkeletonRows, StatTile, StatusBadge } from '../../../shared/ui/ui';
+import { EmptyState, Pagination, SearchBox, SkeletonRows, StatusBadge } from '../../../shared/ui/ui';
 import { Select } from '../../../shared/ui/select';
 import { Period, PeriodFilter, inPeriod } from '../../../shared/ui/period-filter';
 import { NoCopy } from '../../../shared/no-copy.directive';
@@ -38,7 +35,6 @@ import { apiErrorMessage } from '../../../core/api';
     Select,
     PeriodFilter,
     NoCopy,
-    StatTile,
     StatusBadge,
     SearchBox,
     Pagination,
@@ -47,9 +43,6 @@ import { apiErrorMessage } from '../../../core/api';
     LucideSend,
     LucideClock,
     LucideSquarePen,
-    LucideCircleCheck,
-    LucideCircleX,
-    LucideTarget,
     LucidePhoneCall,
   ],
   templateUrl: './leads.html',
@@ -132,24 +125,6 @@ export class RetentionLeads implements OnInit {
     },
     initialSort: { key: 'updatedAt', dir: 'desc' },
     pageSize: 10,
-  });
-
-  readonly stats = computed(() => {
-    const queue = this.pending();
-    const rows = this.past();
-    const mine = this.currentUserId();
-    const accepted = rows.filter((l) => l.status === 'ACCEPTED').length;
-    const rejected = rows.filter((l) => l.status === 'REJECTED').length;
-    const decided = accepted + rejected;
-    return {
-      pending: queue.length,
-      mine: queue.filter((l) => l.retention?.id === mine).length,
-      submitted: rows.length,
-      thisMonth: rows.filter((l) => isThisMonth(l.createdAt)).length,
-      accepted,
-      rejected,
-      acceptRate: decided ? Math.round((accepted / decided) * 100) : null,
-    };
   });
 
   readonly statusCounts = computed(() => {

@@ -3,28 +3,6 @@
     <app-period-filter [(period)]="period" [(anchor)]="anchor" />
   </div>
 
-  <div class="stats-row">
-    <app-stat-tile [value]="stats().pending" label="Pending" tone="tone-gold">
-      <svg lucideClock></svg>
-    </app-stat-tile>
-    <app-stat-tile [value]="stats().submitted" label="Submitted" tone="tone-c">
-      <svg lucideSend></svg>
-    </app-stat-tile>
-    <app-stat-tile [value]="stats().accepted" label="Approved" tone="tone-success">
-      <svg lucideCircleCheck></svg>
-    </app-stat-tile>
-    <app-stat-tile [value]="stats().rejected" label="Declined" tone="tone-danger">
-      <svg lucideCircleX></svg>
-    </app-stat-tile>
-    <app-stat-tile
-      [value]="stats().acceptRate === null ? '—' : stats().acceptRate + '%'"
-      label="Approval rate"
-      tone="tone-a"
-    >
-      <svg lucideTarget></svg>
-    </app-stat-tile>
-  </div>
-
   @if (error()) {
     <div class="error">{{ error() }}</div>
   }
@@ -75,7 +53,17 @@
             @for (lead of pendingView.rows(); track lead.id) {
               <tr>
                 <td>
-                  <div class="cell-main">
+                  <div class="cell-main name-row">
+                    <button
+                      type="button"
+                      class="dial-btn"
+                      [disabled]="dialingId() === lead.id"
+                      (click)="dialLead(lead.id)"
+                      [attr.aria-label]="'Dial ' + lead.customerName"
+                      title="Dial"
+                    >
+                      <svg lucidePhoneCall></svg>
+                    </button>
                     {{ lead.customerName }}
                     @if (lead.status === 'DRAFT' || lead.status === 'RETURNED_TO_RETENTION') {
                       <app-status-badge [status]="lead.status" />
@@ -107,14 +95,6 @@
                 </td>
                 <td>
                   <div class="row-actions">
-                    <button
-                      type="button"
-                      class="btn btn--sm btn--ghost"
-                      [disabled]="dialingId() === lead.id"
-                      (click)="dialLead(lead.id)"
-                    >
-                      <svg lucidePhoneCall></svg> Dial
-                    </button>
                     <a class="btn btn--sm btn--ghost" [routerLink]="['/retention/leads', lead.id]">
                       <svg lucideSquarePen></svg> Open
                     </a>

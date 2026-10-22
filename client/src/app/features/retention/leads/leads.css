@@ -25,6 +25,42 @@
   margin-top: 1.25rem;
 }
 
+.name-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.dial-btn {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--success-50, #ecfdf5);
+  color: var(--success-600, #059669);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.dial-btn:hover:not(:disabled) {
+  background: var(--success-600, #059669);
+  color: #fff;
+}
+
+.dial-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.dial-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
 /* Why a pending lead is parked (draft reason) or was sent back (admin's comment). */
 .row-reason {
   margin-top: 0.3rem;
