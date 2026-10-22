@@ -1,13 +1,21 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { LucideCircleCheck, LucideInbox, LucideRefreshCw, LucideUserCheck } from '@lucide/angular';
+import {
+  LucideCalendarDays,
+  LucideCircleCheck,
+  LucideDatabase,
+  LucideInbox,
+  LucideRefreshCw,
+  LucideUserCheck,
+  LucideUserX,
+} from '@lucide/angular';
 import { LeadService } from '../../../core/services/lead.service';
 import { UserService } from '../../../core/services/user.service';
 import { Lead } from '../../../core/models/lead.model';
 import { createListView } from '../../../core/list-view';
-import { formatDateTime, formatPhone, getAvatarTone, getInitials } from '../../../core/format-utils';
+import { formatDateTime, formatPhone, getAvatarTone, getInitials, isToday } from '../../../core/format-utils';
 import { Modal } from '../../../shared/ui/modal';
-import { PageHero, EmptyState, Pagination, SearchBox, SkeletonRows } from '../../../shared/ui/ui';
+import { PageHero, EmptyState, Pagination, SearchBox, SkeletonRows, StatTile } from '../../../shared/ui/ui';
 import { LeadDetail } from '../../../shared/lead-detail';
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 import { apiErrorMessage } from '../../../core/api';
@@ -24,7 +32,9 @@ interface LookupUser {
  * assigned leads again. */
 @Component({
   selector: 'app-admin-retention',
-  imports: [PageHero, 
+  imports: [
+    PageHero,
+    StatTile,
     FormsModule,
     Modal,
     LeadDetail,
@@ -36,6 +46,9 @@ interface LookupUser {
     LucideRefreshCw,
     LucideCircleCheck,
     LucideUserCheck,
+    LucideUserX,
+    LucideDatabase,
+    LucideCalendarDays,
   ],
   templateUrl: './retention.html',
 })
@@ -44,6 +57,9 @@ export class AdminRetention implements OnInit {
   private readonly leadService = inject(LeadService);
   private readonly userService = inject(UserService);
 
+  /** Every imported lead, assigned or not — feeds the stat tiles. */
+  readonly imports = signal<Lead[]>([]);
+  /** The unassigned slice of `imports` — what the table works on. */
   readonly leads = signal<Lead[]>([]);
   readonly retentionPeople = signal<LookupUser[]>([]);
   readonly loading = signal(true);
@@ -77,7 +93,16 @@ export class AdminRetention implements OnInit {
     pageSize: 12,
   });
 
-  readonly stats = computed(() => ({ total: this.leads().length }));
+  readonly stats = computed(() => {
+    const all = this.imports();
+    const unassigned = all.filter((l) => !l.retentionId).length;
+    return {
+      total: all.length,
+      today: all.filter((l) => isToday(l.createdAt)).length,
+      assigned: all.length - unassigned,
+      unassigned,
+    };
+  });
 
   readonly selectedCount = computed(() => this.selectedIds().size);
 
@@ -102,7 +127,13 @@ export class AdminRetention implements OnInit {
   async refresh(): Promise<void> {
     if (!isSilentReload()) this.loading.set(true);
     try {
-      this.leads.set(await this.leadService.retentionUnassigned());
+      // Imported = came in through the intake form/sheet: still unassigned, or handed out by
+      // Admin (retentionAssignedAt). Leads a Retention person built themselves have neither.
+      const imports = (await this.leadService.retentionAll()).filter(
+        (l) => !l.retentionId || !!l.retentionAssignedAt
+      );
+      this.imports.set(imports);
+      this.leads.set(imports.filter((l) => !l.retentionId));
     } catch {
       this.error.set('Could not load unassigned retention leads. Refresh to try again.');
     } finally {
@@ -192,6 +223,11 @@ export class AdminRetention implements OnInit {
       // Assigning moves the leads into that person's Retention Queue — they leave this page.
       const assignedIds = new Set(leads.map((l) => l.id));
       this.leads.update((rows) => rows.filter((l) => !assignedIds.has(l.id)));
+      this.imports.update((rows) =>
+        rows.map((l) =>
+          assignedIds.has(l.id) ? { ...l, retentionId, retentionAssignedAt: new Date().toISOString() } : l
+        )
+      );
       this.selectedIds.update((ids) => new Set([...ids].filter((id) => !assignedIds.has(id))));
       this.assignLeads.set([]);
       const what = leads.length === 1 ? leads[0].customerName : `${count} ${count === 1 ? 'lead' : 'leads'}`;

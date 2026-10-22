@@ -3,11 +3,26 @@
     eyebrow="Pipeline"
     title="Retention Imports"
     tone="moss"
-    [count]="loading() ? '–' : stats().total"
+    [count]="loading() ? '–' : stats().unassigned"
     countLabel="unassigned leads"
   >
     <svg lucideInbox></svg>
   </app-page-hero>
+
+  <div class="stats-row">
+    <app-stat-tile [value]="loading() ? '–' : stats().total" label="Total leads" tone="tone-gold">
+      <svg lucideDatabase></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="loading() ? '–' : stats().today" label="Imported today" tone="tone-c">
+      <svg lucideCalendarDays></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="loading() ? '–' : stats().assigned" label="Assigned" tone="tone-success">
+      <svg lucideUserCheck></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="loading() ? '–' : stats().unassigned" label="Unassigned" tone="tone-warning">
+      <svg lucideUserX></svg>
+    </app-stat-tile>
+  </div>
 
   @if (error()) {
     <div class="error">{{ error() }}</div>
