@@ -680,7 +680,7 @@ export async function assignLeadToRetention(leadId: string, retentionId: string)
 
   const updated = await prisma.lead.updateMany({
     where: { id: leadId, status: 'NEW' },
-    data: { retentionId },
+    data: { retentionId, retentionAssignedAt: new Date() },
   });
   if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
 
@@ -714,7 +714,7 @@ export async function batchAssignToRetention(
 
   const updated = await prisma.lead.updateMany({
     where: { id: { in: leadIds }, leadType: 'RETENTION', status: 'NEW' },
-    data: { retentionId },
+    data: { retentionId, retentionAssignedAt: new Date() },
   });
   if (updated.count === 0) return { error: 'None of the selected leads are available for assignment', status: 400 };
 
@@ -1040,6 +1040,27 @@ export async function listLeadsForTeamLead() {
 // individually-owned one — confirmed deliberately: any Retention person can cover a
 // teammate's leads, not just view them. So listRetentionQueue() below is NOT scoped to the
 // caller, and enrichAndSubmitRetentionLead() below does NOT check requester ownership.
+//
+// The one exception to the shared queue: for the first RETENTION_EXCLUSIVE_HOURS after Admin
+// hands a lead to someone, only that person can see or work it — teammates were calling
+// each other's freshly assigned customers. After the window it rejoins the shared queue.
+export const RETENTION_EXCLUSIVE_HOURS = 4;
+
+function retentionWindowStart(): Date {
+  return new Date(Date.now() - RETENTION_EXCLUSIVE_HOURS * 60 * 60 * 1000);
+}
+
+/** True while a lead is still inside its assignee's exclusive window and `requesterId` isn't them. */
+function isHiddenFromRetentionTeammate(
+  lead: { retentionId: string | null; retentionAssignedAt: Date | null },
+  requesterId: string
+): boolean {
+  return (
+    lead.retentionId !== requesterId &&
+    lead.retentionAssignedAt !== null &&
+    lead.retentionAssignedAt > retentionWindowStart()
+  );
+}
 
 /**
  * A Retention person builds a lead from scratch — same "self-/AI-sourced, no upstream role
@@ -1117,9 +1138,18 @@ export async function createDraftByRetention(
  * separate "sent back to me" page, same shared-queue model as everything else Retention
  * works). The "filter to Person A" UX is client-side over this one list, same pattern as
  * admin/leads.ts's closerFilter. */
-export async function listRetentionQueue() {
+export async function listRetentionQueue(requesterId: string) {
   return prisma.lead.findMany({
-    where: { leadType: 'RETENTION', retentionId: { not: null }, status: { in: ['NEW', 'DRAFT', 'RETURNED_TO_RETENTION'] } },
+    where: {
+      leadType: 'RETENTION',
+      retentionId: { not: null },
+      status: { in: ['NEW', 'DRAFT', 'RETURNED_TO_RETENTION'] },
+      OR: [
+        { retentionId: requesterId },
+        { retentionAssignedAt: null },
+        { retentionAssignedAt: { lte: retentionWindowStart() } },
+      ],
+    },
     select: RETENTION_QUEUE_PREVIEW_SELECT,
     orderBy: { updatedAt: 'desc' },
   });
@@ -1138,6 +1168,7 @@ export async function enrichAndSubmitRetentionLead(
   const lead = await prisma.lead.findUnique({ where: { id: leadId } });
   if (!lead) return { error: 'Lead not found', status: 404 };
   if (lead.leadType !== 'RETENTION') return { error: 'Not a retention lead', status: 400 };
+  if (isHiddenFromRetentionTeammate(lead, submitterId)) return { error: 'Lead not found', status: 404 };
   if (lead.status !== 'NEW' && lead.status !== 'DRAFT' && lead.status !== 'RETURNED_TO_RETENTION') {
     return { error: 'Lead has already been submitted', status: 400 };
   }
@@ -1171,11 +1202,13 @@ export async function enrichAndSubmitRetentionLead(
  * RETURNED_TO_RETENTION, same as enrichAndSubmitRetentionLead above. */
 export async function saveRetentionLeadAsDraft(
   leadId: string,
+  requesterId: string,
   input: Record<string, unknown>
 ): Promise<ServiceResult<{ lead: unknown }>> {
   const lead = await prisma.lead.findUnique({ where: { id: leadId } });
   if (!lead) return { error: 'Lead not found', status: 404 };
   if (lead.leadType !== 'RETENTION') return { error: 'Not a retention lead', status: 400 };
+  if (isHiddenFromRetentionTeammate(lead, requesterId)) return { error: 'Lead not found', status: 404 };
   if (lead.status !== 'NEW' && lead.status !== 'DRAFT' && lead.status !== 'RETURNED_TO_RETENTION') {
     return { error: 'Only a lead still in the queue can be saved as a draft', status: 400 };
   }
@@ -1641,9 +1674,10 @@ export async function getLeadById(leadId: string, requester: Requester): Promise
   }
 
   if (requester.role === 'RETENTION') {
-    // No masking, and deliberately no ownership check against requester.id — any Retention
-    // teammate can view/edit any RETENTION lead, confirmed shared-queue behavior.
+    // No masking, and no ownership check against requester.id — any Retention teammate can
+    // view/edit any RETENTION lead (shared queue), except during its assignee's exclusive window.
     if (lead.leadType !== 'RETENTION') return { error: 'Forbidden', status: 403 };
+    if (isHiddenFromRetentionTeammate(lead, requester.id)) return { error: 'Lead not found', status: 404 };
     return { data: { lead } };
   }
 

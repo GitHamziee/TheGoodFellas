@@ -258,6 +258,10 @@ model Lead {
   // Set only for RETENTION leads — who Admin handed a form-submitted lead to. Null while an
   // imported lead is still sitting unassigned in the admin retention-import queue.
   retentionId       String?
+  // When Admin last handed this lead to retentionId. For RETENTION_EXCLUSIVE_HOURS after it,
+  // only that person sees the lead in the shared queue (see lead.service.ts). Null on leads
+  // a Retention person created themselves or assigned before this existed — no window.
+  retentionAssignedAt DateTime?
   // Set only for RETENTION leads pulled in by the Google Sheet sync — a hash of name + phone +
   // DOB, so re-reading the same sheet row never creates the lead twice.
   sheetKey          String?       @unique

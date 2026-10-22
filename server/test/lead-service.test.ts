@@ -14,7 +14,14 @@ vi.mock('../src/services/notification.service', () => ({
   notifyRoles: vi.fn(async () => undefined),
 }));
 
-import { batchChargeBack, batchMarkPaid, getLeadById, markLeadChargedBack } from '../src/services/lead.service';
+import {
+  batchChargeBack,
+  batchMarkPaid,
+  enrichAndSubmitRetentionLead,
+  getLeadById,
+  listRetentionQueue,
+  markLeadChargedBack,
+} from '../src/services/lead.service';
 
 const FULL_LEAD = {
   id: 'lead-1',
@@ -102,6 +109,53 @@ describe('getLeadById masking', () => {
   it('forbids RETENTION from non-retention leads', async () => {
     db.lead.findUnique.mockResolvedValueOnce(FULL_LEAD);
     expect(await getLeadById('lead-1', { id: 'r', role: 'RETENTION' })).toEqual({ error: 'Forbidden', status: 403 });
+  });
+});
+
+describe('retention exclusive window', () => {
+  const HOUR = 60 * 60 * 1000;
+  const retentionLead = (assignedAgoMs: number | null) => ({
+    ...FULL_LEAD,
+    leadType: 'RETENTION',
+    juniorCloserId: null,
+    closerId: null,
+    retentionId: 'r-1',
+    retentionAssignedAt: assignedAgoMs === null ? null : new Date(Date.now() - assignedAgoMs),
+  });
+
+  it('hides a freshly assigned lead from teammates', async () => {
+    db.lead.findUnique.mockResolvedValueOnce(retentionLead(1 * HOUR));
+    expect(await getLeadById('lead-1', { id: 'r-2', role: 'RETENTION' })).toEqual({ error: 'Lead not found', status: 404 });
+  });
+
+  it('shows a freshly assigned lead to its assignee', async () => {
+    const lead = retentionLead(1 * HOUR);
+    db.lead.findUnique.mockResolvedValueOnce(lead);
+    expect(await getLeadById('lead-1', { id: 'r-1', role: 'RETENTION' })).toEqual({ data: { lead } });
+  });
+
+  it('opens the lead to teammates after 4 hours, and when never admin-assigned', async () => {
+    for (const lead of [retentionLead(5 * HOUR), retentionLead(null)]) {
+      db.lead.findUnique.mockResolvedValueOnce(lead);
+      expect(await getLeadById('lead-1', { id: 'r-2', role: 'RETENTION' })).toEqual({ data: { lead } });
+    }
+  });
+
+  it('blocks a teammate from submitting inside the window', async () => {
+    db.lead.findUnique.mockResolvedValueOnce(retentionLead(1 * HOUR));
+    expect(await enrichAndSubmitRetentionLead('lead-1', 'r-2', {})).toEqual({ error: 'Lead not found', status: 404 });
+    expect(db.lead.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('scopes the queue to the caller or leads past the window', async () => {
+    db.lead.findMany.mockResolvedValueOnce([]);
+    await listRetentionQueue('r-2');
+    const where = (db.lead.findMany.mock.calls[0][0] as { where: { OR: unknown[] } }).where;
+    expect(where.OR).toEqual([
+      { retentionId: 'r-2' },
+      { retentionAssignedAt: null },
+      { retentionAssignedAt: { lte: expect.any(Date) } },
+    ]);
   });
 });
 

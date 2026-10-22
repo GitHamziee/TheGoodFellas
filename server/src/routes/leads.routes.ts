@@ -416,8 +416,8 @@ router.post(
 router.get(
   '/retention/queue',
   requireRole('RETENTION'),
-  asyncHandler(async (_req, res) => {
-    const leads = await leadService.listRetentionQueue();
+  asyncHandler(async (req, res) => {
+    const leads = await leadService.listRetentionQueue(req.user!.id);
     return apiSuccess(res, { leads });
   })
 );
@@ -435,7 +435,7 @@ router.patch(
   '/retention/:id/draft',
   requireRole('RETENTION'),
   asyncHandler(async (req, res) => {
-    const result = await leadService.saveRetentionLeadAsDraft(req.params.id, req.body ?? {});
+    const result = await leadService.saveRetentionLeadAsDraft(req.params.id, req.user!.id, req.body ?? {});
     return sendResult(res, result, 'Lead saved as a draft');
   })
 );
