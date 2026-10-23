@@ -12,11 +12,18 @@
   animation: fade-up 0.35s ease backwards;
 }
 
-/* Narrower cap for single-record entry forms (intake/enrichment) — the full 1200px page
- * width stretches a 2-column form-grid into uncomfortably wide input boxes. List/table
- * pages keep the wide `.page` default; this is opt-in per page. */
-.page.page--narrow {
-  max-width: 760px;
+/* Single-record entry forms (intake/enrichment) use the full 1200px page width and go to
+ * 3 field columns on wide screens instead of stretching 2 columns into oversized inputs.
+ * Scoped to the page so form-grids in modals and side panels stay 2-column. */
+@media (min-width: 1280px) {
+  .page--form .form-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  /* Full-width at 2 columns, but shares its row with the field before it at 3. */
+  .page--form .form-grid .wide {
+    grid-column: span 2;
+  }
 }
 
 /* ---------- Page header ---------- */
