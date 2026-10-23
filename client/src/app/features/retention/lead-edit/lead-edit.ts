@@ -375,15 +375,18 @@ export class RetentionLeadEdit implements OnInit {
     }
   }
 
-  /** Flips the Callback flag only — no form fields are sent, so unsaved edits stay on screen. */
+  /** Flips the Callback flag only — no form fields are sent. Marking closes the form back to
+   *  the leads list; removing keeps you on the lead to keep working it. */
   async toggleCallback(): Promise<void> {
     this.error.set(null);
     this.savingCallback.set(true);
     try {
-      const lead = this.isCallback()
-        ? await this.leadService.retentionRemoveCallback(this.leadId)
-        : await this.leadService.retentionMarkCallback(this.leadId);
-      this.lead.set(lead);
+      if (this.isCallback()) {
+        this.lead.set(await this.leadService.retentionRemoveCallback(this.leadId));
+      } else {
+        await this.leadService.retentionMarkCallback(this.leadId);
+        this.router.navigateByUrl('/retention/leads');
+      }
     } catch (err) {
       this.error.set(apiErrorMessage(err, 'Could not update the callback.'));
     } finally {

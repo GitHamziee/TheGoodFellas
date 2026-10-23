@@ -511,7 +511,10 @@ export const routes: Routes = [
         loadComponent: () => import('./features/retention/lead-edit/lead-edit').then((m) => m.RetentionLeadEdit),
       },
       { path: 'queue', redirectTo: 'leads', pathMatch: 'full' },
-      { path: 'history', redirectTo: 'leads', pathMatch: 'full' },
+      {
+        path: 'history',
+        loadComponent: () => import('./features/retention/history/history').then((m) => m.RetentionHistory),
+      },
       {
         path: 'state-sheet',
         loadComponent: () => import('./features/admin/state-sheet/state-sheet').then((m) => m.StateSheet),

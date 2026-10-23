@@ -1,8 +1,4 @@
 <div class="page" appNoCopy>
-  <div class="period-bar">
-    <app-period-filter [(period)]="period" [(anchor)]="anchor" />
-  </div>
-
   @if (error()) {
     <div class="error">{{ error() }}</div>
   }
@@ -11,7 +7,7 @@
     <app-search-box
       [value]="pendingView.search()"
       placeholder="Search leads…"
-      (valueChange)="setSearch($event)"
+      (valueChange)="pendingView.setSearch($event)"
     />
   </div>
 
@@ -79,13 +75,13 @@
                       <svg lucidePhoneCall></svg>
                     </button>
                     {{ lead.customerName }}
-                    @if (lead.status === 'DRAFT' || lead.status === 'RETURNED_TO_RETENTION') {
+                    @if ((lead.status === 'DRAFT' && !lead.callbackById) || lead.status === 'RETURNED_TO_RETENTION') {
                       <app-status-badge [status]="lead.status" />
                     }
                   </div>
                   @if (lead.status === 'RETURNED_TO_RETENTION' && lead.returnReason) {
                     <div class="row-reason row-reason--returned"><b>Admin:</b> {{ lead.returnReason }}</div>
-                  } @else if (lead.status === 'DRAFT' && draftReasonText(lead); as reason) {
+                  } @else if (lead.status === 'DRAFT' && !lead.callbackById && draftReasonText(lead); as reason) {
                     <div class="row-reason">{{ reason }}</div>
                   }
                 </td>
@@ -120,90 +116,6 @@
         </table>
       </div>
 
-      <app-pagination
-        [page]="pendingView.page()"
-        [totalPages]="pendingView.totalPages()"
-        [total]="pendingView.total()"
-        (pageChange)="pendingView.page.set($event)"
-      />
-    }
-  </div>
-
-  <div class="card card--flush">
-    <div class="section-head">
-      <h2>History</h2>
-      <div class="pills">
-        @for (filter of statusFilters; track filter.value) {
-          <button
-            type="button"
-            class="pill"
-            [class.active]="historyView.status() === filter.value"
-            (click)="historyView.setStatus(filter.value)"
-          >
-            {{ filter.label }}
-            <span class="n">{{ statusCounts()[filter.value] }}</span>
-          </button>
-        }
-      </div>
-    </div>
-
-    @if (loading()) {
-      <app-skeleton-rows [count]="4" />
-    } @else if (historyView.total() === 0) {
-      <app-empty-state title="Nothing in this period">
-        <svg lucideSend></svg>
-      </app-empty-state>
-    } @else {
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th class="sortable" (click)="historyView.toggleSort('customerName')">
-                Customer <span class="arrow">{{ sortArrow(historyView, 'customerName') }}</span>
-              </th>
-              <th class="hide-md">Worked by</th>
-              <th class="hide-md">Client</th>
-              <th class="sortable" (click)="historyView.toggleSort('status')">
-                Outcome <span class="arrow">{{ sortArrow(historyView, 'status') }}</span>
-              </th>
-              <th class="sortable right hide-sm" (click)="historyView.toggleSort('createdAt')">
-                Submitted <span class="arrow">{{ sortArrow(historyView, 'createdAt') }}</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (lead of historyView.rows(); track lead.id) {
-              <tr>
-                <td><div class="cell-main">{{ lead.customerName }}</div></td>
-                <td class="hide-md">
-                  @if (lead.retention) {
-                    <div class="person">
-                      <span class="avatar-sm" [class]="getAvatarTone(lead.retention.id)">
-                        {{ getInitials(lead.retention.name) }}
-                      </span>
-                      <span class="nm">{{ lead.retention.name }}</span>
-                    </div>
-                  } @else {
-                    <span class="empty">—</span>
-                  }
-                </td>
-                <td class="hide-md">{{ lead.client?.name || '—' }}</td>
-                <td><app-status-badge [status]="lead.status" /></td>
-                <td class="right hide-sm">
-                  <span class="chip"><svg lucideClock></svg>{{ timeAgo(lead.createdAt) }}</span>
-                </td>
-              </tr>
-            }
-          </tbody>
-        </table>
-      </div>
-
-      <app-pagination
-        [page]="historyView.page()"
-        [totalPages]="historyView.totalPages()"
-        [total]="historyView.total()"
-        (pageChange)="historyView.page.set($event)"
-      />
     }
   </div>
 </div>

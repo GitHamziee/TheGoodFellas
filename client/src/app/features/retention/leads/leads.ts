@@ -12,20 +12,19 @@ import { AuthService } from '../../../core/services/auth.service';
 import { ZoomPhoneService } from '../../../core/services/zoom-phone.service';
 import { Lead } from '../../../core/models/lead.model';
 import { ListView, createListView } from '../../../core/list-view';
-import { getAvatarTone, getInitials, pacificIsoDate, pacificToday, timeAgo } from '../../../core/format-utils';
+import { getAvatarTone, getInitials, timeAgo } from '../../../core/format-utils';
 import { DRAFT_REASON_LABEL } from '../../../core/lead-options';
-import { EmptyState, Pagination, SearchBox, SkeletonRows, StatusBadge } from '../../../shared/ui/ui';
+import { EmptyState, SearchBox, SkeletonRows, StatusBadge } from '../../../shared/ui/ui';
 import { Select } from '../../../shared/ui/select';
-import { Period, PeriodFilter, inPeriod } from '../../../shared/ui/period-filter';
 import { NoCopy } from '../../../shared/no-copy.directive';
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 import { apiErrorMessage } from '../../../core/api';
 
 /**
- * One page for the Retention team's leads: what still needs working on top (queue, drafts,
- * sent-back), what has already gone onward below. Both lists are the whole team's — any
- * Retention person can open and submit a teammate's lead — and both are masked like the
- * Closer's: no phone or carrier, only the customer, who worked it, and the outcome.
+ * The Retention team's work queue — new, drafts (incl. sent-back) and the caller's callbacks.
+ * The whole team's list, since any Retention person can open and submit a teammate's lead;
+ * masked like the Closer's (no phone or carrier). Shown in full, no pagination. What has
+ * already gone onward lives on the History page.
  */
 type PendingTab = 'new' | 'drafts' | 'callbacks';
 
@@ -35,11 +34,9 @@ type PendingTab = 'new' | 'drafts' | 'callbacks';
     FormsModule,
     RouterLink,
     Select,
-    PeriodFilter,
     NoCopy,
     StatusBadge,
     SearchBox,
-    Pagination,
     EmptyState,
     SkeletonRows,
     LucideSend,
@@ -57,11 +54,6 @@ export class RetentionLeads implements OnInit {
   private readonly zoom = inject(ZoomPhoneService);
 
   readonly pending = signal<Lead[]>([]);
-  readonly allPast = signal<Lead[]>([]);
-  readonly period = signal<Period>('day');
-  readonly anchor = signal(pacificIsoDate(pacificToday()));
-  /** History submitted inside the selected period; the pending backlog is never filtered. */
-  readonly past = computed(() => inPeriod(this.allPast(), this.period(), this.anchor()));
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
 
@@ -72,14 +64,6 @@ export class RetentionLeads implements OnInit {
   readonly getInitials = getInitials;
   readonly getAvatarTone = getAvatarTone;
   readonly timeAgo = timeAgo;
-
-  readonly statusFilters = [
-    { label: 'All', value: '' },
-    { label: 'Submitted', value: 'SUBMITTED' },
-    { label: 'Assigned', value: 'ASSIGNED' },
-    { label: 'Approved', value: 'ACCEPTED' },
-    { label: 'Declined', value: 'REJECTED' },
-  ];
 
   private readonly teammates = computed(() => {
     const seen = new Map<string, string>();
@@ -135,29 +119,7 @@ export class RetentionLeads implements OnInit {
       updatedAt: (l) => new Date(l.updatedAt ?? l.createdAt).getTime(),
     },
     initialSort: { key: 'updatedAt', dir: 'desc' },
-    pageSize: 8,
-  });
-
-  readonly historyView = createListView<Lead>({
-    source: this.past,
-    searchFields: (l) => [l.customerName, l.retention?.name, l.client?.name],
-    statusOf: (l) => l.status,
-    sorters: {
-      customerName: (l) => l.customerName,
-      status: (l) => l.status,
-      createdAt: (l) => new Date(l.createdAt).getTime(),
-      updatedAt: (l) => new Date(l.updatedAt ?? l.createdAt).getTime(),
-    },
-    initialSort: { key: 'updatedAt', dir: 'desc' },
-    pageSize: 10,
-  });
-
-  readonly statusCounts = computed(() => {
-    const rows = this.past();
-    const counts: Record<string, number> = { '': rows.length };
-    for (const f of this.statusFilters) if (f.value) counts[f.value] = 0;
-    for (const l of rows) counts[l.status] = (counts[l.status] ?? 0) + 1;
-    return counts;
+    pageSize: Infinity,
   });
 
   async ngOnInit(): Promise<void> {
@@ -169,12 +131,7 @@ export class RetentionLeads implements OnInit {
   async refresh(): Promise<void> {
     if (!isSilentReload()) this.loading.set(true);
     try {
-      const [pending, past] = await Promise.all([
-        this.leadService.retentionQueue(),
-        this.leadService.retentionHistory(),
-      ]);
-      this.pending.set(pending);
-      this.allPast.set(past);
+      this.pending.set(await this.leadService.retentionQueue());
     } catch {
       this.error.set('Could not load the leads. Refresh to try again.');
     } finally {
@@ -197,12 +154,6 @@ export class RetentionLeads implements OnInit {
     } finally {
       this.dialingId.set(null);
     }
-  }
-
-  /** One search box drives both lists. */
-  setSearch(value: string): void {
-    this.pendingView.setSearch(value);
-    this.historyView.setSearch(value);
   }
 
   /** Why a draft was parked — the picked reason, or the typed note when the reason is "Other". */
