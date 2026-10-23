@@ -60,7 +60,7 @@
             </tr>
           </thead>
           <tbody>
-            @for (lead of pendingView.rows(); track lead.id) {
+            @for (lead of pendingView.filtered(); track lead.id) {
               <tr>
                 <td>
                   <div class="cell-main name-row">

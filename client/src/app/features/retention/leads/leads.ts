@@ -119,7 +119,6 @@ export class RetentionLeads implements OnInit {
       updatedAt: (l) => new Date(l.updatedAt ?? l.createdAt).getTime(),
     },
     initialSort: { key: 'updatedAt', dir: 'desc' },
-    pageSize: Infinity,
   });
 
   async ngOnInit(): Promise<void> {
