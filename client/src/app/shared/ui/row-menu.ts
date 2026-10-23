@@ -1,5 +1,6 @@
 import { Component, DestroyRef, ElementRef, HostListener, inject, signal } from '@angular/core';
 import { LucideEllipsis } from '@lucide/angular';
+import { uiZoom } from '../../core/ui-zoom';
 
 /**
  * "⋯" overflow menu for table-row actions. Projected children are the menu items (plain
@@ -44,11 +45,12 @@ export class RowMenu {
   protected toggle(event: Event): void {
     event.stopPropagation();
     if (this.open()) return this.open.set(false);
+    const z = uiZoom();
     const r = this.host.nativeElement.getBoundingClientRect();
     const panelHeight = 150;
     // Open upward when there isn't room below, so the last rows' menus stay on screen.
-    this.top.set(r.bottom + panelHeight > window.innerHeight ? Math.max(8, r.top - panelHeight - 4) : r.bottom + 4);
-    this.left.set(Math.max(8, r.right - 184));
+    this.top.set((r.bottom + panelHeight * z > window.innerHeight ? Math.max(8, r.top - (panelHeight + 4) * z) : r.bottom + 4 * z) / z);
+    this.left.set(Math.max(8, r.right / z - 184));
     this.open.set(true);
   }
 

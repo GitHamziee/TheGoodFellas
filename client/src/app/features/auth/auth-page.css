@@ -9,7 +9,7 @@
    ============================================================ */
 
 .auth-split {
-  min-height: 100dvh;
+  min-height: calc(100dvh / var(--ui-zoom));
   display: grid;
   grid-template-columns: 1.05fr 1fr;
 }

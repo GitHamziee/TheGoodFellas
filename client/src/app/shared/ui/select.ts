@@ -13,6 +13,7 @@ import {
 } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 import { LucideCheck, LucideChevronDown } from '@lucide/angular';
+import { uiZoom } from '../../core/ui-zoom';
 
 export interface SelectOption {
   value: unknown;
@@ -142,12 +143,13 @@ export class Select implements ControlValueAccessor, OnDestroy {
       return;
     }
 
+    const z = uiZoom();
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
     this.menuStyle.set({
       position: 'fixed',
-      top: `${rect.bottom + 6}px`,
-      left: `${rect.left}px`,
-      width: `${rect.width}px`,
+      top: `${rect.bottom / z + 6}px`,
+      left: `${rect.left / z}px`,
+      width: `${rect.width / z}px`,
     });
     this.open.set(true);
     // Scroll events don't bubble, and every portal page scrolls an inner `.content` div

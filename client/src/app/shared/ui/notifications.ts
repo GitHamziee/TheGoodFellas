@@ -74,7 +74,7 @@ function relativeTime(iso: string): string {
       display: flex;
       flex-direction: column;
       gap: 0.65rem;
-      width: min(380px, calc(100vw - 2rem));
+      width: min(380px, calc(100vw / var(--ui-zoom) - 2rem));
       pointer-events: none;
     }
     .toast {
@@ -265,7 +265,7 @@ export class ToastHost {
       right: 0;
       top: calc(100% + 0.5rem);
       z-index: 1100;
-      width: min(400px, calc(100vw - 2rem));
+      width: min(400px, calc(100vw / var(--ui-zoom) - 2rem));
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius-lg);
@@ -293,7 +293,7 @@ export class ToastHost {
     }
     .mark-all:disabled { opacity: 0.4; cursor: default; }
     .mark-all svg { width: 14px; height: 14px; }
-    .panel-list { max-height: min(460px, 65vh); overflow-y: auto; }
+    .panel-list { max-height: min(460px, calc(65vh / var(--ui-zoom))); overflow-y: auto; }
     .item {
       --accent: var(--gold-600);
       width: 100%;

@@ -1,6 +1,6 @@
 :host {
   display: block;
-  min-height: 100vh;
+  min-height: calc(100vh / var(--ui-zoom));
   background:
     radial-gradient(60% 45% at 0% 0%, rgba(212, 175, 55, 0.2), transparent 70%),
     radial-gradient(45% 40% at 100% 100%, rgba(217, 155, 106, 0.16), transparent 70%),
@@ -15,7 +15,7 @@
   align-content: center;
   gap: 1.25rem 1.5rem;
   max-width: 1280px;
-  min-height: 100vh;
+  min-height: calc(100vh / var(--ui-zoom));
   margin: 0 auto;
   padding: 1.25rem 2rem;
 }
@@ -202,7 +202,7 @@
 
 /* Done */
 .done {
-  min-height: 100vh;
+  min-height: calc(100vh / var(--ui-zoom));
   display: grid;
   place-items: center;
   padding: 2rem;

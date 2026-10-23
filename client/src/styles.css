@@ -84,8 +84,22 @@
   box-sizing: border-box;
 }
 
+/* The whole UI renders at 90% on desktop — 100% browser zoom read as oversized.
+   CSS zoom scales viewport units too, so full-height rules divide by --ui-zoom,
+   and JS that positions fixed elements from getBoundingClientRect uses uiZoom(). */
+:root {
+  --ui-zoom: 1;
+}
+
+@media (min-width: 881px) {
+  :root {
+    --ui-zoom: 0.9;
+  }
+}
+
 html {
   scroll-behavior: smooth;
+  zoom: var(--ui-zoom);
 }
 
 body {

@@ -1872,7 +1872,7 @@ tr.expand-row td {
   display: flex;
   align-items: center;
   gap: 1.25rem;
-  max-width: calc(100vw - 2rem);
+  max-width: calc(100vw / var(--ui-zoom) - 2rem);
   padding: 0.55rem 0.55rem 0.55rem 0.85rem;
   background: linear-gradient(180deg, var(--ink-700), var(--ink-900));
   color: #fff;

@@ -1,5 +1,5 @@
 .public-shell {
-  min-height: 100dvh;
+  min-height: calc(100dvh / var(--ui-zoom));
   display: flex;
   flex-direction: column;
   background: var(--surface);

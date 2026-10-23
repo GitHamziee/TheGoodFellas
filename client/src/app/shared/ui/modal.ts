@@ -58,7 +58,7 @@ import { LucideX } from '@lucide/angular';
     .modal {
       width: 100%;
       max-width: 520px;
-      max-height: 88dvh;
+      max-height: calc(88dvh / var(--ui-zoom));
       display: flex;
       flex-direction: column;
       background: var(--surface);

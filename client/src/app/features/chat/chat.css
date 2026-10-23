@@ -6,7 +6,7 @@
   position: relative;
   display: grid;
   grid-template-columns: 20rem 1fr;
-  height: calc(100vh - 8.5rem);
+  height: calc(100vh / var(--ui-zoom) - 8.5rem);
   min-height: 30rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -941,7 +941,7 @@
 @media (max-width: 820px) {
   .wa {
     grid-template-columns: 1fr;
-    height: calc(100vh - 7rem);
+    height: calc(100vh / var(--ui-zoom) - 7rem);
   }
 
   .wa-list,

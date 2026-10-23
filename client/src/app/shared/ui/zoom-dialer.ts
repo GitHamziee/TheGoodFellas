@@ -47,10 +47,10 @@ import { ZOOM_EMBED_URL, ZoomPhoneService } from '../../core/services/zoom-phone
       bottom: 16px;
       z-index: 900;
       width: 360px;
-      max-width: calc(100vw - 32px);
+      max-width: calc(100vw / var(--ui-zoom) - 32px);
       /* Zoom needs at least 350×580 for the embed itself, plus our header bar. */
       height: 640px;
-      max-height: calc(100vh - 32px);
+      max-height: calc(100vh / var(--ui-zoom) - 32px);
       display: flex;
       flex-direction: column;
       background: var(--surface);
