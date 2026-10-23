@@ -735,7 +735,7 @@
         <input type="number" min="0" [(ngModel)]="chargeBackPkrAmount" name="chargeBackPkrAmount" placeholder="0" />
       </label>
       <label class="full">
-        Reason <span class="req">Required</span>
+        <span>Reason <span class="req" title="Required">*</span></span>
         <app-select [options]="chargeBackReasonOptions" [(ngModel)]="chargeBackReasonChoice" name="chargeBackReasonChoice" placeholder="Select a reason…" />
       </label>
       @if (chargeBackReasonChoice === 'OTHER') {

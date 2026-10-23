@@ -44,6 +44,7 @@ import {
 import { SkeletonRows } from '../../../shared/ui/ui';
 import { Modal } from '../../../shared/ui/modal';
 import { Select } from '../../../shared/ui/select';
+import { FormSections } from '../../../shared/ui/form-sections';
 import { NoCopy } from '../../../shared/no-copy.directive';
 import { PhoneInput } from '../../../shared/ui/phone-input';
 import { ZipInput } from '../../../shared/ui/zip-input';
@@ -94,6 +95,7 @@ const TRACKED: (keyof CloserCreateLeadInput)[] = [
     SkeletonRows,
     Modal,
     Select,
+    FormSections,
     NoCopy,
     LucideSend,
     LucideUser,

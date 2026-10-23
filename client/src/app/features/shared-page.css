@@ -26,6 +26,200 @@
   }
 }
 
+/* Section index rail (<app-form-sections>) beside the form from 1100px up — widened page
+ * so the rail doesn't eat the field columns. Below that it sits on top as wrapping chips. */
+.page--form {
+  max-width: 1400px;
+}
+
+.form-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.form-layout > .card {
+  margin-bottom: 0;
+}
+
+@media (min-width: 1100px) {
+  .form-layout {
+    grid-template-columns: 210px minmax(0, 1fr);
+    column-gap: 1.75rem;
+  }
+
+  .form-layout > app-form-sections {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    position: sticky;
+    top: 0;
+  }
+
+  .form-layout > :not(app-form-sections) {
+    grid-column: 2;
+  }
+}
+
+.form-sections ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.fs-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.2rem 0 0.9rem;
+}
+
+.fs-progress strong {
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.fs-track {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--field-border);
+  overflow: hidden;
+}
+
+.fs-bar {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--gold-500);
+  transition: width 0.3s ease;
+}
+
+.fs-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.7rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--gray-600);
+  font: inherit;
+  font-size: 0.85rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.fs-item:hover {
+  background: var(--field-bg);
+  color: var(--text);
+}
+
+.fs-item.active {
+  background: var(--field-bg);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.fs-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.fs-count {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--gray-500);
+  font-variant-numeric: tabular-nums;
+}
+
+.fs-mark {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 2px solid var(--gray-300);
+}
+
+.fs-mark.partial {
+  border-color: var(--gold-500);
+  background: radial-gradient(circle, var(--gold-500) 0 3px, transparent 3.5px);
+}
+
+.fs-mark.done {
+  border-color: var(--success-700);
+  background: var(--success-700);
+  color: #fff;
+}
+
+.fs-mark svg {
+  width: 10px;
+  height: 10px;
+  stroke-width: 3.5;
+}
+
+@media (max-width: 1099px) {
+  .form-sections ul {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+
+  .fs-item {
+    width: auto;
+    padding: 0.4rem 0.65rem;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    font-size: 0.8rem;
+  }
+}
+
+/* Lightly filled fields with a gold focus ring — form pages only, so search boxes,
+ * filters and modals keep the plain surface. */
+.page--form .card input:not([type='checkbox']):not([type='radio']):not([readonly]),
+.page--form .card textarea,
+.page--form .card .dropdown-trigger {
+  background: var(--field-bg);
+  border-color: var(--field-border);
+}
+
+.page--form .card input:not([type='checkbox']):not([type='radio']):not([readonly]):focus-visible,
+.page--form .card textarea:focus-visible,
+.page--form .card .dropdown-trigger.open,
+.page--form .card .dropdown-trigger:focus-visible {
+  background: var(--surface);
+  border-color: var(--gold-500);
+  box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.22);
+}
+
+.page--form .card input::placeholder,
+.page--form .card textarea::placeholder,
+.page--form .card .dropdown-trigger .placeholder {
+  color: var(--gray-400);
+  font-weight: 400;
+}
+
+.page--form .card .dropdown-trigger:hover {
+  border-color: var(--gold-500);
+}
+
+.page--form .card input.invalid,
+.page--form .card .dropdown-trigger.invalid {
+  border-color: var(--danger-600);
+}
+
+.page--form .section {
+  scroll-margin-top: 1rem;
+}
+
 /* ---------- Page header ---------- */
 .page-head {
   display: flex;
@@ -346,11 +540,10 @@ input[readonly] {
 }
 
 .req {
-  font-size: 0.68rem;
+  font-size: 0.9rem;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--gold-700);
+  line-height: 1;
+  color: var(--accent-600);
 }
 
 /* ---------- Custom dropdown — styled alternative to native <select>, whose
@@ -515,10 +708,19 @@ input[readonly] {
   flex-wrap: wrap;
   padding: 0.9rem 1.25rem;
   border: 1px solid var(--border);
+  border-top: 1px solid var(--gray-300);
   border-radius: var(--radius-lg);
   background: var(--surface);
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.05);
   margin-bottom: 0.5rem;
+}
+
+/* Disabled submit reads as grey, not a faded gold that looks broken. */
+.form-actions .btn:not(.btn--ghost):disabled {
+  background: var(--gray-200);
+  color: var(--gray-500);
+  opacity: 1;
+  filter: none;
 }
 
 .pending-note {
@@ -673,7 +875,16 @@ input[readonly] {
   box-shadow: var(--shadow-gold);
 }
 
+.pick-card { min-width: 0; }
+
 .pick-card .who { min-width: 0; display: flex; flex-direction: column; }
+
+/* Long emails truncate instead of spilling past the card's right edge. */
+.pick-card .who > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 textarea {
   resize: vertical;

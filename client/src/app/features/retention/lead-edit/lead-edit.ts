@@ -39,6 +39,7 @@ import { formatCardExpiry, getInitials, sanitizeDigits, toDateInput, todayDateIn
 import { SkeletonRows } from '../../../shared/ui/ui';
 import { Modal } from '../../../shared/ui/modal';
 import { Select } from '../../../shared/ui/select';
+import { FormSections } from '../../../shared/ui/form-sections';
 import { NoCopy } from '../../../shared/no-copy.directive';
 import { PhoneInput } from '../../../shared/ui/phone-input';
 import { ZipInput } from '../../../shared/ui/zip-input';
@@ -98,6 +99,7 @@ interface LookupUser {
     SkeletonRows,
     Modal,
     Select,
+    FormSections,
     NoCopy,
     LucideSend,
     LucideUser,

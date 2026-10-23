@@ -4,10 +4,8 @@
       @if (isCorrection) {
         <a class="back-link" routerLink="/junior/returned"><svg lucideArrowLeft></svg> Sent back to me</a>
         <h1>Correct Lead</h1>
-        <p class="sub">Fix what the admin flagged, then send it back to them.</p>
       } @else {
         <a class="back-link" routerLink="/junior/my-leads"><svg lucideArrowLeft></svg> My lead history</a>
-        <p class="sub">Capture the intake, pick the closer who'll work it, and send it on.</p>
       }
     </div>
   </div>
@@ -19,7 +17,8 @@
     <div class="warn"><strong>Admin asked you to fix:</strong> {{ reason }}</div>
   }
 
-  <form appNoCopy (ngSubmit)="submit()">
+  <form class="form-layout" appNoCopy (ngSubmit)="submit()">
+    <app-form-sections />
     <div class="card">
     <!-- Lead type — creation only; a returned lead keeps the type it already has. -->
     @if (!isCorrection) {
@@ -78,7 +77,7 @@
       <h2 class="section-title"><svg lucideUser></svg> Customer</h2>
       <div class="form-grid">
         <label>
-          Customer's name <span class="req">Required</span>
+          <span>Customer's name <span class="req" title="Required">*</span></span>
           <input
             type="text"
             name="customerName"
@@ -91,7 +90,7 @@
         </label>
 
         <label>
-          Phone number <span class="req">Required</span>
+          <span>Phone number <span class="req" title="Required">*</span></span>
           <input appPhone name="phone"
             [(ngModel)]="form.phone"
             [class.invalid]="showErrors() && !form.phone"
@@ -102,7 +101,7 @@
         </label>
 
         <label>
-          State <span class="req">Required</span>
+          <span>State <span class="req" title="Required">*</span></span>
           <app-select [options]="stateOptions" [searchable]="true" name="state" [(ngModel)]="form.state" [invalid]="showErrors() && !form.state" />
           @if (showErrors() && !form.state) {
             <span class="field-error">Enter the customer's state.</span>
@@ -238,7 +237,7 @@
       @if (leadType() === 'CPA') {
         <h2 class="section-title"><svg lucideNotebookPen></svg> Notes for the closer</h2>
         <label>
-          <span>Anything the closer should know <span class="hint">Optional</span></span>
+          Anything the closer should know
           <textarea
             name="juniorNotes"
             rows="4"
@@ -249,7 +248,7 @@
       } @else {
         <h2 class="section-title"><svg lucideNotebookPen></svg> Notes for admin</h2>
         <label>
-          <span>Anything admin should know <span class="hint">Optional</span></span>
+          Anything admin should know
           <textarea
             name="juniorNotes"
             rows="4"

@@ -26,6 +26,7 @@ import {
 } from '../../../core/lead-options';
 import { calculateAge, getAvatarTone, getInitials, toDateInput, todayDateInput } from '../../../core/format-utils';
 import { Select } from '../../../shared/ui/select';
+import { FormSections } from '../../../shared/ui/form-sections';
 import { NoCopy } from '../../../shared/no-copy.directive';
 import { PhoneInput } from '../../../shared/ui/phone-input';
 import { ZipInput } from '../../../shared/ui/zip-input';
@@ -74,6 +75,7 @@ interface LookupUser {
     FormsModule,
     RouterLink,
     Select,
+    FormSections,
     NoCopy,
     LucideSend,
     LucideUser,

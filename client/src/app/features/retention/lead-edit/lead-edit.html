@@ -6,13 +6,10 @@
         <h1>Callback</h1>
       } @else if (isReturned()) {
         <h1>Correct Lead</h1>
-        <p class="sub">Fix what the admin flagged, then send it back to them.</p>
       } @else if (isDraft()) {
         <h1>Resume Draft</h1>
-        <p class="sub">Pick up where it was left off, then submit it to the admin team.</p>
       } @else {
         <h1>Complete Lead</h1>
-        <p class="sub">Fill in what the sheet didn't give us, then submit it to the admin team.</p>
       }
     </div>
   </div>
@@ -52,23 +49,15 @@
       </div>
     }
 
-    <div class="progress-card">
-      <div class="pl">
-        <span>Application completeness</span>
-        <strong>{{ completeness() }}%</strong>
-      </div>
-      <div class="pt"><span class="pb" [style.width.%]="completeness()"></span></div>
-      <p class="ph">Everything below is optional except name, phone and state — fill in as much as you can confirm.</p>
-    </div>
-
-    <form appNoCopy (ngSubmit)="submit()" (input)="touch()" (change)="touch()">
+    <form class="form-layout" appNoCopy (ngSubmit)="submit()" (input)="touch()" (change)="touch()">
+      <app-form-sections [percent]="completeness()" />
       <div class="card">
       <!-- Personal -->
       <div class="section">
         <h2 class="section-title"><svg lucideUser></svg> Personal & contact</h2>
         <div class="form-grid">
           <label>
-            Customer's name <span class="req">Required</span>
+            <span>Customer's name <span class="req" title="Required">*</span></span>
             <input type="text" name="customerName" [(ngModel)]="form.customerName"
               [class.invalid]="showErrors() && !form.customerName" />
             @if (showErrors() && !form.customerName) {
@@ -76,7 +65,7 @@
             }
           </label>
           <label>
-            Phone number <span class="req">Required</span>
+            <span>Phone number <span class="req" title="Required">*</span></span>
             <input appPhone [maxDigits]="10" name="phone" [(ngModel)]="form.phone"
               [class.invalid]="showErrors() && !form.phone" />
             @if (showErrors() && !form.phone) {
@@ -84,7 +73,7 @@
             }
           </label>
           <label>
-            State <span class="req">Required</span>
+            <span>State <span class="req" title="Required">*</span></span>
             <app-select [options]="stateOptions" [searchable]="true" name="state" [(ngModel)]="form.state" [invalid]="showErrors() && !form.state" />
             @if (showErrors() && !form.state) {
               <span class="field-error">Enter the customer's state.</span>
@@ -99,7 +88,7 @@
             <input type="text" name="mailingAddress" [(ngModel)]="form.mailingAddress" />
           </label>
           <label>
-            <span>Email <span class="hint">Optional</span></span>
+            Email
             <input type="email" name="email" [(ngModel)]="form.email" />
           </label>
           <label>
@@ -240,7 +229,7 @@
               (ngModelChange)="form.planType = $event; touch()" placeholder="Select a plan type…" />
           </label>
           <label>
-            Suggested client <span class="hint">Optional — helps admin decide who to assign this to</span>
+            Suggested client
             <app-select [options]="clientOptions()" [ngModel]="form.suggestedClientId" name="suggestedClientId"
               (ngModelChange)="form.suggestedClientId = $event; touch()" placeholder="No suggestion…" />
           </label>
@@ -371,7 +360,7 @@
       <div class="section">
         <h2 class="section-title"><svg lucideNotebookPen></svg> Notes for the admin team</h2>
         <label>
-          <span>Anything worth flagging <span class="hint">Optional</span></span>
+          Anything worth flagging
           <textarea name="closerNotes" rows="4" [(ngModel)]="form.closerNotes"></textarea>
         </label>
       </div>

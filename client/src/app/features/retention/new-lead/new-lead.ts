@@ -33,6 +33,7 @@ import {
   US_STATE_OPTIONS,
 } from '../../../core/lead-options';
 import { Select } from '../../../shared/ui/select';
+import { FormSections } from '../../../shared/ui/form-sections';
 import { Modal } from '../../../shared/ui/modal';
 import { NoCopy } from '../../../shared/no-copy.directive';
 import { PhoneInput } from '../../../shared/ui/phone-input';
@@ -91,6 +92,7 @@ const TRACKED: (keyof RetentionSubmitInput)[] = [
     FormsModule,
     RouterLink,
     Select,
+    FormSections,
     Modal,
     NoCopy,
     LucideSend,
