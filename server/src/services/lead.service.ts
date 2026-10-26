@@ -1531,6 +1531,8 @@ export async function rejectLead(leadId: string, clientId: string, reason?: stri
   // A CPL lead (no closer) goes back to its junior closer the same way.
   const toCloser = lead.leadType === 'CPA' && !!lead.closerId;
   const toJunior = lead.leadType === 'CPL' && !!lead.juniorCloserId;
+  // A RETENTION lead goes back to the shared Retention queue (RETURNED_TO_RETENTION).
+  const toRetention = lead.leadType === 'RETENTION' && !!lead.retentionId;
   const trimmed = isNonEmptyString(reason) ? reason.trim() : null;
 
   const updated = await prisma.lead.updateMany({
@@ -1539,6 +1541,8 @@ export async function rejectLead(leadId: string, clientId: string, reason?: stri
       ? { status: 'RETURNED_TO_CLOSER', clientId: null, rejectionReason: trimmed, returnReason: trimmed ?? 'Rejected by client' }
       : toJunior
       ? { status: 'RETURNED_TO_JUNIOR', clientId: null, rejectionReason: trimmed, returnReason: trimmed ?? 'Rejected by client' }
+      : toRetention
+      ? { status: 'RETURNED_TO_RETENTION', clientId: null, rejectionReason: trimmed, returnReason: trimmed ?? 'Rejected by client' }
       : { status: 'REJECTED', clientId: null, rejectionReason: reason ?? null },
   });
   if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
@@ -1554,6 +1558,14 @@ export async function rejectLead(leadId: string, clientId: string, reason?: stri
   }
   if (toJunior) {
     void notifyUsers([lead.juniorCloserId], {
+      kind: 'warning',
+      title: 'Client rejected your lead',
+      message: `${who(lead.customerName)} needs a re-write.${why}`,
+      page: 'RETURNED',
+    });
+  }
+  if (toRetention) {
+    void notifyUsers([lead.retentionId], {
       kind: 'warning',
       title: 'Client rejected your lead',
       message: `${who(lead.customerName)} needs a re-write.${why}`,
@@ -1601,7 +1613,7 @@ export async function batchDecideAsAdmin(
         { status: 'ASSIGNED_EXTERNAL', externalClientId: { not: null } },
       ],
     },
-    select: { id: true, leadType: true, closerId: true, juniorCloserId: true, customerName: true },
+    select: { id: true, leadType: true, closerId: true, juniorCloserId: true, retentionId: true, customerName: true },
   });
   if (eligible.length === 0) return { error: 'None of the selected leads are awaiting a response', status: 400 };
 
@@ -1624,17 +1636,22 @@ export async function batchDecideAsAdmin(
     return { data: { count: updated.count } };
   }
 
-  // REJECT: CPA leads with a closer go back to that closer for a re-write (reason carried
-  // in returnReason); everything else lands REJECTED in the admin queue as before.
+  // REJECT: CPA leads with a closer go back to that closer, CPL leads to their junior closer,
+  // RETENTION leads to the Retention queue — each for a re-write (reason carried in
+  // returnReason); everything else lands REJECTED in the admin queue as before.
   const trimmed = isNonEmptyString(reason) ? reason.trim() : null;
   const cleared = { clientId: null, externalClientId: null, rejectionReason: trimmed };
   const isCpaToCloser = (l: (typeof eligible)[number]) => l.leadType === 'CPA' && !!l.closerId;
   const isCplToJunior = (l: (typeof eligible)[number]) => l.leadType === 'CPL' && !!l.juniorCloserId;
+  const isToRetention = (l: (typeof eligible)[number]) => l.leadType === 'RETENTION' && !!l.retentionId;
   const toCloserIds = eligible.filter(isCpaToCloser).map((l) => l.id);
   const toJuniorIds = eligible.filter(isCplToJunior).map((l) => l.id);
-  const toAdminIds = eligible.filter((l) => !isCpaToCloser(l) && !isCplToJunior(l)).map((l) => l.id);
+  const toRetentionIds = eligible.filter(isToRetention).map((l) => l.id);
+  const toAdminIds = eligible
+    .filter((l) => !isCpaToCloser(l) && !isCplToJunior(l) && !isToRetention(l))
+    .map((l) => l.id);
 
-  const [toCloser, toJunior, toAdmin] = await prisma.$transaction([
+  const [toCloser, toJunior, toRetention, toAdmin] = await prisma.$transaction([
     prisma.lead.updateMany({
       where: { id: { in: toCloserIds }, ...awaiting },
       data: { ...cleared, status: 'RETURNED_TO_CLOSER', returnReason: trimmed ?? 'Rejected by admin' },
@@ -1644,11 +1661,15 @@ export async function batchDecideAsAdmin(
       data: { ...cleared, status: 'RETURNED_TO_JUNIOR', returnReason: trimmed ?? 'Rejected by admin' },
     }),
     prisma.lead.updateMany({
+      where: { id: { in: toRetentionIds }, ...awaiting },
+      data: { ...cleared, status: 'RETURNED_TO_RETENTION', returnReason: trimmed ?? 'Rejected by admin' },
+    }),
+    prisma.lead.updateMany({
       where: { id: { in: toAdminIds }, ...awaiting },
       data: { ...cleared, status: 'REJECTED' },
     }),
   ]);
-  const count = toCloser.count + toJunior.count + toAdmin.count;
+  const count = toCloser.count + toJunior.count + toRetention.count + toAdmin.count;
   if (count === 0) return { error: 'Leads were already updated', status: 409 };
 
   for (const l of eligible.filter(isCpaToCloser)) {
@@ -1662,6 +1683,15 @@ export async function batchDecideAsAdmin(
 
   for (const l of eligible.filter(isCplToJunior)) {
     void notifyUsers([l.juniorCloserId], {
+      kind: 'warning',
+      title: 'Lead rejected — needs a re-write',
+      message: `${who(l.customerName)}: ${trimmed ?? 'Rejected by admin'}`,
+      page: 'RETURNED',
+    });
+  }
+
+  for (const l of eligible.filter(isToRetention)) {
+    void notifyUsers([l.retentionId], {
       kind: 'warning',
       title: 'Lead rejected — needs a re-write',
       message: `${who(l.customerName)}: ${trimmed ?? 'Rejected by admin'}`,
