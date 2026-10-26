@@ -415,6 +415,16 @@ export class AdminLeads implements OnInit {
     this.selectedIds.set(new Set());
   }
 
+  /** Detail-popup shortcut: narrows the selection to this one lead and runs the same batch flow. */
+  actOnLead(lead: Lead, action: 'accept' | 'reject' | 'paid' | 'chargeBack'): void {
+    this.selected.set(null);
+    this.selectedIds.set(new Set([lead.id]));
+    if (action === 'accept') void this.batchAccept();
+    else if (action === 'reject') this.openRejectModal();
+    else if (action === 'paid') this.openBatchModal();
+    else this.openChargeBackModal();
+  }
+
   /** Client dropdown, narrowed by the search box inside the assign modal. */
   readonly filteredClients = computed(() => {
     const term = this.clientSearch().trim().toLowerCase();
@@ -623,7 +633,16 @@ export class AdminLeads implements OnInit {
       await this.refresh();
       this.clearSelection();
       this.rejectModalOpen.set(false);
-      this.notice.set(`Declined ${count} lead${count === 1 ? '' : 's'} — back in the queue for reassignment.`);
+      // Leads with a closer/junior/retention owner go back to them for a re-write; the rest
+      // land REJECTED in the admin queue — report where they actually went.
+      const ids = new Set(leadIds);
+      const requeued = this.leads().filter((l) => ids.has(l.id) && l.status === 'REJECTED').length;
+      const sentBack = count - requeued;
+      const parts = [
+        sentBack ? `${sentBack} sent back for a re-write` : '',
+        requeued ? `${requeued} back in the queue for reassignment` : '',
+      ].filter(Boolean);
+      this.notice.set(`Declined ${count} lead${count === 1 ? '' : 's'} — ${parts.join(', ')}.`);
     } catch (err) {
       this.error.set(apiErrorMessage(err, 'Could not decline these leads.'));
     } finally {

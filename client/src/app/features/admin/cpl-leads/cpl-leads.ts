@@ -377,6 +377,15 @@ export class AdminCplLeads implements OnInit {
     this.selectedIds.set(new Set());
   }
 
+  /** Detail-popup shortcut: narrows the selection to this one lead and runs the same batch flow. */
+  actOnLead(lead: Lead, action: 'accept' | 'reject' | 'paid'): void {
+    this.detailLead.set(null);
+    this.selectedIds.set(new Set([lead.id]));
+    if (action === 'accept') void this.batchAccept();
+    else if (action === 'reject') this.openRejectModal();
+    else this.openBatchModal();
+  }
+
   /** Client dropdown, narrowed by the search box inside the assign modal. */
   readonly filteredClients = computed(() => {
     const term = this.clientSearch().trim().toLowerCase();

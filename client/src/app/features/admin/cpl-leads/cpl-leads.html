@@ -389,6 +389,19 @@
           <svg lucideUserCheck></svg> Assign to client
         </button>
       }
+      @if (isEligibleForDecision(lead)) {
+        <button type="button" class="btn btn--danger" [disabled]="decisionSubmitting()" (click)="actOnLead(lead, 'reject')">
+          <svg lucideCircleX></svg> Decline
+        </button>
+        <button type="button" class="btn btn--success" [disabled]="decisionSubmitting()" (click)="actOnLead(lead, 'accept')">
+          <svg lucideCircleCheck></svg> Approve
+        </button>
+      }
+      @if (isEligibleForBatchPaid(lead)) {
+        <button type="button" class="btn btn--success" (click)="actOnLead(lead, 'paid')">
+          <svg lucideBanknote></svg> Mark Paid
+        </button>
+      }
       @if (lead.status === 'ACCEPTED' || lead.status === 'ASSIGNED_EXTERNAL') {
         @if (lead.paymentStatus === 'PAID') {
           <button
@@ -404,8 +417,6 @@
             }
             Mark unpaid
           </button>
-        } @else {
-          <span class="hint">Select this lead in the list and use "Mark Paid" to record the amount received.</span>
         }
       }
     </div>
