@@ -111,13 +111,6 @@ export class AdminLeads implements OnInit {
   readonly selected = signal<Lead | null>(null);
   readonly closerFilter = signal('');
   readonly sourceFilter = signal('');
-  readonly retentionPeople = signal<LookupUser[]>([]);
-  readonly assignRetentionLead = signal<Lead | null>(null);
-  /** Batch form of the assign-to-retention modal — acts on the ticked unworked retention leads. */
-  readonly batchRetentionOpen = signal(false);
-  readonly retentionAssigning = signal(false);
-  readonly retentionSearch = signal('');
-  readonly chosenRetentionId = signal('');
 
   /** Which lead each queue-style modal is acting on — only one is ever open at a time. */
   readonly assignLead = signal<Lead | null>(null);
@@ -182,9 +175,12 @@ export class AdminLeads implements OnInit {
   ]);
 
   /** CPA and Retention leads share this page (same admin actions, same payment flow). CPL
-   * leads stay on their own page. */
+   * leads stay on their own page. Retention leads only show once a retention person has
+   * worked them — imported/unworked ones (NEW, DRAFT) live on Retention Imports. */
   private readonly cpaLeads = computed(() =>
-    this.leads().filter((l) => l.leadType === 'CPA' || l.leadType === 'RETENTION'),
+    this.leads().filter(
+      (l) => l.leadType === 'CPA' || (l.leadType === 'RETENTION' && l.status !== 'NEW' && l.status !== 'DRAFT'),
+    ),
   );
 
   readonly sourceOptions = [
@@ -201,14 +197,10 @@ export class AdminLeads implements OnInit {
     return closerId ? rows.filter((l) => l.closer?.id === closerId) : rows;
   });
 
-  /** Waiting on the admin: freshly submitted, bounced back by a client, or an AI-sourced
-   * retention lead nobody has picked up yet. These sit on top whatever day they came in. */
+  /** Waiting on the admin: freshly submitted or bounced back by a client. These sit on top
+   * whatever day they came in. */
   isPending(lead: Lead): boolean {
-    return (
-      lead.status === 'SUBMITTED' ||
-      lead.status === 'REJECTED' ||
-      (lead.leadType === 'RETENTION' && lead.status === 'NEW' && !lead.retention)
-    );
+    return lead.status === 'SUBMITTED' || lead.status === 'REJECTED';
   }
 
   private readonly searchFields = (l: Lead) => [
@@ -278,10 +270,6 @@ export class AdminLeads implements OnInit {
     initialSort: { key: 'updatedAt', dir: 'desc' },
     pageSize: 15,
   });
-
-  /** One-line recap of whatever the table is currently showing. */
-  /** Row-action column only appears when some visible row has an action (retention NEW → Reassign). */
-  readonly showActions = computed(() => this.view.rows().some((l) => l.leadType === 'RETENTION' && l.status === 'NEW'));
 
   readonly summary = computed(() => {
     const rows = this.byDay();
@@ -356,15 +344,6 @@ export class AdminLeads implements OnInit {
     }));
   });
 
-  /** Retention-staff dropdown, narrowed by the search box inside the assign-retention modal. */
-  readonly filteredRetentionPeople = computed(() => {
-    const term = this.retentionSearch().trim().toLowerCase();
-    if (!term) return this.retentionPeople();
-    return this.retentionPeople().filter(
-      (p) => p.name.toLowerCase().includes(term) || p.email.toLowerCase().includes(term),
-    );
-  });
-
   readonly selectedCount = computed(() => this.selectedIds().size);
 
   /** Only unpaid ACCEPTED/ASSIGNED_EXTERNAL leads can be batch-marked paid. */
@@ -382,19 +361,9 @@ export class AdminLeads implements OnInit {
     return lead.status === 'ASSIGNED' || lead.status === 'ASSIGNED_EXTERNAL';
   }
 
-  /** Unworked retention leads — can be (re)assigned to a retention person. */
-  isEligibleForRetentionAssign(lead: Lead): boolean {
-    return lead.leadType === 'RETENTION' && lead.status === 'NEW';
-  }
-
-  /** A row is selectable if any batch action (Approve / Reject / Mark Paid / Charge Back / Assign to retention) applies to it. */
+  /** A row is selectable if any batch action (Approve / Reject / Mark Paid / Charge Back) applies to it. */
   isSelectable(lead: Lead): boolean {
-    return (
-      this.isEligibleForDecision(lead) ||
-      this.isEligibleForBatchPaid(lead) ||
-      this.isEligibleForBatchChargeBack(lead) ||
-      this.isEligibleForRetentionAssign(lead)
-    );
+    return this.isEligibleForDecision(lead) || this.isEligibleForBatchPaid(lead) || this.isEligibleForBatchChargeBack(lead);
   }
 
   private selectedLeads(): Lead[] {
@@ -404,9 +373,6 @@ export class AdminLeads implements OnInit {
 
   readonly decidableSelectedCount = computed(() => this.selectedLeads().filter((l) => this.isEligibleForDecision(l)).length);
   readonly payableSelectedCount = computed(() => this.selectedLeads().filter((l) => this.isEligibleForBatchPaid(l)).length);
-  readonly retentionAssignableSelectedCount = computed(
-    () => this.selectedLeads().filter((l) => this.isEligibleForRetentionAssign(l)).length,
-  );
   readonly chargeableSelectedCount = computed(
     () => this.selectedLeads().filter((l) => this.isEligibleForBatchChargeBack(l)).length,
   );
@@ -471,78 +437,18 @@ export class AdminLeads implements OnInit {
   });
 
   async ngOnInit(): Promise<void> {
-    const [clients, externalClients, retentionPeople] = await Promise.all([
+    const [clients, externalClients] = await Promise.all([
       this.userService.listClients(),
       this.externalClientService.list(),
-      this.userService.listRetention(),
       this.refresh(),
     ]);
     this.clients.set(clients);
     this.externalClients.set(externalClients);
-    this.retentionPeople.set(retentionPeople);
   }
 
   setSourceFilter(value: string): void {
     this.sourceFilter.set(value);
     this.view.page.set(1);
-  }
-
-  // ─── Assign to retention person (unworked retention leads only) ──
-  openAssignRetention(lead: Lead, event?: Event): void {
-    event?.stopPropagation();
-    this.error.set(null);
-    this.retentionSearch.set('');
-    this.chosenRetentionId.set(lead.retention?.id ?? '');
-    this.assignRetentionLead.set(lead);
-  }
-
-  async confirmAssignRetention(): Promise<void> {
-    const lead = this.assignRetentionLead();
-    const retentionId = this.chosenRetentionId();
-    if (!lead || !retentionId) return;
-
-    this.error.set(null);
-    this.busyId.set(lead.id);
-    try {
-      const updated = await this.leadService.assignRetention(lead.id, retentionId);
-      this.leads.update((rows) => rows.map((l) => (l.id === lead.id ? updated : l)));
-      if (this.selected()?.id === lead.id) this.selected.set(updated);
-      this.assignRetentionLead.set(null);
-      this.notice.set(`${lead.customerName} assigned to ${updated.retention?.name ?? 'retention'}.`);
-    } catch (err) {
-      this.error.set(apiErrorMessage(err, 'Could not assign the lead.'));
-    } finally {
-      this.busyId.set(null);
-    }
-  }
-
-  openBatchAssignRetention(): void {
-    if (this.retentionAssignableSelectedCount() === 0) return;
-    this.error.set(null);
-    this.retentionSearch.set('');
-    this.chosenRetentionId.set('');
-    this.batchRetentionOpen.set(true);
-  }
-
-  async confirmBatchAssignRetention(): Promise<void> {
-    const retentionId = this.chosenRetentionId();
-    if (!retentionId || this.retentionAssignableSelectedCount() === 0) return;
-
-    this.error.set(null);
-    this.retentionAssigning.set(true);
-    try {
-      const leadIds = this.selectedLeads().filter((l) => this.isEligibleForRetentionAssign(l)).map((l) => l.id);
-      const { count } = await this.leadService.batchAssignRetention(leadIds, retentionId);
-      const person = this.retentionPeople().find((p) => p.id === retentionId);
-      this.batchRetentionOpen.set(false);
-      this.clearSelection();
-      this.notice.set(`${count} ${count === 1 ? 'lead' : 'leads'} assigned to ${person?.name ?? 'retention'}.`);
-      await this.refresh();
-    } catch (err) {
-      this.error.set(apiErrorMessage(err, 'Could not assign the leads.'));
-    } finally {
-      this.retentionAssigning.set(false);
-    }
   }
 
   async refresh(): Promise<void> {

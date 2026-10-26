@@ -24,14 +24,6 @@
         <button type="button" class="btn btn--sm btn--ghost" (click)="clearSelection()">Clear</button>
         <button
           type="button"
-          class="btn btn--sm"
-          [disabled]="retentionAssignableSelectedCount() === 0"
-          (click)="openBatchAssignRetention()"
-        >
-          <svg lucideHeadset></svg> Assign to retention ({{ retentionAssignableSelectedCount() }})
-        </button>
-        <button
-          type="button"
           class="btn btn--sm btn--success"
           title="Approve on the client's behalf"
           [disabled]="decidableSelectedCount() === 0 || decisionSubmitting()"
@@ -137,22 +129,16 @@
                 </td>
                 <td (click)="$event.stopPropagation()">
                   <div class="row-actions">
-                    @if (lead.status === 'NEW') {
-                      <button type="button" class="btn btn--sm" (click)="openAssignRetention(lead, $event)">
-                        <svg lucideHeadset></svg> Assign
-                      </button>
-                    } @else {
-                      <button type="button" class="btn btn--sm" (click)="openAssign(lead, $event)">
-                        <svg lucideUserCheck></svg> Assign
-                      </button>
-                      <app-row-menu>
-                        @if (lead.status === 'REJECTED') {
-                          <button type="button" class="menu-item" (click)="openEdit(lead)"><svg lucideSquarePen></svg> Edit details</button>
-                        }
-                        <button type="button" class="menu-item" (click)="openReturn(lead)"><svg lucideUndo2></svg> Send back</button>
-                        <button type="button" class="menu-item" (click)="openAssignExternal(lead)"><svg lucideBuilding2></svg> Assign to external</button>
-                      </app-row-menu>
-                    }
+                    <button type="button" class="btn btn--sm" (click)="openAssign(lead, $event)">
+                      <svg lucideUserCheck></svg> Assign
+                    </button>
+                    <app-row-menu>
+                      @if (lead.status === 'REJECTED') {
+                        <button type="button" class="menu-item" (click)="openEdit(lead)"><svg lucideSquarePen></svg> Edit details</button>
+                      }
+                      <button type="button" class="menu-item" (click)="openReturn(lead)"><svg lucideUndo2></svg> Send back</button>
+                      <button type="button" class="menu-item" (click)="openAssignExternal(lead)"><svg lucideBuilding2></svg> Assign to external</button>
+                    </app-row-menu>
                   </div>
                 </td>
               </tr>
@@ -241,9 +227,6 @@
               <th class="sortable right" (click)="view.toggleSort('updatedAt')">
                 {{ singleDay() ? 'Time' : 'Updated' }} <span class="arrow">{{ sortArrow('updatedAt') }}</span>
               </th>
-              @if (showActions()) {
-                <th class="right">Actions</th>
-              }
             </tr>
           </thead>
           <tbody>
@@ -324,17 +307,6 @@
                     <span class="cell-sub">{{ formatDate(lead.updatedAt) }}</span>
                   }
                 </td>
-                @if (showActions()) {
-                  <td (click)="$event.stopPropagation()">
-                    <div class="row-actions">
-                      @if (lead.leadType === 'RETENTION' && lead.status === 'NEW') {
-                        <button type="button" class="btn btn--sm" (click)="openAssignRetention(lead, $event)">
-                          <svg lucideHeadset></svg> Reassign
-                        </button>
-                      }
-                    </div>
-                  </td>
-                }
               </tr>
             }
           </tbody>
@@ -361,11 +333,6 @@
     <app-lead-detail [lead]="lead" [unmasked]="true" />
 
     <div footer>
-      @if (lead.leadType === 'RETENTION' && lead.status === 'NEW') {
-        <button type="button" class="btn" (click)="selected.set(null); openAssignRetention(lead)">
-          <svg lucideHeadset></svg> {{ lead.retention ? 'Reassign' : 'Assign to retention' }}
-        </button>
-      }
       @if (lead.status === 'SUBMITTED' || lead.status === 'REJECTED') {
         @if (lead.status === 'REJECTED') {
           <button type="button" class="btn btn--ghost" (click)="selected.set(null); openEdit(lead)">
@@ -505,69 +472,6 @@
           <span class="spinner"></span> Sending…
         } @else {
           <svg lucideUndo2></svg> Send back
-        }
-      </button>
-    </div>
-  </app-modal>
-}
-
-<!-- Assign to retention person -->
-@if (assignRetentionLead() || batchRetentionOpen()) {
-  <app-modal
-    title="Assign to retention"
-    [subtitle]="
-      'Choose who works ' +
-      (batchRetentionOpen()
-        ? retentionAssignableSelectedCount() + ' lead' + (retentionAssignableSelectedCount() === 1 ? '' : 's')
-        : assignRetentionLead()?.customerName)
-    "
-    (close)="assignRetentionLead.set(null); batchRetentionOpen.set(false)"
-  >
-    @if (error()) {
-      <div class="error">{{ error() }}</div>
-    }
-
-    <app-search-box
-      [value]="retentionSearch()"
-      placeholder="Search retention staff by name or email…"
-      (valueChange)="retentionSearch.set($event)"
-    />
-
-    <div class="pick-list">
-      @for (person of filteredRetentionPeople(); track person.id) {
-        <button
-          type="button"
-          class="pick-row"
-          [class.chosen]="chosenRetentionId() === person.id"
-          (click)="chosenRetentionId.set(person.id)"
-        >
-          <span class="avatar-sm" [class]="getAvatarTone(person.id)">{{ getInitials(person.name) }}</span>
-          <span class="who">
-            <span class="cell-main">{{ person.name }}</span>
-            <span class="cell-sub">{{ person.email }}</span>
-          </span>
-          @if (chosenRetentionId() === person.id) {
-            <svg lucideCircleCheck class="tick"></svg>
-          }
-        </button>
-      } @empty {
-        <app-empty-state title="No retention staff match" hint="Clear the search to see everyone.">
-          <svg lucideHeadset></svg>
-        </app-empty-state>
-      }
-    </div>
-
-    <div footer>
-      <button
-        type="button"
-        class="btn"
-        [disabled]="!chosenRetentionId() || retentionAssigning() || (!!assignRetentionLead() && busyId() === assignRetentionLead()?.id)"
-        (click)="batchRetentionOpen() ? confirmBatchAssignRetention() : confirmAssignRetention()"
-      >
-        @if (retentionAssigning() || (!!assignRetentionLead() && busyId() === assignRetentionLead()?.id)) {
-          <span class="spinner"></span> Assigning…
-        } @else {
-          <svg lucideHeadset></svg> Confirm assignment
         }
       </button>
     </div>
