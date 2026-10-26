@@ -35,15 +35,19 @@
     <div class="card"><app-skeleton-rows [count]="6" /></div>
   } @else {
     <div class="stats-row">
-      <app-stat-tile [value]="formatPkr(stats().pkr)" label="Total charged back" tone="tone-danger">
-        <svg lucideBanknoteX></svg>
-      </app-stat-tile>
+      @if (showPkr()) {
+        <app-stat-tile [value]="formatPkr(stats().pkr)" label="Total charged back" tone="tone-danger">
+          <svg lucideBanknoteX></svg>
+        </app-stat-tile>
+      }
       <app-stat-tile [value]="stats().total" [label]="pluralize(stats().total, 'charge-back')">
         <svg lucideUsers></svg>
       </app-stat-tile>
-      <app-stat-tile [value]="formatPkr(stats().avg)" label="Average per chargeback">
-        <svg lucideBanknoteX></svg>
-      </app-stat-tile>
+      @if (showPkr()) {
+        <app-stat-tile [value]="formatPkr(stats().avg)" label="Average per chargeback">
+          <svg lucideBanknoteX></svg>
+        </app-stat-tile>
+      }
       <app-stat-tile
         [value]="stats().awaiting"
         label="Waiting for a new client"
@@ -79,10 +83,10 @@
                 type="button"
                 class="col"
                 [class.on]="monthFilter() === m.key"
-                [title]="m.label + ' — ' + pluralize(m.count, 'charge-back') + ', ' + formatPkr(m.pkr)"
+                [title]="m.label + ' — ' + pluralize(m.count, 'charge-back') + (showPkr() ? ', ' + formatPkr(m.pkr) : '')"
                 (click)="pick('month', m.key)"
               >
-                <span class="val">{{ formatPkr(m.pkr) }}</span>
+                <span class="val">{{ showPkr() ? formatPkr(m.pkr) : m.count }}</span>
                 <span class="bar" [style.height.%]="m.pct"></span>
                 <span class="lbl">{{ m.label }}</span>
               </button>
@@ -94,7 +98,7 @@
         <div class="card">
           <div class="inline-head">
             <h2>Clients with the most chargebacks</h2>
-            <span class="count">By PKR</span>
+            <span class="count">{{ showPkr() ? 'By PKR' : 'By count' }}</span>
           </div>
           <div class="rank">
             @for (c of byClient(); track c.id) {
@@ -102,7 +106,7 @@
                 [title]="c.name + ' — ' + pluralize(c.count, 'charge-back')">
                 <span class="nm">{{ c.name }}</span>
                 <span class="track"><span class="fill" [style.width.%]="c.pct"></span></span>
-                <span class="amt">{{ formatPkr(c.pkr) }}</span>
+                <span class="amt">{{ showPkr() ? formatPkr(c.pkr) : c.count }}</span>
               </button>
             }
           </div>
@@ -188,13 +192,15 @@
                   <th class="hide-sm">Client</th>
                   <th class="hide-md">Closer</th>
                   <th class="hide-sm">Plan</th>
-                  <th>Where it is now</th>
                   <th class="sortable hide-md" (click)="view.toggleSort('createdAt')">
                     Date <span class="arrow">{{ sortArrow('createdAt') }}</span>
                   </th>
-                  <th class="sortable right" (click)="view.toggleSort('pkrAmount')">
-                    PKR <span class="arrow">{{ sortArrow('pkrAmount') }}</span>
-                  </th>
+                  <th>Where it is now</th>
+                  @if (showPkr()) {
+                    <th class="sortable right" (click)="view.toggleSort('pkrAmount')">
+                      PKR <span class="arrow">{{ sortArrow('pkrAmount') }}</span>
+                    </th>
+                  }
                   <th class="right">Actions</th>
                 </tr>
               </thead>
@@ -202,9 +208,9 @@
                 @for (row of view.rows(); track row.id) {
                   @let lead = leadFor(row);
                   <tr
-                    [class.clickable]="lead"
+                    class="clickable"
                     [class.row--stale]="lead && urgency(row) === 'stale'"
-                    (click)="lead && detailLead.set(lead)"
+                    (click)="openRow(row)"
                   >
                     <td>
                       <div class="cell-main">{{ row.customerName }}</div>
@@ -247,13 +253,17 @@
                         <span class="wait wait--{{ urgency(row) }}">
                           <svg lucideClock></svg>Waiting {{ waitingDays(row) }} {{ waitingDays(row) === 1 ? 'day' : 'days' }}
                         </span>
+                      } @else if (isSentBack(row)) {
+                        <app-status-badge [status]="row.leadStatus" />
                       } @else if (row.reassignedTo) {
                         <span class="wait done">Given to {{ row.reassignedTo }}</span>
                       } @else {
-                        <span class="wait done">Handled</span>
+                        <app-status-badge [status]="row.leadStatus" />
                       }
                     </td>
-                    <td class="right num amount-hit">−{{ formatPkr(row.pkrAmount) }}</td>
+                    @if (showPkr()) {
+                      <td class="right num amount-hit">−{{ formatPkr(row.pkrAmount ?? 0) }}</td>
+                    }
                     <td>
                       @if (lead) {
                         <div class="row-actions">
@@ -292,17 +302,19 @@
 @if (detailLead(); as lead) {
   <app-modal title="Lead details" [subtitle]="lead.customerName" [wide]="true" (close)="detailLead.set(null)">
     <app-lead-detail [lead]="lead" [unmasked]="true" />
-    <div footer>
-      <button type="button" class="btn btn--ghost" (click)="detailLead.set(null); openEdit(lead)">
-        <svg lucideSquarePen></svg> Edit
-      </button>
-      <button type="button" class="btn btn--ghost" (click)="detailLead.set(null); openAssignExternal(lead)">
-        <svg lucideBuilding2></svg> Assign to external
-      </button>
-      <button type="button" class="btn" (click)="detailLead.set(null); openAssign(lead)">
-        <svg lucideUserCheck></svg> Assign to client
-      </button>
-    </div>
+    @if (!detailIsHistory()) {
+      <div footer>
+        <button type="button" class="btn btn--ghost" (click)="detailLead.set(null); openEdit(lead)">
+          <svg lucideSquarePen></svg> Edit
+        </button>
+        <button type="button" class="btn btn--ghost" (click)="detailLead.set(null); openAssignExternal(lead)">
+          <svg lucideBuilding2></svg> Assign to external
+        </button>
+        <button type="button" class="btn" (click)="detailLead.set(null); openAssign(lead)">
+          <svg lucideUserCheck></svg> Assign to client
+        </button>
+      </div>
+    }
   </app-modal>
 }
 

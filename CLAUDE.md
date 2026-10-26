@@ -271,6 +271,7 @@ Per-page stat tiles are likewise `computed()` over the same loaded array, not a 
 - Chat access rules change in `lib/chat-rooms.ts` only — never by adding a role check in a route, a component, or the socket handler
 - No auto-commits unless explicitly asked
 - **Currency scope: PKR is Expenses-page bookkeeping only** — `Expense.amount`, `IncomePayment.pkrAmount` (written via `/api/leads/batch-payment`), and `ChargeBack.pkrAmount`. Every other money field — lead fields (`coverageAmount`, `monthlyPremiums`, `annualIncome`, `yearlyIncome`), the per-plan client/external-client pricing (`levelCost`/`gradedCost`/`modifiedCost`/`giCost`), and anything derived from them (e.g. Analytics' `annualPremiumRevenue`) — is USD (`formatMoney`), not PKR (`formatPkr`). Don't mix the two formatters or sum across them.
+- **PKR amounts are ADMIN-only, no exceptions.** `FULL_INCLUDE` omits `chargeBacks[].pkrAmount`; only `ADMIN_FULL_INCLUDE` (picked via `adminInclude(viewer)` / the ADMIN branch of `getLeadById`) carries it, and `chargeBackAnalytics('MANAGER')` strips every PKR field. Never send a stored PKR amount to MANAGER or any other role.
 
 ---
 

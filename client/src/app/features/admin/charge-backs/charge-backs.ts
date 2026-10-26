@@ -10,6 +10,7 @@ import {
   LucideUsers,
   LucideX,
 } from '@lucide/angular';
+import { AuthService } from '../../../core/services/auth.service';
 import { LeadService } from '../../../core/services/lead.service';
 import { UserService } from '../../../core/services/user.service';
 import { ExternalClientService } from '../../../core/services/external-client.service';
@@ -28,7 +29,7 @@ import {
   timeAgo,
 } from '../../../core/format-utils';
 import { Modal } from '../../../shared/ui/modal';
-import { PageHero, EmptyState, Pagination, SearchBox, SkeletonRows, StatTile } from '../../../shared/ui/ui';
+import { PageHero, EmptyState, Pagination, SearchBox, SkeletonRows, StatTile, StatusBadge } from '../../../shared/ui/ui';
 import { LeadDetail } from '../../../shared/lead-detail';
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 import { Select } from '../../../shared/ui/select';
@@ -72,6 +73,7 @@ const PLAN_COLORS: Record<string, string> = {
     Modal,
     LeadDetail,
     StatTile,
+    StatusBadge,
     SearchBox,
     Pagination,
     EmptyState,
@@ -142,6 +144,10 @@ export class AdminChargeBacks implements OnInit {
   private readonly userService = inject(UserService);
   private readonly externalClientService = inject(ExternalClientService);
   private readonly analyticsService = inject(AnalyticsService);
+  private readonly auth = inject(AuthService);
+
+  /** PKR amounts are ADMIN-only (the server omits them for MANAGER) — charts fall back to counts. */
+  readonly showPkr = computed(() => this.auth.user()?.role === 'ADMIN');
 
   /** Charged-back leads still awaiting reassignment — the only ones actions apply to. */
   readonly leads = signal<Lead[]>([]);
@@ -158,6 +164,8 @@ export class AdminChargeBacks implements OnInit {
   readonly assignLead = signal<Lead | null>(null);
   readonly assignExternalLead = signal<Lead | null>(null);
   readonly editLead = signal<Lead | null>(null);
+  /** True when the open detail modal is a past charge-back — read-only, no actions. */
+  readonly detailIsHistory = signal(false);
 
   readonly clientSearch = signal('');
   readonly chosenClientId = signal('');
@@ -185,6 +193,7 @@ export class AdminChargeBacks implements OnInit {
   readonly statusOptions = [
     { value: '', label: 'All statuses' },
     { value: 'AWAITING', label: 'Waiting for a new client' },
+    { value: 'SENT_BACK', label: 'Sent back for correction' },
     { value: 'REASSIGNED', label: 'Given to a new client' },
   ];
 
@@ -196,6 +205,16 @@ export class AdminChargeBacks implements OnInit {
   }
 
   readonly reasonOptions = [{ value: '', label: 'All reasons' }, ...CHARGE_BACK_REASON_OPTIONS];
+
+  /** Bucket for the status filter — where the lead went after this charge-back. */
+  private stateOf(r: ChargeBackRecent): 'AWAITING' | 'SENT_BACK' | 'REASSIGNED' {
+    if (this.leadFor(r)) return 'AWAITING';
+    return r.leadStatus.startsWith('RETURNED_TO_') ? 'SENT_BACK' : 'REASSIGNED';
+  }
+
+  isSentBack(r: ChargeBackRecent): boolean {
+    return r.leadStatus.startsWith('RETURNED_TO_');
+  }
 
   private monthOf(r: ChargeBackRecent): string {
     return pacificIsoDate(r.createdAt).slice(0, 7);
@@ -241,7 +260,7 @@ export class AdminChargeBacks implements OnInit {
         (!client || r.client.id === client) &&
         (!reason || this.reasonBucket(r) === reason) &&
         (!plan || r.planType === plan) &&
-        (!status || (status === 'AWAITING') === !!this.leadFor(r)),
+        (!status || this.stateOf(r) === status),
     );
   });
 
@@ -275,18 +294,19 @@ export class AdminChargeBacks implements OnInit {
       const k = this.monthOf(r);
       const e = byMonth.get(k) ?? { count: 0, pkr: 0 };
       e.count++;
-      e.pkr += r.pkrAmount;
+      e.pkr += r.pkrAmount ?? 0;
       byMonth.set(k, e);
     }
     const keys = [...byMonth.keys()].sort().slice(-12);
-    const max = Math.max(1, ...keys.map((k) => byMonth.get(k)!.pkr));
+    const size = (e: { count: number; pkr: number }) => (this.showPkr() ? e.pkr : e.count);
+    const max = Math.max(1, ...keys.map((k) => size(byMonth.get(k)!)));
     return keys.map((k) => {
       const e = byMonth.get(k)!;
       return {
         key: k,
         label: this.monthDate(k).toLocaleDateString('en-US', { month: 'short' }),
         ...e,
-        pct: Math.max(6, Math.round((e.pkr / max) * 100)),
+        pct: Math.max(6, Math.round((size(e) / max) * 100)),
       };
     });
   });
@@ -298,12 +318,13 @@ export class AdminChargeBacks implements OnInit {
       if (!k) continue;
       const e = m.get(k.id) ?? { id: k.id, name: k.name, count: 0, pkr: 0 };
       e.count++;
-      e.pkr += r.pkrAmount;
+      e.pkr += r.pkrAmount ?? 0;
       m.set(k.id, e);
     }
-    const rows = [...m.values()].sort((a, b) => b.pkr - a.pkr).slice(0, 6);
-    const max = Math.max(1, ...rows.map((r) => r.pkr));
-    return rows.map((r) => ({ ...r, pct: Math.max(4, Math.round((r.pkr / max) * 100)) }));
+    const size = (e: { count: number; pkr: number }) => (this.showPkr() ? e.pkr : e.count);
+    const rows = [...m.values()].sort((a, b) => size(b) - size(a)).slice(0, 6);
+    const max = Math.max(1, ...rows.map(size));
+    return rows.map((r) => ({ ...r, pct: Math.max(4, Math.round((size(r) / max) * 100)) }));
   }
 
   readonly byClient = computed(() => this.rank((r) => r.client));
@@ -348,7 +369,7 @@ export class AdminChargeBacks implements OnInit {
 
   readonly stats = computed(() => {
     const rows = this.filtered();
-    const pkr = rows.reduce((s, r) => s + r.pkrAmount, 0);
+    const pkr = rows.reduce((s, r) => s + (r.pkrAmount ?? 0), 0);
     return {
       total: rows.length,
       pkr,
@@ -376,7 +397,7 @@ export class AdminChargeBacks implements OnInit {
     sorters: {
       customerName: (r) => r.customerName,
       createdAt: (r) => new Date(r.createdAt).getTime(),
-      pkrAmount: (r) => r.pkrAmount,
+      pkrAmount: (r) => r.pkrAmount ?? 0,
     },
     initialSort: { key: 'createdAt', dir: 'desc' },
     pageSize: 10,
@@ -426,6 +447,24 @@ export class AdminChargeBacks implements OnInit {
       this.error.set('Could not load charge-backs. Refresh to try again.');
     } finally {
       this.loading.set(false);
+    }
+  }
+
+  /** Open any row — a still-waiting lead is already loaded; a handled one is fetched. */
+  async openRow(r: ChargeBackRecent): Promise<void> {
+    const open = this.leadFor(r);
+    if (open) {
+      this.detailIsHistory.set(false);
+      this.detailLead.set(open);
+      return;
+    }
+    this.error.set(null);
+    try {
+      const lead = await this.leadService.getLead(r.leadId);
+      this.detailIsHistory.set(true);
+      this.detailLead.set(lead);
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not open the lead.'));
     }
   }
 

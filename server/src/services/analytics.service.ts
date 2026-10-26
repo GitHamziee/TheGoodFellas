@@ -379,7 +379,7 @@ export async function overallAnalytics() {
 // Breaks chargeback events down by client (who caused it) and by closer (whose sale got
 // clawed back) — the ChargeBack table is the audit trail, since Lead.clientId gets
 // cleared and reassigned once a chargeback happens (see lead.service#markLeadChargedBack).
-export async function chargeBackAnalytics() {
+export async function chargeBackAnalytics(viewer: 'ADMIN' | 'MANAGER') {
   const chargeBacks = await prisma.chargeBack.findMany({
     select: {
       id: true,
@@ -426,7 +426,7 @@ export async function chargeBackAnalytics() {
 
   const sortDesc = (rows: Bucket[]) => rows.sort((a, b) => b.count - a.count);
 
-  return {
+  const result = {
     total: chargeBacks.length,
     totalPkrAmount: chargeBacks.reduce((sum, cb) => sum + cb.pkrAmount, 0),
     byClient: sortDesc([...byClient.values()]),
@@ -443,11 +443,24 @@ export async function chargeBackAnalytics() {
       reassignedTo: cb.lead.client?.name ?? cb.lead.externalClient?.name ?? null,
       // CHARGED_BACK = still awaiting reassignment; anything else was reassigned since.
       awaitingReassignment: cb.lead.status === 'CHARGED_BACK',
+      // Where the lead sits today — a charge-back row is kept forever, even after the lead
+      // is sent back for correction or reassigned, so the page can show what became of it.
+      leadStatus: cb.lead.status,
       client: cb.client,
       closer: cb.lead.closer,
       pkrAmount: cb.pkrAmount,
       reason: cb.reason,
       createdAt: cb.createdAt,
     })),
+  };
+  if (viewer === 'ADMIN') return result;
+
+  // PKR amounts are ADMIN-only — MANAGER gets counts, parties and reasons, never money.
+  const { totalPkrAmount: _total, ...rest } = result;
+  return {
+    ...rest,
+    byClient: rest.byClient.map(({ pkrAmount: _p, ...b }) => b),
+    byCloser: rest.byCloser.map(({ pkrAmount: _p, ...b }) => b),
+    recent: rest.recent.map(({ pkrAmount: _p, ...r }) => r),
   };
 }

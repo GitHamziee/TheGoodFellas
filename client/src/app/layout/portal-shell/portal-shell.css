@@ -1,7 +1,11 @@
+/* Pinned to the window with insets rather than calc(100dvh / --ui-zoom): whether `zoom`
+ * rescales viewport units differs between browser versions, and where it doesn't the shell
+ * came out 1/0.9 too tall — pushing the sticky form action bar below the window edge. */
 .shell {
+  position: fixed;
+  inset: 0;
   display: grid;
   grid-template-columns: 260px 1fr;
-  height: calc(100dvh / var(--ui-zoom));
   transition: grid-template-columns 0.2s ease;
 }
 
@@ -368,7 +372,7 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
-  height: calc(100dvh / var(--ui-zoom));
+  min-height: 0;
 }
 
 .topbar {

@@ -97,7 +97,8 @@ export interface ChargeBackBucket {
   name: string;
   email: string;
   count: number;
-  pkrAmount: number;
+  /** ADMIN only — omitted for MANAGER. */
+  pkrAmount?: number;
 }
 
 export interface ChargeBackRecent {
@@ -108,20 +109,24 @@ export interface ChargeBackRecent {
   state: string;
   planType: PlanType | null;
   awaitingReassignment: boolean;
+  /** The lead's current status — the row outlives the CHARGED_BACK state. */
+  leadStatus: LeadStatus;
   /** Who the lead went to after the chargeback; null while it is still waiting for a new client. */
   reassignedTo: string | null;
   juniorCloser: LeadParty | null;
   client: LeadParty;
   /** Null for a charged-back CPL lead — CPL has no closer to attribute it to. */
   closer: LeadParty | null;
-  pkrAmount: number;
+  /** ADMIN only — omitted for MANAGER. */
+  pkrAmount?: number;
   reason: string;
   createdAt: string;
 }
 
 export interface ChargeBackAnalytics {
   total: number;
-  totalPkrAmount: number;
+  /** ADMIN only — omitted for MANAGER. */
+  totalPkrAmount?: number;
   byClient: ChargeBackBucket[];
   byCloser: ChargeBackBucket[];
   recent: ChargeBackRecent[];

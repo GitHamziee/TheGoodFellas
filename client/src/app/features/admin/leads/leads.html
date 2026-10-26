@@ -333,8 +333,8 @@
     <app-lead-detail [lead]="lead" [unmasked]="true" />
 
     <div footer>
-      @if (lead.status === 'SUBMITTED' || lead.status === 'REJECTED') {
-        @if (lead.status === 'REJECTED') {
+      @if (lead.status === 'SUBMITTED' || lead.status === 'REJECTED' || lead.status === 'CHARGED_BACK') {
+        @if (lead.status === 'REJECTED' || lead.status === 'CHARGED_BACK') {
           <button type="button" class="btn btn--ghost" (click)="selected.set(null); openEdit(lead)">
             <svg lucideSquarePen></svg> Edit
           </button>

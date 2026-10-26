@@ -52,6 +52,17 @@ const FULL_INCLUDE = {
   externalClient: { select: { id: true, name: true, company: true, email: true, phone: true } },
   retention: { select: { id: true, name: true, email: true } },
   suggestedClient: { select: { id: true, name: true, email: true } },
+  // PKR amounts are ADMIN-only — every other role gets the chargeback history without them.
+  chargeBacks: {
+    orderBy: { createdAt: 'desc' },
+    include: { client: { select: { id: true, name: true, email: true } } },
+    omit: { pkrAmount: true },
+  },
+} as const;
+
+// FULL_INCLUDE plus each chargeback's PKR amount — ADMIN reads only.
+const ADMIN_FULL_INCLUDE = {
+  ...FULL_INCLUDE,
   chargeBacks: {
     orderBy: { createdAt: 'desc' },
     include: { client: { select: { id: true, name: true, email: true } } },
@@ -153,6 +164,7 @@ const TEAM_LEAD_SELECT = {
 // set, while a Closer's self-/AI-sourced lead and every Retention lead never does.
 type AdminViewer = 'ADMIN' | 'MANAGER';
 const managerScope = (viewer?: AdminViewer) => (viewer === 'MANAGER' ? { juniorCloserId: null } : {});
+const adminInclude = (viewer?: AdminViewer) => (viewer === 'ADMIN' ? ADMIN_FULL_INCLUDE : FULL_INCLUDE);
 
 /** True when every given lead is one a MANAGER may act on (non-existent ids pass; the action 404s). */
 export async function leadsInManagerScope(leadIds: string[]): Promise<boolean> {
@@ -352,7 +364,7 @@ export async function listDraftsForCloser(closerId: string) {
 export async function listDraftsForAdmin(viewer?: AdminViewer) {
   return prisma.lead.findMany({
     where: { status: 'DRAFT', ...managerScope(viewer) },
-    include: FULL_INCLUDE,
+    include: adminInclude(viewer),
     orderBy: { updatedAt: 'desc' },
   });
 }
@@ -759,8 +771,9 @@ export async function editLead(leadId: string, input: Record<string, unknown>): 
 
 /**
  * Admin sends a lead back for correction, to whichever role entered the bad data.
- * Only from the admin's own queue (SUBMITTED / REJECTED) — a lead that is out with a
- * client, already accepted, or still being worked isn't the admin's to recall.
+ * Only from the admin's own queue (SUBMITTED / REJECTED) or a CHARGED_BACK lead awaiting
+ * reassignment — a lead that is out with a client, already accepted, or still being worked
+ * isn't the admin's to recall.
  *
  * A RETENTION lead never has a junior closer or closer on it (see schema.prisma), so it can
  * only ever be sent back to RETENTION — never JUNIOR_CLOSER/CLOSER — and conversely a
@@ -775,8 +788,8 @@ export async function returnLeadForEdit(
 
   const lead = await prisma.lead.findUnique({ where: { id: leadId } });
   if (!lead) return { error: 'Lead not found', status: 404 };
-  if (lead.status !== 'SUBMITTED' && lead.status !== 'REJECTED') {
-    return { error: 'Only leads waiting in the admin queue can be sent back', status: 400 };
+  if (lead.status !== 'SUBMITTED' && lead.status !== 'REJECTED' && lead.status !== 'CHARGED_BACK') {
+    return { error: 'Only leads waiting in the admin queue or charged back can be sent back', status: 400 };
   }
 
   if (target === 'RETENTION') {
@@ -893,7 +906,7 @@ export async function batchMarkPaid(
 export async function listQueueForAdmin(viewer?: AdminViewer) {
   return prisma.lead.findMany({
     where: { status: { in: ['SUBMITTED', 'REJECTED'] }, ...managerScope(viewer) },
-    include: FULL_INCLUDE,
+    include: adminInclude(viewer),
     orderBy: { updatedAt: 'desc' },
   });
 }
@@ -1002,7 +1015,7 @@ export async function batchChargeBack(
 export async function listChargeBacksForAdmin(viewer?: AdminViewer) {
   return prisma.lead.findMany({
     where: { status: 'CHARGED_BACK', ...managerScope(viewer) },
-    include: FULL_INCLUDE,
+    include: adminInclude(viewer),
     orderBy: { updatedAt: 'desc' },
   });
 }
@@ -1010,7 +1023,7 @@ export async function listChargeBacksForAdmin(viewer?: AdminViewer) {
 export async function listAllLeadsForAdmin(viewer?: AdminViewer) {
   return prisma.lead.findMany({
     where: managerScope(viewer),
-    include: FULL_INCLUDE,
+    include: adminInclude(viewer),
     orderBy: { updatedAt: 'desc' },
   });
 }
@@ -1019,7 +1032,7 @@ export async function listAllLeadsForAdmin(viewer?: AdminViewer) {
 export async function listCplLeadsForAdmin(viewer?: AdminViewer) {
   return prisma.lead.findMany({
     where: { leadType: 'CPL', ...managerScope(viewer) },
-    include: FULL_INCLUDE,
+    include: adminInclude(viewer),
     orderBy: { updatedAt: 'desc' },
   });
 }
@@ -1678,7 +1691,10 @@ type Requester = {
 export async function getLeadById(leadId: string, requester: Requester): Promise<ServiceResult<{ lead: unknown }>> {
   // Loaded once with the full include: the unmasked branches return it as-is, and only the
   // masked branches go back to the DB for their narrower select.
-  const lead = await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE });
+  const lead = await prisma.lead.findUnique({
+    where: { id: leadId },
+    include: requester.role === 'ADMIN' ? ADMIN_FULL_INCLUDE : FULL_INCLUDE,
+  });
   if (!lead) return { error: 'Lead not found', status: 404 };
 
   // MANAGER gets the same full, unmasked view ADMIN does, but only of Closer/Retention leads

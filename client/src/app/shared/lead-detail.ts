@@ -17,6 +17,7 @@ import {
   formatDate,
   formatDateTime,
   formatMoney,
+  formatPkr,
   formatPhone,
   humanizeEnum,
   maskAccount,
@@ -299,7 +300,9 @@ export class LeadDetail {
           'Charge-backs',
           l.chargeBacks.length || null,
           l.chargeBacks.length
-            ? `${l.chargeBacks.length} · ${formatMoney(l.chargeBacks.reduce((sum, c) => sum + c.pkrAmount, 0))} total`
+            ? l.chargeBacks.some((c) => c.pkrAmount !== undefined)
+              ? `${l.chargeBacks.length} · ${formatPkr(l.chargeBacks.reduce((sum, c) => sum + (c.pkrAmount ?? 0), 0))} total`
+              : String(l.chargeBacks.length)
             : undefined,
         ),
         row('Last updated', l.updatedAt, formatDateTime(l.updatedAt)),

@@ -82,12 +82,12 @@ router.get(
   })
 );
 
-// Admin-only — chargeback/revenue-loss reporting, same "business totals" category as /overall.
+// Chargeback reporting — PKR amounts stripped for MANAGER inside chargeBackAnalytics.
 router.get(
   '/charge-backs',
   requireRole('ADMIN', 'MANAGER'),
-  asyncHandler(async (_req, res) => {
-    const chargeBacks = await analyticsService.chargeBackAnalytics();
+  asyncHandler(async (req, res) => {
+    const chargeBacks = await analyticsService.chargeBackAnalytics(req.user!.role as 'ADMIN' | 'MANAGER');
     return apiSuccess(res, { chargeBacks });
   })
 );

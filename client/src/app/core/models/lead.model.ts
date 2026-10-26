@@ -59,7 +59,8 @@ export interface LeadParty {
 export interface ChargeBack {
   id: string;
   leadId: string;
-  pkrAmount: number;
+  /** ADMIN reads only — the server omits it for every other role. */
+  pkrAmount?: number;
   reason: string;
   createdAt: string;
   client: LeadParty;
