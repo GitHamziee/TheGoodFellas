@@ -273,10 +273,10 @@ export class LeadService {
     return res.data.lead;
   }
 
-  /** Sets (or clears, with null) the admin's tracking label — allowed on any lead at any time. */
-  async setAdminStatus(id: string, adminStatus: LeadAdminStatus | null): Promise<Lead> {
+  /** Sets (or clears, with null) the admin's tracking label; `reason` is only used when Declined rejects the lead. */
+  async setAdminStatus(id: string, adminStatus: LeadAdminStatus | null, reason?: string): Promise<Lead> {
     const res = await firstValueFrom(
-      this.http.patch<ApiSuccess<{ lead: Lead }>>(`${BASE}/${id}/admin-status`, { adminStatus })
+      this.http.patch<ApiSuccess<{ lead: Lead }>>(`${BASE}/${id}/admin-status`, { adminStatus, reason })
     );
     return res.data.lead;
   }

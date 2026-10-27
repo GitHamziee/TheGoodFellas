@@ -893,7 +893,8 @@ const ADMIN_STATUS_VALUES = [
 export async function setLeadAdminStatus(
   leadId: string,
   adminStatus: unknown,
-  actorId?: string
+  actorId?: string,
+  reason?: unknown
 ): Promise<ServiceResult<{ lead: unknown }>> {
   if (adminStatus !== null && !(ADMIN_STATUS_VALUES as readonly unknown[]).includes(adminStatus)) {
     return { error: `adminStatus must be one of ${ADMIN_STATUS_VALUES.join(', ')} or null`, status: 400 };
@@ -917,7 +918,7 @@ export async function setLeadAdminStatus(
       select: { id: true },
     });
     if (awaiting) {
-      const decided = await batchDecideAsAdmin([leadId], adminStatus === 'APPROVAL_CONFIRMED' ? 'ACCEPT' : 'REJECT', undefined, actorId);
+      const decided = await batchDecideAsAdmin([leadId], adminStatus === 'APPROVAL_CONFIRMED' ? 'ACCEPT' : 'REJECT', reason, actorId);
       if ('error' in decided) return decided;
       // A declined lead leaves the tracking stage (batchDecideAsAdmin already cleared its label).
       if (adminStatus === 'DECLINED') {

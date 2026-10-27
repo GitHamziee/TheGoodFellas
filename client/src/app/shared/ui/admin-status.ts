@@ -1,10 +1,12 @@
 import { Component, ElementRef, HostListener, computed, inject, input, output, signal } from '@angular/core';
-import { LucideChevronDown, LucideCheck } from '@lucide/angular';
+import { FormsModule } from '@angular/forms';
+import { LucideChevronDown, LucideCheck, LucideCircleX } from '@lucide/angular';
 import { apiErrorMessage } from '../../core/api';
 import { ADMIN_STATUS_OPTIONS } from '../../core/lead-options';
 import { Lead, LeadAdminStatus } from '../../core/models/lead.model';
 import { LeadService } from '../../core/services/lead.service';
 import { uiZoom } from '../../core/ui-zoom';
+import { Modal } from './modal';
 
 @Component({
   selector: 'app-admin-status-badge',
@@ -22,7 +24,7 @@ export class AdminStatusBadge {
  */
 @Component({
   selector: 'app-admin-status-control',
-  imports: [LucideChevronDown, LucideCheck],
+  imports: [FormsModule, Modal, LucideChevronDown, LucideCheck, LucideCircleX],
   template: `
     <button type="button" [class]="cls()" [disabled]="busy()" aria-haspopup="menu" [attr.aria-expanded]="open()" (click)="toggle($event)">
       <span class="trk-dot"></span>
@@ -41,6 +43,21 @@ export class AdminStatusBadge {
           </button>
         }
       </div>
+    }
+    @if (declining()) {
+      <app-modal title="Decline lead" [subtitle]="lead().customerName" (close)="declining.set(false)">
+        <div class="form-grid">
+          <label class="full">
+            <span>Reason <span class="hint">Optional</span></span>
+            <input type="text" maxlength="200" [(ngModel)]="declineReason" name="declineReason" placeholder="e.g. Client declined on call" />
+          </label>
+        </div>
+        <div footer>
+          <button type="button" class="btn btn--danger" [disabled]="busy()" (click)="confirmDecline()">
+            <svg lucideCircleX></svg> Confirm decline
+          </button>
+        </div>
+      </app-modal>
     }
     @if (error()) {
       <div class="error">{{ error() }}</div>
@@ -73,6 +90,8 @@ export class AdminStatusControl {
   readonly busy = signal(false);
   readonly error = signal<string | null>(null);
   protected readonly open = signal(false);
+  protected readonly declining = signal(false);
+  protected declineReason = '';
   protected readonly top = signal(0);
   protected readonly left = signal(0);
 
@@ -107,10 +126,25 @@ export class AdminStatusControl {
   async pick(next: LeadAdminStatus | null): Promise<void> {
     this.open.set(false);
     if (next === (this.lead().adminStatus ?? null)) return;
+    // Declining a lead that is still awaiting its client rejects it, so ask for the reason first.
+    if (next === 'DECLINED' && (this.lead().status === 'ASSIGNED' || this.lead().status === 'ASSIGNED_EXTERNAL')) {
+      this.declineReason = '';
+      this.declining.set(true);
+      return;
+    }
+    await this.save(next);
+  }
+
+  protected async confirmDecline(): Promise<void> {
+    await this.save('DECLINED', this.declineReason.trim() || undefined);
+    this.declining.set(false);
+  }
+
+  private async save(next: LeadAdminStatus | null, reason?: string): Promise<void> {
     this.error.set(null);
     this.busy.set(true);
     try {
-      this.changed.emit(await this.leadService.setAdminStatus(this.lead().id, next));
+      this.changed.emit(await this.leadService.setAdminStatus(this.lead().id, next, reason));
     } catch (err) {
       this.error.set(apiErrorMessage(err, 'Could not update status.'));
     } finally {
