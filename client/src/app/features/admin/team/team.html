@@ -146,10 +146,6 @@
         <input type="password" [(ngModel)]="password" name="password" placeholder="At least 8 characters" />
         <span class="hint">Minimum 8 characters.</span>
       </label>
-      <label>
-        <span>Phone <span class="hint">Optional</span></span>
-        <input appPhone [(ngModel)]="phone" name="phone" />
-      </label>
       <label class="full">
         Role
         <app-select [options]="roleOptions" [(ngModel)]="role" name="role" />

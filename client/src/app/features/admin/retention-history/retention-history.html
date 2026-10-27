@@ -30,7 +30,7 @@
         <span class="g-label">Charge-back rate · {{ stats().chargedBack }} of {{ stats().everPaid }} paid</span>
       </div>
       <div class="g">
-        <span class="g-num">{{ stats().avgMonths }} mo</span>
+        <span class="g-num">{{ stats().avgMonths }} {{ stats().avgMonths === 1 ? 'Month' : 'Months' }}</span>
         <span class="g-label">Avg time on book</span>
       </div>
     </div>

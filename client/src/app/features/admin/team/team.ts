@@ -20,7 +20,6 @@ import { Modal } from '../../../shared/ui/modal';
 import { PageHero, EmptyState, Pagination, SearchBox, SkeletonRows, StatTile } from '../../../shared/ui/ui';
 import { Select } from '../../../shared/ui/select';
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
-import { PhoneInput } from '../../../shared/ui/phone-input';
 import { apiErrorMessage } from '../../../core/api';
 
 const ROLE_TONE: Record<Role, string> = {
@@ -40,7 +39,7 @@ const ROLE_TONE: Record<Role, string> = {
  * this page has no pricing/coverage editor because none of these roles carry that data. */
 @Component({
   selector: 'app-admin-team',
-  imports: [PageHero, PhoneInput, 
+  imports: [PageHero,
     FormsModule,
     Modal,
     Select,
@@ -104,7 +103,6 @@ export class AdminTeam implements OnInit {
   name = '';
   email = '';
   password = '';
-  phone = '';
   role: Role = 'JUNIOR_CLOSER';
   newPassword = '';
 
@@ -174,7 +172,6 @@ export class AdminTeam implements OnInit {
     this.name = '';
     this.email = '';
     this.password = '';
-    this.phone = '';
     this.role = 'JUNIOR_CLOSER';
     this.showCreate.set(true);
   }
@@ -188,7 +185,6 @@ export class AdminTeam implements OnInit {
         email: this.email.trim(),
         password: this.password,
         role: this.role,
-        phone: this.phone.trim() || undefined,
       });
       this.team.update((rows) => [...rows, created]);
       this.showCreate.set(false);
