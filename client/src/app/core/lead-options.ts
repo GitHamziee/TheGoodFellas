@@ -1,6 +1,9 @@
-import { AccountOwnership, AccountType, CardType, DCode, DraftReason, IncomeSource, LeadAdminStatus, LeadNeed, PayerType, PaymentMethod, PlanType, RetiredIncomeType } from './models/lead.model';
+import { AccountOwnership, AccountType, CardType, DCode, DraftReason, IncomeSource, LeadAdminStatus, LeadNeed, LeadStatus, PayerType, PaymentMethod, PlanType, RetiredIncomeType } from './models/lead.model';
 
 import { US_STATES } from './us-states';
+
+/** Leads handed to a client can be marked paid / charged back whatever their decision status. */
+export const MONEY_STATUSES: LeadStatus[] = ['ASSIGNED', 'ACCEPTED', 'ASSIGNED_EXTERNAL', 'REJECTED'];
 
 export const ADMIN_STATUS_OPTIONS: { value: LeadAdminStatus; label: string }[] = [
   { value: 'CLIENT_PAID', label: 'Client Paid' },

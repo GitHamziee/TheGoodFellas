@@ -44,6 +44,7 @@ import { AdminStatusControl } from '../../../shared/ui/admin-status';
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 import { DayBar, rangeBounds, rangeLabel } from '../../../shared/ui/day-bar';
 import { LeadQuickEdit } from '../../../shared/lead-quick-edit';
+import { MONEY_STATUSES } from '../../../core/lead-options';
 import { apiErrorMessage } from '../../../core/api';
 
 interface LookupUser {
@@ -89,6 +90,7 @@ const STATUS_FILTERS = [
   templateUrl: './cpl-leads.html',
 })
 export class AdminCplLeads implements OnInit {
+  protected readonly MONEY_STATUSES = MONEY_STATUSES;
   private readonly liveReload = reloadOnChange(() => this.refresh());
   private readonly leadService = inject(LeadService);
   private readonly userService = inject(UserService);
@@ -139,11 +141,6 @@ export class AdminCplLeads implements OnInit {
   readonly batchSubmitting = signal(false);
   batchPkrAmount: number | null = null;
   batchNote = '';
-
-  /** Admin approve/decline on the client's behalf — Approve is immediate, Reject opens a modal for an optional reason. */
-  readonly rejectModalOpen = signal(false);
-  readonly decisionSubmitting = signal(false);
-  rejectReason = '';
 
   /** Junior Closers who actually appear on a CPL lead — drives the "filter by junior" dropdown. */
   readonly juniorClosers = computed(() => {
@@ -318,19 +315,14 @@ export class AdminCplLeads implements OnInit {
 
   readonly selectedCount = computed(() => this.selectedIds().size);
 
-  /** Only unpaid ACCEPTED/ASSIGNED_EXTERNAL leads can be batch-marked paid. */
+  /** Only unpaid assigned leads can be batch-marked paid. */
   isEligibleForBatchPaid(lead: Lead): boolean {
-    return lead.paymentStatus === 'UNPAID' && (lead.status === 'ACCEPTED' || lead.status === 'ASSIGNED_EXTERNAL');
+    return lead.paymentStatus === 'UNPAID' && MONEY_STATUSES.includes(lead.status);
   }
 
-  /** Awaiting a response from a client (login account or external) — admin can decide for them. */
-  isEligibleForDecision(lead: Lead): boolean {
-    return lead.status === 'ASSIGNED' || lead.status === 'ASSIGNED_EXTERNAL';
-  }
-
-  /** A row is selectable if any batch action (Approve / Reject / Mark Paid) applies to it. */
+  /** A row is selectable if any batch action (Mark Paid) applies to it. */
   isSelectable(lead: Lead): boolean {
-    return this.isEligibleForDecision(lead) || this.isEligibleForBatchPaid(lead);
+    return this.isEligibleForBatchPaid(lead);
   }
 
   private selectedLeads(): Lead[] {
@@ -338,7 +330,6 @@ export class AdminCplLeads implements OnInit {
     return this.leads().filter((l) => ids.has(l.id));
   }
 
-  readonly decidableSelectedCount = computed(() => this.selectedLeads().filter((l) => this.isEligibleForDecision(l)).length);
   readonly payableSelectedCount = computed(() => this.selectedLeads().filter((l) => this.isEligibleForBatchPaid(l)).length);
 
   isSelected(lead: Lead): boolean {
@@ -380,12 +371,10 @@ export class AdminCplLeads implements OnInit {
   }
 
   /** Detail-popup shortcut: narrows the selection to this one lead and runs the same batch flow. */
-  actOnLead(lead: Lead, action: 'accept' | 'reject' | 'paid'): void {
+  actOnLead(lead: Lead): void {
     this.detailLead.set(null);
     this.selectedIds.set(new Set([lead.id]));
-    if (action === 'accept') void this.batchAccept();
-    else if (action === 'reject') this.openRejectModal();
-    else this.openBatchModal();
+    this.openBatchModal();
   }
 
   /** Client dropdown, narrowed by the search box inside the assign modal. */
@@ -457,57 +446,6 @@ export class AdminCplLeads implements OnInit {
   /** Time of day in Pacific — what the day log shows in place of a date. */
   timeOf(dateStr: string): string {
     return new Date(dateStr).toLocaleTimeString('en-US', { timeZone: APP_TIME_ZONE, hour: 'numeric', minute: '2-digit' });
-  }
-
-  /**
-   * Records the client's approve/decline decision on their behalf for the selected leads — the
-   * normal path is the client logging in themselves (and external clients have no login at
-   * all), but the decision is often made over a phone call, so admin records it here. Same
-   * select-then-act flow as Mark Paid. Reject asks for an optional reason first.
-   */
-  async batchAccept(): Promise<void> {
-    if (this.decidableSelectedCount() === 0) return;
-    this.error.set(null);
-    this.decisionSubmitting.set(true);
-    try {
-      const leadIds = this.selectedLeads().filter((l) => this.isEligibleForDecision(l)).map((l) => l.id);
-      const { count } = await this.leadService.batchDecide(leadIds, 'ACCEPT');
-      await this.refresh();
-      this.clearSelection();
-      this.notice.set(`Approved ${count} lead${count === 1 ? '' : 's'} on the client's behalf.`);
-    } catch (err) {
-      this.error.set(apiErrorMessage(err, 'Could not approve these leads.'));
-    } finally {
-      this.decisionSubmitting.set(false);
-    }
-  }
-
-  openRejectModal(): void {
-    if (this.decidableSelectedCount() === 0) return;
-    this.error.set(null);
-    this.rejectReason = '';
-    this.rejectModalOpen.set(true);
-  }
-
-  closeRejectModal(): void {
-    this.rejectModalOpen.set(false);
-  }
-
-  async confirmBatchReject(): Promise<void> {
-    this.error.set(null);
-    this.decisionSubmitting.set(true);
-    try {
-      const leadIds = this.selectedLeads().filter((l) => this.isEligibleForDecision(l)).map((l) => l.id);
-      const { count } = await this.leadService.batchDecide(leadIds, 'REJECT', this.rejectReason.trim() || undefined);
-      await this.refresh();
-      this.clearSelection();
-      this.rejectModalOpen.set(false);
-      this.notice.set(`Declined ${count} lead${count === 1 ? '' : 's'} — sent back to the junior closer to fix.`);
-    } catch (err) {
-      this.error.set(apiErrorMessage(err, 'Could not decline these leads.'));
-    } finally {
-      this.decisionSubmitting.set(false);
-    }
   }
 
   // ─── Assign ────────────────────────────────────────────────

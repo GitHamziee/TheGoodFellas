@@ -10,7 +10,7 @@
     <svg lucideTag></svg>
   </app-page-hero>
 
-  @if (error() && !batchModalOpen() && !rejectModalOpen()) {
+  @if (error() && !batchModalOpen()) {
     <div class="error">{{ error() }}</div>
   }
   @if (notice()) {
@@ -22,24 +22,6 @@
       <span><strong>{{ selectedCount() }}</strong> lead{{ selectedCount() === 1 ? '' : 's' }} selected</span>
       <div class="row-actions">
         <button type="button" class="btn btn--sm btn--ghost" (click)="clearSelection()">Clear</button>
-        <button
-          type="button"
-          class="btn btn--sm btn--success"
-          title="Approve on the client's behalf"
-          [disabled]="decidableSelectedCount() === 0 || decisionSubmitting()"
-          (click)="batchAccept()"
-        >
-          <svg lucideCircleCheck></svg> Approve ({{ decidableSelectedCount() }})
-        </button>
-        <button
-          type="button"
-          class="btn btn--sm btn--danger"
-          title="Decline on the client's behalf"
-          [disabled]="decidableSelectedCount() === 0 || decisionSubmitting()"
-          (click)="openRejectModal()"
-        >
-          <svg lucideCircleX></svg> Decline ({{ decidableSelectedCount() }})
-        </button>
         <button
           type="button"
           class="btn btn--sm btn--success"
@@ -345,7 +327,7 @@
                 <td>
                   <div class="status-stack">
                     <app-status-badge [status]="lead.status" />
-                    @if (lead.status === 'ACCEPTED' || lead.status === 'ASSIGNED_EXTERNAL') {
+                    @if (MONEY_STATUSES.includes(lead.status)) {
                       <app-payment-badge [status]="lead.paymentStatus" />
                     }
                     <span (click)="$event.stopPropagation()"><app-admin-status-control [lead]="lead" (changed)="onAdminStatusChanged($event)" /></span>
@@ -395,20 +377,12 @@
           <svg lucideUserCheck></svg> Assign to client
         </button>
       }
-      @if (isEligibleForDecision(lead)) {
-        <button type="button" class="btn btn--danger" [disabled]="decisionSubmitting()" (click)="actOnLead(lead, 'reject')">
-          <svg lucideCircleX></svg> Decline
-        </button>
-        <button type="button" class="btn btn--success" [disabled]="decisionSubmitting()" (click)="actOnLead(lead, 'accept')">
-          <svg lucideCircleCheck></svg> Approve
-        </button>
-      }
       @if (isEligibleForBatchPaid(lead)) {
-        <button type="button" class="btn btn--success" (click)="actOnLead(lead, 'paid')">
+        <button type="button" class="btn btn--success" (click)="actOnLead(lead)">
           <svg lucideBanknote></svg> Mark Paid
         </button>
       }
-      @if (lead.status === 'ACCEPTED' || lead.status === 'ASSIGNED_EXTERNAL') {
+      @if (MONEY_STATUSES.includes(lead.status)) {
         @if (lead.paymentStatus === 'PAID') {
           <button
             type="button"
@@ -587,34 +561,6 @@
 }
 
 <!-- Batch mark paid -->
-@if (rejectModalOpen()) {
-  <app-modal
-    title="Decline leads"
-    [subtitle]="decidableSelectedCount() + ' lead' + (decidableSelectedCount() === 1 ? '' : 's') + ' selected'"
-    (close)="closeRejectModal()"
-  >
-    @if (error()) {
-      <div class="error">{{ error() }}</div>
-    }
-
-    <div class="form-grid">
-      <label class="full">
-        <span>Reason <span class="hint">Optional</span></span>
-        <input type="text" maxlength="200" [(ngModel)]="rejectReason" name="rejectReason" placeholder="e.g. Client declined on call" />
-      </label>
-    </div>
-
-    <div footer>
-      <button type="button" class="btn btn--danger" [disabled]="decisionSubmitting()" (click)="confirmBatchReject()">
-        @if (decisionSubmitting()) {
-          <span class="spinner"></span> Saving…
-        } @else {
-          <svg lucideCircleX></svg> Confirm decline
-        }
-      </button>
-    </div>
-  </app-modal>
-}
 
 @if (batchModalOpen()) {
   <app-modal

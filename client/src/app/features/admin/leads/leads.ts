@@ -42,7 +42,7 @@ import {
 import { DayBar, rangeBounds, rangeLabel } from '../../../shared/ui/day-bar';
 import { LeadQuickEdit } from '../../../shared/lead-quick-edit';
 import { Select } from '../../../shared/ui/select';
-import { CHARGE_BACK_MONTH_OPTIONS, CHARGE_BACK_REASON_OPTIONS } from '../../../core/lead-options';
+import { CHARGE_BACK_MONTH_OPTIONS, CHARGE_BACK_REASON_OPTIONS, MONEY_STATUSES } from '../../../core/lead-options';
 import { LeadDetail } from '../../../shared/lead-detail';
 import { RowMenu } from '../../../shared/ui/row-menu';
 import { AdminStatusControl } from '../../../shared/ui/admin-status';
@@ -98,6 +98,7 @@ interface LookupUser {
   templateUrl: './leads.html',
 })
 export class AdminLeads implements OnInit {
+  protected readonly MONEY_STATUSES = MONEY_STATUSES;
   private readonly liveReload = reloadOnChange(() => this.refresh());
   private readonly leadService = inject(LeadService);
   private readonly userService = inject(UserService);
@@ -149,10 +150,6 @@ export class AdminLeads implements OnInit {
   batchPkrAmount: number | null = null;
   batchNote = '';
 
-  /** Admin approve/decline on the client's behalf — Approve is immediate, Reject opens a modal for an optional reason. */
-  readonly rejectModalOpen = signal(false);
-  readonly decisionSubmitting = signal(false);
-  rejectReason = '';
 
   /** Lead being charged back — single-record action, mirrors the batch "Mark Paid" modal. */
   readonly chargeBackModalOpen = signal(false);
@@ -350,24 +347,19 @@ export class AdminLeads implements OnInit {
 
   readonly selectedCount = computed(() => this.selectedIds().size);
 
-  /** Only unpaid ACCEPTED/ASSIGNED_EXTERNAL leads can be batch-marked paid. */
+  /** Only unpaid assigned leads can be batch-marked paid. */
   isEligibleForBatchPaid(lead: Lead): boolean {
-    return lead.paymentStatus === 'UNPAID' && (lead.status === 'ACCEPTED' || lead.status === 'ASSIGNED_EXTERNAL');
+    return lead.paymentStatus === 'UNPAID' && MONEY_STATUSES.includes(lead.status);
   }
 
-  /** Only ACCEPTED + PAID leads can be batch-charged back. */
+  /** Only assigned, PAID leads can be batch-charged back. */
   isEligibleForBatchChargeBack(lead: Lead): boolean {
-    return lead.paymentStatus === 'PAID' && lead.status === 'ACCEPTED';
+    return lead.paymentStatus === 'PAID' && MONEY_STATUSES.includes(lead.status);
   }
 
-  /** Awaiting a response from a client (login account or external) — admin can decide for them. */
-  isEligibleForDecision(lead: Lead): boolean {
-    return lead.status === 'ASSIGNED' || lead.status === 'ASSIGNED_EXTERNAL';
-  }
-
-  /** A row is selectable if any batch action (Approve / Reject / Mark Paid / Charge Back) applies to it. */
+  /** A row is selectable if any batch action (Mark Paid / Charge Back) applies to it. */
   isSelectable(lead: Lead): boolean {
-    return this.isEligibleForDecision(lead) || this.isEligibleForBatchPaid(lead) || this.isEligibleForBatchChargeBack(lead);
+    return this.isEligibleForBatchPaid(lead) || this.isEligibleForBatchChargeBack(lead);
   }
 
   private selectedLeads(): Lead[] {
@@ -375,7 +367,6 @@ export class AdminLeads implements OnInit {
     return this.leads().filter((l) => ids.has(l.id));
   }
 
-  readonly decidableSelectedCount = computed(() => this.selectedLeads().filter((l) => this.isEligibleForDecision(l)).length);
   readonly payableSelectedCount = computed(() => this.selectedLeads().filter((l) => this.isEligibleForBatchPaid(l)).length);
   readonly chargeableSelectedCount = computed(
     () => this.selectedLeads().filter((l) => this.isEligibleForBatchChargeBack(l)).length,
@@ -420,12 +411,10 @@ export class AdminLeads implements OnInit {
   }
 
   /** Detail-popup shortcut: narrows the selection to this one lead and runs the same batch flow. */
-  actOnLead(lead: Lead, action: 'accept' | 'reject' | 'paid' | 'chargeBack'): void {
+  actOnLead(lead: Lead, action: 'paid' | 'chargeBack'): void {
     this.selected.set(null);
     this.selectedIds.set(new Set([lead.id]));
-    if (action === 'accept') void this.batchAccept();
-    else if (action === 'reject') this.openRejectModal();
-    else if (action === 'paid') this.openBatchModal();
+    if (action === 'paid') this.openBatchModal();
     else this.openChargeBackModal();
   }
 
@@ -592,66 +581,6 @@ export class AdminLeads implements OnInit {
   setCloserFilter(value: string): void {
     this.closerFilter.set(value);
     this.view.page.set(1);
-  }
-
-  /**
-   * Records the client's approve/decline decision on their behalf for the selected leads — the
-   * normal path is the client logging in themselves (and external clients have no login at
-   * all), but the decision is often made over a phone call, so admin records it here. Same
-   * select-then-act flow as Mark Paid / Charge Back. Reject asks for an optional reason first.
-   */
-  async batchAccept(): Promise<void> {
-    if (this.decidableSelectedCount() === 0) return;
-    this.error.set(null);
-    this.decisionSubmitting.set(true);
-    try {
-      const leadIds = this.selectedLeads().filter((l) => this.isEligibleForDecision(l)).map((l) => l.id);
-      const { count } = await this.leadService.batchDecide(leadIds, 'ACCEPT');
-      await this.refresh();
-      this.clearSelection();
-      this.notice.set(`Approved ${count} lead${count === 1 ? '' : 's'} on the client's behalf.`);
-    } catch (err) {
-      this.error.set(apiErrorMessage(err, 'Could not approve these leads.'));
-    } finally {
-      this.decisionSubmitting.set(false);
-    }
-  }
-
-  openRejectModal(): void {
-    if (this.decidableSelectedCount() === 0) return;
-    this.error.set(null);
-    this.rejectReason = '';
-    this.rejectModalOpen.set(true);
-  }
-
-  closeRejectModal(): void {
-    this.rejectModalOpen.set(false);
-  }
-
-  async confirmBatchReject(): Promise<void> {
-    this.error.set(null);
-    this.decisionSubmitting.set(true);
-    try {
-      const leadIds = this.selectedLeads().filter((l) => this.isEligibleForDecision(l)).map((l) => l.id);
-      const { count } = await this.leadService.batchDecide(leadIds, 'REJECT', this.rejectReason.trim() || undefined);
-      await this.refresh();
-      this.clearSelection();
-      this.rejectModalOpen.set(false);
-      // Leads with a closer/junior/retention owner go back to them for a re-write; the rest
-      // land REJECTED in the admin queue — report where they actually went.
-      const ids = new Set(leadIds);
-      const requeued = this.leads().filter((l) => ids.has(l.id) && l.status === 'REJECTED').length;
-      const sentBack = count - requeued;
-      const parts = [
-        sentBack ? `${sentBack} sent back for a re-write` : '',
-        requeued ? `${requeued} back in the queue for reassignment` : '',
-      ].filter(Boolean);
-      this.notice.set(`Declined ${count} lead${count === 1 ? '' : 's'} — ${parts.join(', ')}.`);
-    } catch (err) {
-      this.error.set(apiErrorMessage(err, 'Could not decline these leads.'));
-    } finally {
-      this.decisionSubmitting.set(false);
-    }
   }
 
   sortArrow(key: string): string {

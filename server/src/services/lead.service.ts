@@ -859,8 +859,8 @@ export async function returnLeadForEdit(
 export async function setLeadPaymentStatus(leadId: string): Promise<ServiceResult<{ lead: unknown }>> {
   const lead = await prisma.lead.findUnique({ where: { id: leadId } });
   if (!lead) return { error: 'Lead not found', status: 404 };
-  if (lead.status !== 'ACCEPTED' && lead.status !== 'ASSIGNED_EXTERNAL') {
-    return { error: 'Only approved or externally-assigned leads can be marked paid/unpaid', status: 400 };
+  if (!(MONEY_STATUSES as readonly string[]).includes(lead.status)) {
+    return { error: 'Only assigned leads can be marked paid/unpaid', status: 400 };
   }
 
   const updated = await prisma.lead.updateMany({
@@ -872,6 +872,9 @@ export async function setLeadPaymentStatus(leadId: string): Promise<ServiceResul
   const result = await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE });
   return { data: { lead: result } };
 }
+
+/** Any lead that has been handed to a client can be marked paid / charged back, whatever its decision status. */
+const MONEY_STATUSES = ['ASSIGNED', 'ACCEPTED', 'ASSIGNED_EXTERNAL', 'REJECTED'] as const;
 
 const ADMIN_STATUS_VALUES = [
   'CLIENT_PAID',
@@ -889,10 +892,24 @@ const ADMIN_STATUS_VALUES = [
  */
 export async function setLeadAdminStatus(
   leadId: string,
-  adminStatus: unknown
+  adminStatus: unknown,
+  actorId?: string
 ): Promise<ServiceResult<{ lead: unknown }>> {
   if (adminStatus !== null && !(ADMIN_STATUS_VALUES as readonly unknown[]).includes(adminStatus)) {
     return { error: `adminStatus must be one of ${ADMIN_STATUS_VALUES.join(', ')} or null`, status: 400 };
+  }
+
+  // Approval Confirmed / Declined carry the old accept / reject transition for a lead that is
+  // still awaiting its client's decision; on any other lead they are just the label.
+  if (adminStatus === 'APPROVAL_CONFIRMED' || adminStatus === 'DECLINED') {
+    const awaiting = await prisma.lead.findFirst({
+      where: { id: leadId, status: { in: ['ASSIGNED', 'ASSIGNED_EXTERNAL'] } },
+      select: { id: true },
+    });
+    if (awaiting) {
+      const decided = await batchDecideAsAdmin([leadId], adminStatus === 'APPROVAL_CONFIRMED' ? 'ACCEPT' : 'REJECT', undefined, actorId);
+      if ('error' in decided) return decided;
+    }
   }
 
   const updated = await prisma.lead.updateMany({
@@ -928,7 +945,7 @@ export async function batchMarkPaid(
   if (note !== undefined && note !== null && typeof note !== 'string') return { error: 'Invalid note', status: 400 };
 
   const eligible = await prisma.lead.findMany({
-    where: { id: { in: leadIds }, status: { in: ['ACCEPTED', 'ASSIGNED_EXTERNAL'] }, paymentStatus: 'UNPAID' },
+    where: { id: { in: leadIds }, status: { in: [...MONEY_STATUSES] }, paymentStatus: 'UNPAID' },
     select: { id: true },
   });
   if (eligible.length === 0) return { error: 'None of the selected leads can be marked paid', status: 400 };
@@ -940,7 +957,7 @@ export async function batchMarkPaid(
   // transaction rolls back — so income is never recorded twice for the same lead.
   const applied = await runGuardedTransaction(async (tx) => {
     const updated = await tx.lead.updateMany({
-      where: { id: { in: eligibleIds }, status: { in: ['ACCEPTED', 'ASSIGNED_EXTERNAL'] }, paymentStatus: 'UNPAID' },
+      where: { id: { in: eligibleIds }, status: { in: [...MONEY_STATUSES] }, paymentStatus: 'UNPAID' },
       data: { paymentStatus: 'PAID', closedAt: new Date() },
     });
     if (updated.count !== eligibleIds.length) throw new StaleTransitionError();
@@ -995,8 +1012,8 @@ export async function markLeadChargedBack(
 
   const lead = await prisma.lead.findUnique({ where: { id: leadId } });
   if (!lead) return { error: 'Lead not found', status: 404 };
-  if (lead.status !== 'ACCEPTED' || lead.paymentStatus !== 'PAID') {
-    return { error: 'Only an approved, paid lead can be charged back', status: 400 };
+  if (!(MONEY_STATUSES as readonly string[]).includes(lead.status) || lead.paymentStatus !== 'PAID') {
+    return { error: 'Only an assigned, paid lead can be charged back', status: 400 };
   }
   if (!lead.clientId) return { error: 'Lead has no client on record', status: 400 };
 
@@ -1007,7 +1024,7 @@ export async function markLeadChargedBack(
   // charge-back of the same lead rolls back instead of recording the money twice.
   const applied = await runGuardedTransaction(async (tx) => {
     const updated = await tx.lead.updateMany({
-      where: { id: leadId, status: 'ACCEPTED', paymentStatus: 'PAID' },
+      where: { id: leadId, status: lead.status, paymentStatus: 'PAID' },
       data: { status: 'CHARGED_BACK', clientId: null, paymentStatus: 'UNPAID', closedAt: null },
     });
     if (updated.count !== 1) throw new StaleTransitionError();
@@ -1047,7 +1064,7 @@ export async function batchChargeBack(
   if (!Number.isFinite(amountNum) || amountNum <= 0) return { error: 'Enter the PKR amount charged back', status: 400 };
 
   const eligible = await prisma.lead.findMany({
-    where: { id: { in: leadIds }, status: 'ACCEPTED', paymentStatus: 'PAID', clientId: { not: null } },
+    where: { id: { in: leadIds }, status: { in: [...MONEY_STATUSES] }, paymentStatus: 'PAID', clientId: { not: null } },
     select: { id: true, clientId: true, customerName: true },
   });
   if (eligible.length === 0) return { error: 'None of the selected leads can be charged back', status: 400 };
@@ -1060,7 +1077,7 @@ export async function batchChargeBack(
   // Same guard as batchMarkPaid: update first, abort the whole batch if any lead moved.
   const applied = await runGuardedTransaction(async (tx) => {
     const updated = await tx.lead.updateMany({
-      where: { id: { in: eligible.map((l) => l.id) }, status: 'ACCEPTED', paymentStatus: 'PAID', clientId: { not: null } },
+      where: { id: { in: eligible.map((l) => l.id) }, status: { in: [...MONEY_STATUSES] }, paymentStatus: 'PAID', clientId: { not: null } },
       data: { status: 'CHARGED_BACK', clientId: null, paymentStatus: 'UNPAID', closedAt: null },
     });
     if (updated.count !== eligible.length) throw new StaleTransitionError();

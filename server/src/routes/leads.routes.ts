@@ -331,7 +331,7 @@ router.patch(
   '/:id/admin-status',
   requireRole('ADMIN', 'MANAGER'),
   asyncHandler(async (req, res) => {
-    const result = await leadService.setLeadAdminStatus(req.params.id, req.body?.adminStatus ?? null);
+    const result = await leadService.setLeadAdminStatus(req.params.id, req.body?.adminStatus ?? null, req.user!.id);
     return sendResult(res, result, 'Status updated');
   })
 );
