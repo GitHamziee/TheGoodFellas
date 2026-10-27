@@ -54,11 +54,16 @@ export function periodBounds(period: Period, anchor: string): [number, number] {
 }
 
 /** Rows whose `createdAt` falls inside the selected period. */
-export function inPeriod<T extends { createdAt: string }>(rows: T[], period: Period, anchor: string): T[] {
+export function inPeriod<T extends { createdAt: string }>(
+  rows: T[],
+  period: Period,
+  anchor: string,
+  dateOf: (row: T) => string = (r) => r.createdAt,
+): T[] {
   if (period === 'all') return rows;
   const [start, end] = periodBounds(period, anchor);
   return rows.filter((r) => {
-    const t = new Date(r.createdAt).getTime();
+    const t = new Date(dateOf(r)).getTime();
     return t >= start && t < end;
   });
 }

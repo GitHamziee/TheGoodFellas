@@ -69,8 +69,8 @@
               <th class="sortable" (click)="view.toggleSort('status')">
                 Outcome <span class="arrow">{{ sortArrow('status') }}</span>
               </th>
-              <th class="sortable right hide-sm" (click)="view.toggleSort('createdAt')">
-                Submitted <span class="arrow">{{ sortArrow('createdAt') }}</span>
+              <th class="sortable right hide-sm" (click)="view.toggleSort('updatedAt')">
+                Submitted <span class="arrow">{{ sortArrow('updatedAt') }}</span>
               </th>
             </tr>
           </thead>
@@ -93,7 +93,7 @@
                 <td class="hide-md">{{ lead.client?.name || '—' }}</td>
                 <td><app-status-badge [status]="lead.status" /></td>
                 <td class="right hide-sm">
-                  <span class="chip"><svg lucideClock></svg>{{ timeAgo(lead.createdAt) }}</span>
+                  <span class="chip"><svg lucideClock></svg>{{ timeAgo(lead.updatedAt) }}</span>
                 </td>
               </tr>
             }

@@ -48,7 +48,7 @@ export class RetentionHistory implements OnInit {
   readonly allPast = signal<Lead[]>([]);
   readonly period = signal<Period>('day');
   readonly anchor = signal(pacificIsoDate(pacificToday()));
-  readonly past = computed(() => inPeriod(this.allPast(), this.period(), this.anchor()));
+  readonly past = computed(() => inPeriod(this.allPast(), this.period(), this.anchor(), (l) => l.updatedAt ?? l.createdAt));
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
 
