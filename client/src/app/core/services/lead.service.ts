@@ -11,6 +11,7 @@ import {
 } from '../models/lead.model';
 import { LeadReviewRow, QaCloserLeadRow, QaJuniorLeadRow, ReviewOutcome } from '../models/review.model';
 import type { ApiSuccess } from '../api';
+import type { RetentionHistoryRow, RetentionTimelineEntry } from '../models/retention-history.model';
 
 const BASE = `${API_BASE_URL}/leads`;
 
@@ -351,6 +352,19 @@ export class LeadService {
   async retentionAll(): Promise<Lead[]> {
     const res = await firstValueFrom(this.http.get<ApiSuccess<{ leads: Lead[] }>>(`${BASE}/retention/all`));
     return res.data.leads;
+  }
+
+  /** Retention History: every retention lead's lifecycle summary (Admin/Manager only). */
+  async retentionLifecycle(): Promise<RetentionHistoryRow[]> {
+    const res = await firstValueFrom(this.http.get<ApiSuccess<{ leads: RetentionHistoryRow[] }>>(`${BASE}/retention/lifecycle`));
+    return res.data.leads;
+  }
+
+  async retentionLifecycleDetail(id: string): Promise<{ lead: RetentionHistoryRow; timeline: RetentionTimelineEntry[] }> {
+    const res = await firstValueFrom(
+      this.http.get<ApiSuccess<{ lead: RetentionHistoryRow; timeline: RetentionTimelineEntry[] }>>(`${BASE}/retention/lifecycle/${id}`)
+    );
+    return res.data;
   }
 
   /** Hands (or re-hands, to correct a misassignment) an unworked retention lead to a person. */

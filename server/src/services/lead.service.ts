@@ -18,6 +18,7 @@ import {
 const JUNIOR_EDIT_FIELDS = Array.from(new Set<string>([...JUNIOR_INTAKE_FIELDS, ...CPL_INTAKE_FIELDS]));
 
 import { notifyRoles, notifyUsers } from './notification.service';
+import { recordRetentionEvents } from './lead-event.service';
 import type { ServiceResult } from '../lib/service-result';
 
 const ADMIN_TEAM = ['ADMIN', 'MANAGER'] as ('ADMIN' | 'MANAGER')[];
@@ -579,7 +580,7 @@ function normalizeDraftReason(data: Record<string, unknown>): string | null {
 // ─── Admin ──────────────────────────────────────────────────────
 const ASSIGNABLE_STATUSES = ['SUBMITTED', 'REJECTED', 'CHARGED_BACK'] as const;
 
-export async function assignLeadToClient(leadId: string, clientId: string): Promise<ServiceResult<{ lead: unknown }>> {
+export async function assignLeadToClient(leadId: string, clientId: string, actorId?: string): Promise<ServiceResult<{ lead: unknown }>> {
   const lead = await prisma.lead.findUnique({ where: { id: leadId } });
   if (!lead) return { error: 'Lead not found', status: 404 };
   if (!ASSIGNABLE_STATUSES.includes(lead.status as (typeof ASSIGNABLE_STATUSES)[number])) {
@@ -595,6 +596,7 @@ export async function assignLeadToClient(leadId: string, clientId: string): Prom
   });
   if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
 
+  void recordRetentionEvents([leadId], 'ASSIGNED_TO_CLIENT', { actorId, targetId: clientId, note: client.name });
   void notifyUsers([clientId], {
     kind: 'success',
     title: 'New lead for you',
@@ -609,7 +611,8 @@ export async function assignLeadToClient(leadId: string, clientId: string): Prom
 /** Admin hands a lead to a non-login ExternalClient — no accept/reject step, terminal. */
 export async function assignLeadToExternalClient(
   leadId: string,
-  externalClientId: string
+  externalClientId: string,
+  actorId?: string
 ): Promise<ServiceResult<{ lead: unknown }>> {
   const lead = await prisma.lead.findUnique({ where: { id: leadId } });
   if (!lead) return { error: 'Lead not found', status: 404 };
@@ -625,6 +628,7 @@ export async function assignLeadToExternalClient(
     data: { externalClientId, clientId: null, status: 'ASSIGNED_EXTERNAL', rejectionReason: null },
   });
   if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
+  void recordRetentionEvents([leadId], 'ASSIGNED_EXTERNAL', { actorId, note: externalClient.name });
 
   const result = await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE });
   return { data: { lead: result } };
@@ -655,6 +659,7 @@ export async function submitRetentionIntake(
     data: { leadType: 'RETENTION', status: 'NEW', ...data, ...sheet } as Prisma.LeadUncheckedCreateInput,
     include: FULL_INCLUDE,
   });
+  void recordRetentionEvents([lead.id], 'CREATED');
   return { data: { lead } };
 }
 
@@ -683,7 +688,7 @@ export async function listRetentionAllForAdmin() {
  * Retention person. Doesn't change status — mirrors how a Junior Closer picks a Closer at
  * CPA intake, claimed via a foreign key while the lead stays NEW until actually worked.
  */
-export async function assignLeadToRetention(leadId: string, retentionId: string): Promise<ServiceResult<{ lead: unknown }>> {
+export async function assignLeadToRetention(leadId: string, retentionId: string, actorId?: string): Promise<ServiceResult<{ lead: unknown }>> {
   const lead = await prisma.lead.findUnique({ where: { id: leadId } });
   if (!lead) return { error: 'Lead not found', status: 404 };
   if (lead.leadType !== 'RETENTION') return { error: 'Not a retention lead', status: 400 };
@@ -698,6 +703,7 @@ export async function assignLeadToRetention(leadId: string, retentionId: string)
   });
   if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
 
+  void recordRetentionEvents([leadId], 'ASSIGNED_TO_RETENTION', { actorId, targetId: retentionId, note: person.name });
   void notifyUsers([retentionId], {
     kind: 'info',
     title: 'New retention lead',
@@ -716,7 +722,8 @@ export async function assignLeadToRetention(leadId: string, retentionId: string)
  */
 export async function batchAssignToRetention(
   leadIds: unknown,
-  retentionId: unknown
+  retentionId: unknown,
+  actorId?: string
 ): Promise<ServiceResult<{ count: number }>> {
   if (!Array.isArray(leadIds) || leadIds.length === 0 || !leadIds.every((id) => typeof id === 'string')) {
     return { error: 'Select at least one lead', status: 400 };
@@ -731,6 +738,7 @@ export async function batchAssignToRetention(
     data: { retentionId, retentionAssignedAt: new Date() },
   });
   if (updated.count === 0) return { error: 'None of the selected leads are available for assignment', status: 400 };
+  void recordRetentionEvents(leadIds, 'ASSIGNED_TO_RETENTION', { actorId, targetId: retentionId, note: person.name });
 
   void notifyUsers([retentionId], {
     kind: 'info',
@@ -782,7 +790,8 @@ export async function editLead(leadId: string, input: Record<string, unknown>): 
 export async function returnLeadForEdit(
   leadId: string,
   target: 'JUNIOR_CLOSER' | 'CLOSER' | 'RETENTION',
-  reason: string
+  reason: string,
+  actorId?: string
 ): Promise<ServiceResult<{ lead: unknown }>> {
   if (!isNonEmptyString(reason)) return { error: 'A reason is required so they know what to fix', status: 400 };
 
@@ -818,6 +827,9 @@ export async function returnLeadForEdit(
   if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
 
   const returnedTo = target === 'JUNIOR_CLOSER' ? lead.juniorCloserId : target === 'CLOSER' ? lead.closerId : lead.retentionId;
+  if (target === 'RETENTION') {
+    void recordRetentionEvents([leadId], 'RETURNED_TO_RETENTION', { actorId, targetId: lead.retentionId, note: reason.trim() });
+  }
   void notifyUsers([returnedTo], {
     kind: 'warning',
     title: 'Lead sent back for correction',
@@ -862,7 +874,8 @@ export async function setLeadPaymentStatus(leadId: string): Promise<ServiceResul
 export async function batchMarkPaid(
   leadIds: unknown,
   pkrAmount: unknown,
-  note: unknown
+  note: unknown,
+  actorId?: string
 ): Promise<ServiceResult<{ count: number }>> {
   if (!Array.isArray(leadIds) || leadIds.length === 0 || !leadIds.every((id) => typeof id === 'string')) {
     return { error: 'Select at least one lead', status: 400 };
@@ -900,6 +913,7 @@ export async function batchMarkPaid(
   });
   if (!applied) return STALE_TRANSITION_ERROR;
 
+  void recordRetentionEvents(eligibleIds, 'PAID', { actorId });
   return { data: { count: eligibleIds.length } };
 }
 
@@ -1109,6 +1123,8 @@ export async function createLeadByRetention(
     data: { retentionId, leadType: 'RETENTION', status: 'SUBMITTED', ...data, ...suggested } as Prisma.LeadUncheckedCreateInput,
     include: FULL_INCLUDE,
   });
+  void recordRetentionEvents([lead.id], 'CREATED', { actorId: retentionId });
+  void recordRetentionEvents([lead.id], 'SUBMITTED', { actorId: retentionId });
 
   void notifyRoles(ADMIN_TEAM, {
     kind: 'info',
@@ -1147,6 +1163,7 @@ export async function createDraftByRetention(
     data: { retentionId, leadType: 'RETENTION', status: 'DRAFT', ...data, ...suggested } as Prisma.LeadUncheckedCreateInput,
     include: FULL_INCLUDE,
   });
+  void recordRetentionEvents([lead.id], 'CREATED', { actorId: retentionId });
 
   return { data: { lead } };
 }
@@ -1210,6 +1227,7 @@ export async function enrichAndSubmitRetentionLead(
   });
   if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
 
+  void recordRetentionEvents([leadId], 'SUBMITTED', { actorId: submitterId });
   void notifyRoles(ADMIN_TEAM, {
     kind: 'info',
     title: 'Retention lead submitted',
@@ -1504,6 +1522,7 @@ export async function acceptLead(leadId: string, clientId: string): Promise<Serv
   });
   if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
 
+  void recordRetentionEvents([leadId], 'ACCEPTED', { actorId: clientId });
   void notifyRoles(ADMIN_TEAM, {
     kind: 'success',
     title: 'Lead accepted',
@@ -1548,6 +1567,7 @@ export async function rejectLead(leadId: string, clientId: string, reason?: stri
   if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
 
   const why = trimmed ? ` Reason: ${trimmed}` : '';
+  void recordRetentionEvents([leadId], 'REJECTED', { actorId: clientId, note: trimmed });
   if (toCloser) {
     void notifyUsers([lead.closerId], {
       kind: 'warning',
@@ -1597,7 +1617,8 @@ export async function rejectLead(leadId: string, clientId: string, reason?: stri
 export async function batchDecideAsAdmin(
   leadIds: unknown,
   decision: unknown,
-  reason: unknown
+  reason: unknown,
+  actorId?: string
 ): Promise<ServiceResult<{ count: number }>> {
   if (!Array.isArray(leadIds) || leadIds.length === 0 || !leadIds.every((id) => typeof id === 'string')) {
     return { error: 'Select at least one lead', status: 400 };
@@ -1625,6 +1646,7 @@ export async function batchDecideAsAdmin(
       data: { status: 'ACCEPTED' },
     });
     if (updated.count === 0) return { error: 'Leads were already updated', status: 409 };
+    void recordRetentionEvents(eligible.map((l) => l.id), 'ACCEPTED', { actorId });
     for (const l of eligible) {
       void notifyUsers([l.closerId, l.juniorCloserId], {
         kind: 'success',
@@ -1672,6 +1694,7 @@ export async function batchDecideAsAdmin(
   const count = toCloser.count + toJunior.count + toRetention.count + toAdmin.count;
   if (count === 0) return { error: 'Leads were already updated', status: 409 };
 
+  void recordRetentionEvents(eligible.map((l) => l.id), 'REJECTED', { actorId, note: trimmed });
   for (const l of eligible.filter(isCpaToCloser)) {
     void notifyUsers([l.closerId], {
       kind: 'warning',

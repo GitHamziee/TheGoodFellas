@@ -390,6 +390,7 @@ model Lead {
   suggestedClient User?           @relation("SuggestedClientLeads", fields: [suggestedClientId], references: [id], onDelete: SetNull)
   incomePayment   IncomePayment?  @relation(fields: [incomePaymentId], references: [id], onDelete: SetNull)
   chargeBacks     ChargeBack[]
+  events          LeadEvent[]
   qaReviews       LeadReview[]
   callReviews     CallReview[]
 
@@ -470,6 +471,39 @@ model IncomePayment {
   leads Lead[]
 
   @@index([createdAt])
+}
+
+// What happened to a lead, in order — the audit trail behind the Retention History page.
+// Written best-effort next to each lead.service.ts transition (never blocks it), so leads
+// that predate this table have no rows; the history view falls back to the Lead's own
+// timestamps and ChargeBack rows for them. Charge-backs are deliberately NOT an event type:
+// ChargeBack is already the authoritative record (date + reason). `actorId`/`targetId` are
+// plain user ids with no FK so history survives a deleted account; `note` is free text
+// (return reason, assignee name).
+enum LeadEventType {
+  CREATED
+  ASSIGNED_TO_RETENTION
+  SUBMITTED
+  RETURNED_TO_RETENTION
+  ASSIGNED_TO_CLIENT
+  ASSIGNED_EXTERNAL
+  ACCEPTED
+  REJECTED
+  PAID
+}
+
+model LeadEvent {
+  id        String        @id @default(cuid())
+  leadId    String
+  type      LeadEventType
+  actorId   String?
+  targetId  String?
+  note      String?
+  createdAt DateTime      @default(now())
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId, createdAt])
 }
 
 // One chargeback event against a lead that was ACCEPTED and PAID. Snapshots which

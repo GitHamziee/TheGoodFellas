@@ -142,6 +142,11 @@ export const routes: Routes = [
         path: 'retention',
         loadComponent: () => import('./features/admin/retention/retention').then((m) => m.AdminRetention),
       },
+      {
+        path: 'retention-history',
+        loadComponent: () =>
+          import('./features/admin/retention-history/retention-history').then((m) => m.RetentionHistory),
+      },
       { path: 'retention-leads', redirectTo: 'leads', pathMatch: 'full' },
       {
         path: 'cpl-leads',
@@ -263,6 +268,11 @@ export const routes: Routes = [
       {
         path: 'retention',
         loadComponent: () => import('./features/admin/retention/retention').then((m) => m.AdminRetention),
+      },
+      {
+        path: 'retention-history',
+        loadComponent: () =>
+          import('./features/admin/retention-history/retention-history').then((m) => m.RetentionHistory),
       },
       { path: 'retention-leads', redirectTo: 'leads', pathMatch: 'full' },
       {

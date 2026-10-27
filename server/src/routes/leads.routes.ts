@@ -5,6 +5,7 @@ import { reportError } from '../lib/rollbar';
 import { authenticate, requireRole } from '../middleware/auth';
 import * as leadService from '../services/lead.service';
 import * as sheetSync from '../services/retention-sheet-sync.service';
+import * as retentionHistory from '../services/retention-history.service';
 
 const router = Router();
 
@@ -241,7 +242,7 @@ router.patch(
     const { clientId } = req.body ?? {};
     if (!clientId || typeof clientId !== 'string') return apiError(res, 'clientId is required', 400);
 
-    const result = await leadService.assignLeadToClient(req.params.id, clientId);
+    const result = await leadService.assignLeadToClient(req.params.id, clientId, req.user!.id);
     return sendResult(res, result, 'Lead assigned');
   })
 );
@@ -253,7 +254,7 @@ router.patch(
     const { externalClientId } = req.body ?? {};
     if (!externalClientId || typeof externalClientId !== 'string') return apiError(res, 'externalClientId is required', 400);
 
-    const result = await leadService.assignLeadToExternalClient(req.params.id, externalClientId);
+    const result = await leadService.assignLeadToExternalClient(req.params.id, externalClientId, req.user!.id);
     return sendResult(res, result, 'Lead assigned to external client');
   })
 );
@@ -266,7 +267,7 @@ router.patch(
     if (target !== 'JUNIOR_CLOSER' && target !== 'CLOSER' && target !== 'RETENTION') {
       return apiError(res, 'target must be JUNIOR_CLOSER, CLOSER, or RETENTION', 400);
     }
-    const result = await leadService.returnLeadForEdit(req.params.id, target, reason);
+    const result = await leadService.returnLeadForEdit(req.params.id, target, reason, req.user!.id);
     return sendResult(res, result, 'Lead sent back for editing');
   })
 );
@@ -276,7 +277,7 @@ router.patch(
   requireRole('ADMIN', 'MANAGER'),
   asyncHandler(async (req, res) => {
     const { leadIds, decision, reason } = req.body ?? {};
-    const result = await leadService.batchDecideAsAdmin(leadIds, decision, reason);
+    const result = await leadService.batchDecideAsAdmin(leadIds, decision, reason, req.user!.id);
     return sendResult(res, result, decision === 'ACCEPT' ? 'Leads approved' : 'Leads declined');
   })
 );
@@ -286,7 +287,7 @@ router.patch(
   requireRole('ADMIN', 'MANAGER'),
   asyncHandler(async (req, res) => {
     const { leadIds, pkrAmount, note } = req.body ?? {};
-    const result = await leadService.batchMarkPaid(leadIds, pkrAmount, note);
+    const result = await leadService.batchMarkPaid(leadIds, pkrAmount, note, req.user!.id);
     return sendResult(res, result, 'Leads marked paid');
   })
 );
@@ -354,6 +355,26 @@ router.get(
   })
 );
 
+// Retention History — full lifecycle of every retention lead. ADMIN/MANAGER only; carries no
+// PKR figures. (Not '/retention/history': that path is the Retention role's own history page.)
+router.get(
+  '/retention/lifecycle',
+  requireRole('ADMIN', 'MANAGER'),
+  asyncHandler(async (_req, res) => {
+    const leads = await retentionHistory.listRetentionHistory();
+    return apiSuccess(res, { leads });
+  })
+);
+
+router.get(
+  '/retention/lifecycle/:id',
+  requireRole('ADMIN', 'MANAGER'),
+  asyncHandler(async (req, res) => {
+    const result = await retentionHistory.getRetentionHistory(req.params.id);
+    return sendResult(res, result);
+  })
+);
+
 // Admin-only: the manager scope middleware above would 403 this path for a MANAGER anyway.
 router.post(
   '/retention/sync',
@@ -376,7 +397,7 @@ router.patch(
     const { retentionId } = req.body ?? {};
     if (!retentionId || typeof retentionId !== 'string') return apiError(res, 'retentionId is required', 400);
 
-    const result = await leadService.assignLeadToRetention(req.params.id, retentionId);
+    const result = await leadService.assignLeadToRetention(req.params.id, retentionId, req.user!.id);
     return sendResult(res, result, 'Lead assigned');
   })
 );
@@ -386,7 +407,7 @@ router.patch(
   requireRole('ADMIN', 'MANAGER'),
   asyncHandler(async (req, res) => {
     const { leadIds, retentionId } = req.body ?? {};
-    const result = await leadService.batchAssignToRetention(leadIds, retentionId);
+    const result = await leadService.batchAssignToRetention(leadIds, retentionId, req.user!.id);
     return sendResult(res, result, 'Leads assigned');
   })
 );

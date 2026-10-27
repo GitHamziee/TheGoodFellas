@@ -1,0 +1,171 @@
+<div class="page">
+  @if (error()) {
+    <div class="error">{{ error() }}</div>
+  }
+
+  @if (loading()) {
+    <div class="card"><app-skeleton-rows [count]="6" /></div>
+  } @else if (leads().length === 0) {
+    <div class="card">
+      <app-empty-state title="No retention leads yet">
+        <svg lucideFileText></svg>
+      </app-empty-state>
+    </div>
+  } @else {
+    <div class="stats-row">
+      <app-stat-tile [value]="stats().total" label="Retention leads" tone="tone-gold">
+        <svg lucideFileText></svg>
+      </app-stat-tile>
+      <app-stat-tile [value]="stats().avgMonths + ' mo'" label="Avg time on book" tone="tone-c">
+        <svg lucideClock></svg>
+      </app-stat-tile>
+      <app-stat-tile [value]="stats().chargedBack" label="Ever charged back" [tone]="stats().chargedBack ? 'tone-danger' : 'tone-gold'">
+        <svg lucideTriangleAlert></svg>
+      </app-stat-tile>
+      <app-stat-tile [value]="stats().retained" label="Retained" tone="tone-f">
+        <svg lucideShieldCheck></svg>
+      </app-stat-tile>
+    </div>
+
+    <div class="pills">
+      <button type="button" class="pill" [class.active]="view.status() === ''" (click)="view.setStatus('')">
+        All <span class="n">{{ leads().length }}</span>
+      </button>
+      @for (o of stateOptions(); track o.value) {
+        <button type="button" class="pill" [class.active]="view.status() === o.value" (click)="view.setStatus(o.value)">
+          {{ o.label }} <span class="n">{{ o.count }}</span>
+        </button>
+      }
+    </div>
+
+    <div class="toolbar">
+      <app-search-box
+        [value]="view.search()"
+        placeholder="Search by customer or retention person…"
+        (valueChange)="view.setSearch($event)"
+      />
+    </div>
+
+    <div class="card card--flush">
+      @if (view.total() === 0) {
+        <app-empty-state title="No retention leads match">
+          <svg lucideFileText></svg>
+        </app-empty-state>
+      } @else {
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th class="sortable" (click)="view.toggleSort('customerName')">
+                  Customer <span class="arrow">{{ sortArrow('customerName') }}</span>
+                </th>
+                <th class="sortable hide-md" (click)="view.toggleSort('createdAt')">
+                  Created <span class="arrow">{{ sortArrow('createdAt') }}</span>
+                </th>
+                <th class="hide-sm">Closer</th>
+                <th class="sortable" (click)="view.toggleSort('monthsOnBook')">
+                  Time on book <span class="arrow">{{ sortArrow('monthsOnBook') }}</span>
+                </th>
+                <th class="sortable hide-sm" (click)="view.toggleSort('chargedBackAt')">
+                  Charged back <span class="arrow">{{ sortArrow('chargedBackAt') }}</span>
+                </th>
+                <th class="hide-md">Reassigned to</th>
+                <th class="hide-md">Retained by</th>
+                <th>State</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (lead of view.rows(); track lead.id) {
+                <tr class="clickable" (click)="open(lead)">
+                  <td><div class="cell-main">{{ lead.customerName }}</div></td>
+                  <td class="hide-md">{{ formatDate(lead.createdAt) }}</td>
+                  <td class="hide-sm">
+                    @if (lead.closer) {
+                      <div class="person">
+                        <span class="avatar-sm" [class]="getAvatarTone(lead.closer)">{{ getInitials(lead.closer) }}</span>
+                        <span class="nm">{{ lead.closer }}</span>
+                      </div>
+                    } @else {
+                      <span class="empty">—</span>
+                    }
+                  </td>
+                  <td>
+                    @if (lead.monthsOnBook !== null) {
+                      <div class="book">
+                        <span class="book-track">
+                          <span class="book-bar" [class.book-bar--over]="lead.monthsOnBook >= bookMonths" [style.width.%]="barPct(lead.monthsOnBook)"></span>
+                        </span>
+                        <span class="book-val">{{ lead.monthsOnBook }} / {{ bookMonths }} mo</span>
+                      </div>
+                    } @else {
+                      <span class="empty">—</span>
+                    }
+                  </td>
+                  <td class="hide-sm">
+                    {{ formatDate(lead.chargedBackAt) }}
+                    @if (lead.chargeBackCount > 1) {
+                      <span class="chip">×{{ lead.chargeBackCount }}</span>
+                    }
+                  </td>
+                  <td class="hide-md">{{ lead.reassignedTo ?? '—' }}</td>
+                  <td class="hide-md">{{ lead.retainedBy ?? '—' }}</td>
+                  <td><span class="badge" [class]="'badge ' + stateBadge(lead.state)">{{ stateLabel(lead.state) }}</span></td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <app-pagination
+          [page]="view.page()"
+          [totalPages]="view.totalPages()"
+          [total]="view.total()"
+          (pageChange)="view.page.set($event)"
+        />
+      }
+    </div>
+  }
+</div>
+
+@if (selected(); as lead) {
+  <app-modal title="Lifecycle" [subtitle]="lead.customerName" [wide]="true" (close)="selected.set(null)">
+    <dl class="summary">
+      <div><dt>Created</dt><dd>{{ formatDate(lead.createdAt) }}</dd></div>
+      <div><dt>Closer</dt><dd>{{ lead.closer ?? '—' }}</dd></div>
+      <div>
+        <dt>Time on book</dt>
+        <dd>{{ lead.monthsOnBook !== null ? lead.monthsOnBook + ' / ' + bookMonths + ' ' + pluralize(lead.monthsOnBook, 'month') : '—' }}</dd>
+      </div>
+      <div><dt>Charged back</dt><dd>{{ formatDate(lead.chargedBackAt) }}</dd></div>
+      <div><dt>Worked by</dt><dd>{{ lead.workedBy.length ? lead.workedBy.join(', ') : '—' }}</dd></div>
+      <div><dt>Reassigned to</dt><dd>{{ lead.reassignedTo ?? '—' }}</dd></div>
+      <div><dt>Retained by</dt><dd>{{ lead.retainedBy ?? '—' }}</dd></div>
+      <div><dt>State</dt><dd><span class="badge" [class]="'badge ' + stateBadge(lead.state)">{{ stateLabel(lead.state) }}</span></dd></div>
+    </dl>
+
+    @if (detailLoading()) {
+      <app-skeleton-rows [count]="4" />
+    } @else if (detailError()) {
+      <div class="error">{{ detailError() }}</div>
+    } @else {
+      <ol class="timeline">
+        @for (e of timeline(); track $index) {
+          <li>
+            <span class="dot" [class]="'dot ' + kindTone(e.kind)"></span>
+            <div class="tl-head">
+              <span class="tl-title">{{ kindLabel(e.kind) }}</span>
+              <span class="tl-when">{{ formatDateTime(e.at) }}</span>
+            </div>
+            @if (e.actor || e.target || e.note) {
+              <div class="tl-detail">
+                @if (e.actor) { by {{ e.actor }} }
+                @if (e.target) { {{ e.actor ? '→' : 'to' }} {{ e.target }} }
+                @if (e.note) { {{ e.actor || e.target ? '·' : '' }} {{ e.note }} }
+              </div>
+            }
+          </li>
+        }
+      </ol>
+    }
+  </app-modal>
+}

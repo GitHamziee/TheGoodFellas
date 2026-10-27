@@ -112,6 +112,7 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
       { label: 'CPL Leads', path: '/admin/cpl-leads' },
       { label: 'Drafts', path: '/admin/drafts' },
       { label: 'Retention Imports', path: '/admin/retention' },
+      { label: 'Retention History', path: '/admin/retention-history' },
     ]),
     group('People', 'users', [
       { label: 'Team', path: '/admin/team' },
@@ -140,6 +141,7 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
       { label: 'CPL Leads', path: '/manager/cpl-leads' },
       { label: 'Drafts', path: '/manager/drafts' },
       { label: 'Retention Imports', path: '/manager/retention' },
+      { label: 'Retention History', path: '/manager/retention-history' },
       { label: 'Charge Backs', path: '/manager/charge-backs' },
     ]),
     analyticsTabs('/manager'),
