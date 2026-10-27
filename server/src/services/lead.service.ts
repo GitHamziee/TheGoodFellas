@@ -836,9 +836,11 @@ export async function returnLeadForEdit(
   if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
 
   const returnedTo = target === 'JUNIOR_CLOSER' ? lead.juniorCloserId : target === 'CLOSER' ? lead.closerId : lead.retentionId;
-  if (target === 'RETENTION') {
-    void recordRetentionEvents([leadId], 'RETURNED_TO_RETENTION', { actorId, targetId: lead.retentionId, note: reason.trim() });
-  }
+  void recordRetentionEvents(
+    [leadId],
+    target === 'RETENTION' ? 'RETURNED_TO_RETENTION' : target === 'CLOSER' ? 'RETURNED_TO_CLOSER' : 'RETURNED_TO_JUNIOR',
+    { actorId, targetId: returnedTo, note: reason.trim() }
+  );
   void notifyUsers([returnedTo], {
     kind: 'warning',
     title: 'Lead sent back for correction',
@@ -878,6 +880,10 @@ const MONEY_STATUSES = ['ASSIGNED', 'ACCEPTED', 'ASSIGNED_EXTERNAL', 'REJECTED']
 
 /** Leads the admin can label: the admin queue (incl. charged back) plus everything handed to a client. Not new, draft or sent-back leads. */
 const TRACKABLE_STATUSES = [...MONEY_STATUSES, 'SUBMITTED', 'CHARGED_BACK'] as const;
+
+function humanizeAdminStatus(value: string): string {
+  return value.toLowerCase().split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
 
 const ADMIN_STATUS_VALUES = [
   'CLIENT_PAID',
@@ -935,6 +941,7 @@ export async function setLeadAdminStatus(
     data: { adminStatus: adminStatus as (typeof ADMIN_STATUS_VALUES)[number] | null },
   });
   if (updated.count === 0) return { error: 'Lead not found', status: 404 };
+  void recordRetentionEvents([leadId], 'STATUS_SET', { actorId, note: adminStatus ? humanizeAdminStatus(adminStatus as string) : 'Cleared' });
 
   const result = await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE });
   return { data: { lead: result } };
@@ -1043,7 +1050,7 @@ export async function markLeadChargedBack(
   const applied = await runGuardedTransaction(async (tx) => {
     const updated = await tx.lead.updateMany({
       where: { id: leadId, status: lead.status, paymentStatus: 'PAID' },
-      data: { status: 'CHARGED_BACK', clientId: null, paymentStatus: 'UNPAID', closedAt: null },
+      data: { status: 'CHARGED_BACK', clientId: null, paymentStatus: 'UNPAID', closedAt: null, adminStatus: null },
     });
     if (updated.count !== 1) throw new StaleTransitionError();
     // Deliberately NOT mirrored into Expenses: a charge-back is made good by a replacement
@@ -1096,7 +1103,7 @@ export async function batchChargeBack(
   const applied = await runGuardedTransaction(async (tx) => {
     const updated = await tx.lead.updateMany({
       where: { id: { in: eligible.map((l) => l.id) }, status: { in: [...MONEY_STATUSES] }, paymentStatus: 'PAID', clientId: { not: null } },
-      data: { status: 'CHARGED_BACK', clientId: null, paymentStatus: 'UNPAID', closedAt: null },
+      data: { status: 'CHARGED_BACK', clientId: null, paymentStatus: 'UNPAID', closedAt: null, adminStatus: null },
     });
     if (updated.count !== eligible.length) throw new StaleTransitionError();
     await tx.chargeBack.createMany({
@@ -1646,12 +1653,12 @@ export async function rejectLead(leadId: string, clientId: string, reason?: stri
   const updated = await prisma.lead.updateMany({
     where: { id: leadId, status: 'ASSIGNED', clientId },
     data: toCloser
-      ? { status: 'RETURNED_TO_CLOSER', clientId: null, rejectionReason: trimmed, returnReason: trimmed ?? 'Rejected by client' }
+      ? { status: 'RETURNED_TO_CLOSER', clientId: null, rejectionReason: trimmed, adminStatus: null, returnReason: trimmed ?? 'Rejected by client' }
       : toJunior
-      ? { status: 'RETURNED_TO_JUNIOR', clientId: null, rejectionReason: trimmed, returnReason: trimmed ?? 'Rejected by client' }
+      ? { status: 'RETURNED_TO_JUNIOR', clientId: null, rejectionReason: trimmed, adminStatus: null, returnReason: trimmed ?? 'Rejected by client' }
       : toRetention
-      ? { status: 'RETURNED_TO_RETENTION', clientId: null, rejectionReason: trimmed, returnReason: trimmed ?? 'Rejected by client' }
-      : { status: 'REJECTED', clientId: null, rejectionReason: reason ?? null },
+      ? { status: 'RETURNED_TO_RETENTION', clientId: null, rejectionReason: trimmed, adminStatus: null, returnReason: trimmed ?? 'Rejected by client' }
+      : { status: 'REJECTED', clientId: null, rejectionReason: reason ?? null, adminStatus: null },
   });
   if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
 

@@ -70,6 +70,7 @@
                   <td>
                     <div class="cell-main">
                       {{ lead.customerName }}
+                    <app-lifecycle-button [leadId]="lead.id" [name]="lead.customerName" />
                       @if (lead.dCode) {
                         <span class="chip">{{ lead.dCode }}</span>
                       }
@@ -144,6 +145,7 @@
                 <td>
                   <div class="cell-main">
                     {{ lead.customerName }}
+                    <app-lifecycle-button [leadId]="lead.id" [name]="lead.customerName" />
                     @if (lead.dCode) {
                       <span class="chip">{{ lead.dCode }}</span>
                     }
@@ -302,7 +304,8 @@
                   />
                 </td>
                 <td>
-                  <div class="cell-main">{{ lead.customerName }}</div>
+                  <div class="cell-main">{{ lead.customerName }}
+                    <app-lifecycle-button [leadId]="lead.id" [name]="lead.customerName" /></div>
                   <div class="cell-sub">{{ formatPhone(lead.phone) }} · {{ lead.state }}</div>
                 </td>
                 <td class="hide-sm">

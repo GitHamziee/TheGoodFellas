@@ -41,6 +41,7 @@ import {
 import { LeadDetail } from '../../../shared/lead-detail';
 import { RowMenu } from '../../../shared/ui/row-menu';
 import { AdminStatusControl } from '../../../shared/ui/admin-status';
+import { LifecycleButton } from '../../../shared/ui/lifecycle-button';
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 import { DayBar, rangeBounds, rangeLabel } from '../../../shared/ui/day-bar';
 import { LeadQuickEdit } from '../../../shared/lead-quick-edit';
@@ -74,6 +75,7 @@ const STATUS_FILTERS = [
     StatusBadge,
     PaymentBadge,
     AdminStatusControl,
+    LifecycleButton,
     SearchBox,
     Pagination,
     EmptyState,

@@ -71,6 +71,7 @@
                 <td>
                   <div class="cell-main">
                     {{ lead.customerName }}
+                    <app-lifecycle-button [leadId]="lead.id" [name]="lead.customerName" />
                     @if (lead.leadType === 'RETENTION') {
                       <span class="chip"><svg lucideHeadset></svg>Retention</span>
                     }
@@ -233,6 +234,7 @@
                 <td>
                   <div class="cell-main">
                     {{ lead.customerName }}
+                    <app-lifecycle-button [leadId]="lead.id" [name]="lead.customerName" />
                     @if (lead.leadType === 'RETENTION') {
                       <span class="chip"><svg lucideHeadset></svg>Retention</span>
                     }

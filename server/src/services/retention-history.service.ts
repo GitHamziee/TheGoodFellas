@@ -157,7 +157,7 @@ function buildTimeline(r: LeadRecord, names: Map<string, string>): TimelineEntry
     actor: nameOf(e.actorId),
     target: nameOf(e.targetId) ?? (e.type === 'ASSIGNED_TO_CLIENT' || e.type === 'ASSIGNED_EXTERNAL' ? e.note : null),
     // For assignments `note` is only the assignee's name, already shown as the target.
-    note: e.type === 'RETURNED_TO_RETENTION' || e.type === 'REJECTED' ? e.note : null,
+    note: ['RETURNED_TO_RETENTION', 'RETURNED_TO_CLOSER', 'RETURNED_TO_JUNIOR', 'REJECTED', 'STATUS_SET'].includes(e.type) ? e.note : null,
   }));
 
   // Leads that predate LeadEvent: fill the two anchors we can still derive.
@@ -204,4 +204,12 @@ export async function getRetentionHistory(
   if (!record) return { error: 'Lead not found', status: 404 };
   const names = await nameMap([record]);
   return { data: { lead: summarize(record, names, new Date()), timeline: buildTimeline(record, names) } };
+}
+
+/** Timeline for any lead (CPA / CPL / Retention) — the admin lead popup. Same events, no leadType filter. */
+export async function getLeadLifecycle(leadId: string): Promise<ServiceResult<{ timeline: TimelineEntry[] }>> {
+  const record = (await prisma.lead.findUnique({ where: { id: leadId }, select: ROW_SELECT })) as LeadRecord | null;
+  if (!record) return { error: 'Lead not found', status: 404 };
+  const names = await nameMap([record]);
+  return { data: { timeline: buildTimeline(record, names) } };
 }

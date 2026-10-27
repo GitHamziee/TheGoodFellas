@@ -384,6 +384,17 @@ router.get(
   })
 );
 
+// Lifecycle timeline for any lead — the "i" popup on the admin lead lists. Manager scope is
+// enforced by router.param('id').
+router.get(
+  '/:id/lifecycle',
+  requireRole('ADMIN', 'MANAGER'),
+  asyncHandler(async (req, res) => {
+    const result = await retentionHistory.getLeadLifecycle(req.params.id);
+    return sendResult(res, result);
+  })
+);
+
 // Admin-only: the manager scope middleware above would 403 this path for a MANAGER anyway.
 router.post(
   '/retention/sync',

@@ -2,9 +2,9 @@ import prisma from '../lib/prisma';
 import type { LeadEventType } from '@prisma/client';
 
 /**
- * Appends audit rows for the Retention History page. Best-effort and fire-and-forget like
+ * Appends audit rows for a lead's lifecycle (Retention History page and the admin lead popup). Best-effort and fire-and-forget like
  * notifications (`void recordRetentionEvents(...)`): a failure here must never fail the lead
- * transition it describes. Only RETENTION leads are recorded — nothing else reads them.
+ * transition it describes.
  */
 export async function recordRetentionEvents(
   leadIds: string[],
@@ -14,7 +14,7 @@ export async function recordRetentionEvents(
   if (leadIds.length === 0) return;
   try {
     const leads = await prisma.lead.findMany({
-      where: { id: { in: leadIds }, leadType: 'RETENTION' },
+      where: { id: { in: leadIds } },
       select: { id: true },
     });
     if (leads.length === 0) return;

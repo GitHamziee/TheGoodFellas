@@ -376,6 +376,12 @@ export class LeadService {
     return res.data;
   }
 
+  /** Lifecycle timeline of any lead (Admin/Manager) — the "i" popup on the lead lists. */
+  async leadLifecycle(id: string): Promise<RetentionTimelineEntry[]> {
+    const res = await firstValueFrom(this.http.get<ApiSuccess<{ timeline: RetentionTimelineEntry[] }>>(`${BASE}/${id}/lifecycle`));
+    return res.data.timeline;
+  }
+
   /** Hands (or re-hands, to correct a misassignment) an unworked retention lead to a person. */
   async assignRetention(id: string, retentionId: string): Promise<Lead> {
     const res = await firstValueFrom(

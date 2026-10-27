@@ -12,6 +12,9 @@ export type RetentionTimelineKind =
   | 'ACCEPTED'
   | 'REJECTED'
   | 'PAID'
+  | 'RETURNED_TO_CLOSER'
+  | 'RETURNED_TO_JUNIOR'
+  | 'STATUS_SET'
   | 'CHARGED_BACK';
 
 export interface RetentionHistoryRow {

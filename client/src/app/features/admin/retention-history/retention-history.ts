@@ -12,6 +12,7 @@ import {
 } from '../../../core/models/retention-history.model';
 import { chargeBackMonthLabel } from '../../../core/lead-options';
 import { Modal } from '../../../shared/ui/modal';
+import { KIND_LABEL, KIND_TONE } from '../../../shared/ui/lifecycle-button';
 import { EmptyState, Pagination, SearchBox, SkeletonRows } from '../../../shared/ui/ui';
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 
@@ -56,27 +57,6 @@ function stageOf(l: RetentionHistoryRow): string {
       return humanizeEnum(l.status);
   }
 }
-
-const KIND_LABEL: Record<RetentionTimelineKind, string> = {
-  CREATED: 'Lead created',
-  ASSIGNED_TO_RETENTION: 'Assigned to retention',
-  SUBMITTED: 'Worked and submitted',
-  RETURNED_TO_RETENTION: 'Sent back to retention',
-  ASSIGNED_TO_CLIENT: 'Assigned to client',
-  ASSIGNED_EXTERNAL: 'Handed to external client',
-  ACCEPTED: 'Approved by Admin',
-  REJECTED: 'Rejected',
-  PAID: 'Marked paid',
-  CHARGED_BACK: 'Charged back',
-};
-
-const KIND_TONE: Partial<Record<RetentionTimelineKind, string>> = {
-  ACCEPTED: 'dot--good',
-  PAID: 'dot--good',
-  REJECTED: 'dot--bad',
-  CHARGED_BACK: 'dot--bad',
-  RETURNED_TO_RETENTION: 'dot--warn',
-};
 
 @Component({
   selector: 'app-retention-history',
