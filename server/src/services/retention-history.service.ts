@@ -22,6 +22,8 @@ export interface RetentionHistoryRow {
   paidAt: Date | null;
   chargedBackAt: Date | null;
   chargeBackCount: number;
+  /** Every charge-back date, oldest first — feeds the per-month chart. */
+  chargeBackDates: Date[];
   /** Whole months between first paid and first charge-back (or today while still active). */
   monthsOnBook: number | null;
   workedBy: string[];
@@ -137,6 +139,7 @@ function summarize(r: LeadRecord, names: Map<string, string>, now: Date): Retent
     paidAt,
     chargedBackAt,
     chargeBackCount: r.chargeBacks.length,
+    chargeBackDates: r.chargeBacks.map((c) => c.createdAt),
     monthsOnBook: paidAt ? wholeMonthsBetween(paidAt, chargedBackAt ?? now) : null,
     workedBy: unique(submits.map((e) => nameOf(e.actorId))).concat(
       submits.length === 0 && r.retention ? [r.retention.name] : []

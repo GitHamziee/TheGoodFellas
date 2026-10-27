@@ -12,19 +12,55 @@
       </app-empty-state>
     </div>
   } @else {
-    <div class="stats-row">
-      <app-stat-tile [value]="stats().total" label="Retention leads" tone="tone-gold">
-        <svg lucideFileText></svg>
-      </app-stat-tile>
-      <app-stat-tile [value]="stats().avgMonths + ' mo'" label="Avg time on book" tone="tone-c">
-        <svg lucideClock></svg>
-      </app-stat-tile>
-      <app-stat-tile [value]="stats().chargedBack" label="Ever charged back" [tone]="stats().chargedBack ? 'tone-danger' : 'tone-gold'">
-        <svg lucideTriangleAlert></svg>
-      </app-stat-tile>
-      <app-stat-tile [value]="stats().retained" label="Retained" tone="tone-f">
-        <svg lucideShieldCheck></svg>
-      </app-stat-tile>
+    <div class="glance">
+      <div class="g" [class.g--bad]="stats().needsReassignment">
+        <span class="g-num">{{ stats().needsReassignment }}</span>
+        <span class="g-label">Needs reassignment</span>
+      </div>
+      <div class="g">
+        <span class="g-num">{{ stats().awaitingDecision }}</span>
+        <span class="g-label">Awaiting client decision</span>
+      </div>
+      <div class="g g--good">
+        <span class="g-num">{{ stats().active }}</span>
+        <span class="g-label">Approved and paid</span>
+      </div>
+      <div class="g" [class.g--warn]="stats().chargedBack">
+        <span class="g-num">{{ stats().chargeBackRate }}%</span>
+        <span class="g-label">Charge-back rate · {{ stats().chargedBack }} of {{ stats().everPaid }} paid</span>
+      </div>
+      <div class="g">
+        <span class="g-num">{{ stats().avgMonths }} mo</span>
+        <span class="g-label">Avg time on book</span>
+      </div>
+    </div>
+
+    <div class="card monthly">
+      <div class="m-head">
+        <span class="m-title">Paid vs charged back, last {{ monthly().length }} months</span>
+        <span class="m-legend">
+          <span><i style="background: var(--paid)"></i>Marked paid</span>
+          <span><i style="background: var(--charged)"></i>Charged back</span>
+        </span>
+      </div>
+      <div class="m-plot">
+        @for (m of monthly(); track m.full) {
+          <div class="m-grp" tabindex="0" [attr.aria-label]="m.full + ': ' + m.paid + ' marked paid, ' + m.charged + ' charged back'">
+            <div class="m-col">
+              @if (m.paid) { <span class="m-val">{{ m.paid }}</span> }
+              <span class="m-bar m-bar--paid" [style.height.%]="m.paidPct"></span>
+            </div>
+            <div class="m-col">
+              @if (m.charged) { <span class="m-val">{{ m.charged }}</span> }
+              <span class="m-bar m-bar--charged" [style.height.%]="m.chargedPct"></span>
+            </div>
+            <div class="m-tip"><div>{{ m.full }}</div><div><b>{{ m.paid }}</b> marked paid</div><div><b>{{ m.charged }}</b> charged back</div></div>
+          </div>
+        }
+      </div>
+      <div class="m-axis">
+        @for (m of monthly(); track m.full) { <span>{{ m.label }}</span> }
+      </div>
     </div>
 
     <div class="pills">
@@ -71,7 +107,8 @@
                 </th>
                 <th class="hide-md">Reassigned to</th>
                 <th class="hide-md">Retained by</th>
-                <th>State</th>
+                <th>Current stage</th>
+                <th>Status</th>
               </tr>
             </thead>
             <tbody>
@@ -109,6 +146,7 @@
                   </td>
                   <td class="hide-md">{{ lead.reassignedTo ?? '—' }}</td>
                   <td class="hide-md">{{ lead.retainedBy ?? '—' }}</td>
+                  <td>{{ stage(lead) }}</td>
                   <td><span class="badge" [class]="'badge ' + stateBadge(lead.state)">{{ stateLabel(lead.state) }}</span></td>
                 </tr>
               }
@@ -140,7 +178,8 @@
       <div><dt>Worked by</dt><dd>{{ lead.workedBy.length ? lead.workedBy.join(', ') : '—' }}</dd></div>
       <div><dt>Reassigned to</dt><dd>{{ lead.reassignedTo ?? '—' }}</dd></div>
       <div><dt>Retained by</dt><dd>{{ lead.retainedBy ?? '—' }}</dd></div>
-      <div><dt>State</dt><dd><span class="badge" [class]="'badge ' + stateBadge(lead.state)">{{ stateLabel(lead.state) }}</span></dd></div>
+      <div><dt>Current stage</dt><dd>{{ stage(lead) }}</dd></div>
+      <div><dt>Status</dt><dd><span class="badge" [class]="'badge ' + stateBadge(lead.state)">{{ stateLabel(lead.state) }}</span></dd></div>
     </dl>
 
     @if (detailLoading()) {

@@ -1,9 +1,9 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { LucideClock, LucideFileText, LucideShieldCheck, LucideTriangleAlert } from '@lucide/angular';
+import { LucideFileText } from '@lucide/angular';
 import { LeadService } from '../../../core/services/lead.service';
 import { apiErrorMessage } from '../../../core/api';
 import { createListView } from '../../../core/list-view';
-import { formatDate, formatDateTime, getAvatarTone, getInitials, pluralize } from '../../../core/format-utils';
+import { formatDate, formatDateTime, getAvatarTone, getInitials, humanizeEnum, pluralize } from '../../../core/format-utils';
 import {
   RetentionHistoryRow,
   RetentionHistoryState,
@@ -12,11 +12,12 @@ import {
 } from '../../../core/models/retention-history.model';
 import { chargeBackMonthLabel } from '../../../core/lead-options';
 import { Modal } from '../../../shared/ui/modal';
-import { EmptyState, Pagination, SearchBox, SkeletonRows, StatTile } from '../../../shared/ui/ui';
+import { EmptyState, Pagination, SearchBox, SkeletonRows } from '../../../shared/ui/ui';
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 
 /** The window the page tracks a lead over. */
 const BOOK_MONTHS = 12;
+const MONTHS_SHOWN = 6;
 
 const STATE_LABEL: Record<RetentionHistoryState, string> = {
   PENDING: 'Pending',
@@ -31,6 +32,30 @@ const STATE_BADGE: Record<RetentionHistoryState, string> = {
   CHARGED_BACK: 'badge--rejected',
   RETAINED: 'badge--assigned',
 };
+
+/** Where the lead sits in the pipeline right now. */
+function stageOf(l: RetentionHistoryRow): string {
+  switch (l.status) {
+    case 'NEW':
+      return 'With retention';
+    case 'SUBMITTED':
+      return 'In admin queue';
+    case 'ASSIGNED':
+      return 'With client, awaiting decision';
+    case 'ACCEPTED':
+      return l.state === 'ACTIVE' ? 'Approved, paid' : 'Approved, awaiting payment';
+    case 'REJECTED':
+      return 'Rejected by client';
+    case 'RETURNED_TO_RETENTION':
+      return 'Sent back to retention';
+    case 'ASSIGNED_EXTERNAL':
+      return 'With external client';
+    case 'CHARGED_BACK':
+      return 'Charged back, awaiting reassignment';
+    default:
+      return humanizeEnum(l.status);
+  }
+}
 
 const KIND_LABEL: Record<RetentionTimelineKind, string> = {
   CREATED: 'Lead created',
@@ -57,18 +82,41 @@ const KIND_TONE: Partial<Record<RetentionTimelineKind, string>> = {
   selector: 'app-retention-history',
   imports: [
     Modal,
-    StatTile,
     SearchBox,
     Pagination,
     EmptyState,
     SkeletonRows,
     LucideFileText,
-    LucideClock,
-    LucideTriangleAlert,
-    LucideShieldCheck,
   ],
   templateUrl: './retention-history.html',
   styles: `
+    .glance { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); background: var(--surface, #fff); border: 1px solid var(--gray-200, #e5e7eb); border-radius: 12px; margin-bottom: 1rem; overflow: hidden; }
+    .g { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.7rem 1rem; border-left: 3px solid transparent; box-shadow: -1px 0 0 var(--gray-100, #f3f4f6); }
+    .g-num { font-size: 1.45rem; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+    .g-label { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--gray-500); }
+    .g--bad { border-left-color: var(--danger-600, #dc2626); }
+    .g--bad .g-num { color: var(--danger-600, #dc2626); }
+    .g--warn { border-left-color: #d99a1d; }
+    .g--good { border-left-color: var(--success-600, #16a34a); }
+    .monthly { --paid: #2a78d6; --charged: #eb6834; padding: 0.8rem 1rem 0.6rem; margin-bottom: 1rem; }
+    @media (prefers-color-scheme: dark) { :root:where(:not([data-theme='light'])) .monthly { --paid: #3987e5; --charged: #d95926; } }
+    :root[data-theme='dark'] .monthly { --paid: #3987e5; --charged: #d95926; }
+    .m-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.3rem 1rem; margin-bottom: 0.5rem; }
+    .m-title { font-weight: 700; font-size: 0.9rem; }
+    .m-legend { display: flex; gap: 1rem; font-size: 0.78rem; color: var(--gray-600); }
+    .m-legend i { display: inline-block; width: 0.6rem; height: 0.6rem; border-radius: 2px; margin-right: 0.35rem; }
+    .m-plot { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.5rem; height: 120px; border-bottom: 1px solid var(--gray-200, #e5e7eb); }
+    .m-grp { position: relative; display: flex; align-items: flex-end; justify-content: center; gap: 2px; outline: none; border-radius: 6px; }
+    .m-grp:hover, .m-grp:focus-visible { background: var(--gray-50, #f9fafb); }
+    .m-col { width: 100%; max-width: 24px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; }
+    .m-bar { width: 100%; border-radius: 4px 4px 0 0; min-height: 2px; }
+    .m-bar--paid { background: var(--paid); }
+    .m-bar--charged { background: var(--charged); }
+    .m-val { font-size: 0.7rem; font-weight: 600; color: var(--gray-700, #374151); font-variant-numeric: tabular-nums; margin-bottom: 2px; }
+    .m-tip { display: none; position: absolute; bottom: calc(100% + 4px); left: 50%; transform: translateX(-50%); z-index: 5; white-space: nowrap; background: var(--surface, #fff); border: 1px solid var(--gray-200, #e5e7eb); border-radius: 8px; padding: 0.4rem 0.6rem; font-size: 0.75rem; box-shadow: 0 4px 14px rgba(0,0,0,0.12); }
+    .m-grp:hover .m-tip, .m-grp:focus-visible .m-tip { display: block; }
+    .m-tip b { font-variant-numeric: tabular-nums; }
+    .m-axis { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.5rem; margin-top: 0.3rem; text-align: center; font-size: 0.72rem; color: var(--gray-500); }
     .pills { margin-bottom: 1rem; }
     .book { display: flex; align-items: center; gap: 0.6rem; min-width: 150px; }
     .book-track { flex: 1; height: 6px; border-radius: 999px; background: var(--gray-100); overflow: hidden; }
@@ -113,6 +161,7 @@ export class RetentionHistory implements OnInit {
   readonly pluralize = pluralize;
   readonly stateLabel = (s: RetentionHistoryState) => STATE_LABEL[s];
   readonly stateBadge = (s: RetentionHistoryState) => STATE_BADGE[s];
+  readonly stage = stageOf;
   readonly kindLabel = (k: RetentionTimelineKind) => KIND_LABEL[k];
   readonly monthLabel = chargeBackMonthLabel;
   readonly kindTone = (k: RetentionTimelineKind) => KIND_TONE[k] ?? '';
@@ -129,19 +178,45 @@ export class RetentionHistory implements OnInit {
     const rows = this.leads();
     const booked = rows.filter((l) => l.monthsOnBook !== null);
     const charged = rows.filter((l) => l.chargeBackCount > 0);
+    // A charge-back only happens to a paid lead, so "ever paid" is the base for the rate.
+    const everPaid = rows.filter((l) => l.paidAt !== null || l.chargeBackCount > 0).length;
     return {
-      total: rows.length,
+      needsReassignment: rows.filter((l) => l.status === 'CHARGED_BACK').length,
+      awaitingDecision: rows.filter((l) => l.status === 'ASSIGNED').length,
+      active: rows.filter((l) => l.state === 'ACTIVE').length,
+      chargeBackRate: everPaid ? Math.round((charged.length / everPaid) * 100) : 0,
       chargedBack: charged.length,
-      retained: rows.filter((l) => l.state === 'RETAINED').length,
+      everPaid,
       avgMonths: booked.length
         ? Math.round((booked.reduce((s, l) => s + (l.monthsOnBook ?? 0), 0) / booked.length) * 10) / 10
         : 0,
     };
   });
 
+  /** Last six calendar months: leads first marked paid vs charge-backs recorded. */
+  readonly monthly = computed(() => {
+    const now = new Date();
+    const key = (d: Date) => d.getFullYear() * 12 + d.getMonth();
+    const months = Array.from({ length: MONTHS_SHOWN }, (_, i) => new Date(now.getFullYear(), now.getMonth() - (MONTHS_SHOWN - 1) + i, 1));
+    const paid = new Map<number, number>();
+    const charged = new Map<number, number>();
+    for (const l of this.leads()) {
+      if (l.paidAt) paid.set(key(new Date(l.paidAt)), (paid.get(key(new Date(l.paidAt))) ?? 0) + 1);
+      for (const at of l.chargeBackDates) charged.set(key(new Date(at)), (charged.get(key(new Date(at))) ?? 0) + 1);
+    }
+    const rows = months.map((m) => ({
+      label: m.toLocaleString('en-US', { month: 'short' }),
+      full: m.toLocaleString('en-US', { month: 'long', year: 'numeric' }),
+      paid: paid.get(key(m)) ?? 0,
+      charged: charged.get(key(m)) ?? 0,
+    }));
+    const max = Math.max(1, ...rows.map((r) => Math.max(r.paid, r.charged)));
+    return rows.map((r) => ({ ...r, paidPct: (r.paid / max) * 80, chargedPct: (r.charged / max) * 80 }));
+  });
+
   readonly view = createListView<RetentionHistoryRow>({
     source: this.leads,
-    searchFields: (l) => [l.customerName, l.closer, l.reassignedTo, l.retainedBy, ...l.workedBy],
+    searchFields: (l) => [l.customerName, stageOf(l), l.closer, l.reassignedTo, l.retainedBy, ...l.workedBy],
     statusOf: (l) => l.state,
     sorters: {
       customerName: (l) => l.customerName,

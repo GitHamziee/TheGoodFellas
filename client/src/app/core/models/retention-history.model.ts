@@ -24,6 +24,7 @@ export interface RetentionHistoryRow {
   paidAt: string | null;
   chargedBackAt: string | null;
   chargeBackCount: number;
+  chargeBackDates: string[];
   /** Whole months from first paid to first charge-back (or today while still active). */
   monthsOnBook: number | null;
   workedBy: string[];
