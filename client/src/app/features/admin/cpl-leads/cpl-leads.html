@@ -165,7 +165,7 @@
                 </td>
                 <td>
                   <div class="status-stack" (click)="$event.stopPropagation()">
-                    <app-status-badge [status]="lead.status" />
+                    <div class="status-line"><app-status-badge [status]="lead.status" /></div>
                     <app-admin-status-control [lead]="lead" (changed)="onAdminStatusChanged($event)" />
                   </div>
                 </td>
@@ -326,10 +326,12 @@
                 </td>
                 <td>
                   <div class="status-stack">
-                    <app-status-badge [status]="lead.status" />
-                    @if (MONEY_STATUSES.includes(lead.status)) {
-                      <app-payment-badge [status]="lead.paymentStatus" />
-                    }
+                    <div class="status-line">
+                      <app-status-badge [status]="lead.status" />
+                      @if (MONEY_STATUSES.includes(lead.status)) {
+                        <app-payment-badge [status]="lead.paymentStatus" />
+                      }
+                    </div>
                     <span (click)="$event.stopPropagation()"><app-admin-status-control [lead]="lead" (changed)="onAdminStatusChanged($event)" /></span>
                   </div>
                 </td>

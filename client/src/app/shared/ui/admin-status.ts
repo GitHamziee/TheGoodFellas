@@ -25,6 +25,7 @@ export class AdminStatusBadge {
   imports: [LucideChevronDown, LucideCheck],
   template: `
     <button type="button" [class]="cls()" [disabled]="busy()" aria-haspopup="menu" [attr.aria-expanded]="open()" (click)="toggle($event)">
+      <span class="trk-dot"></span>
       {{ label() ?? 'Set tracking' }}
       <svg lucideChevronDown></svg>
     </button>
@@ -78,7 +79,7 @@ export class AdminStatusControl {
   readonly label = computed(() => this.options.find((o) => o.value === this.lead().adminStatus)?.label ?? null);
   readonly cls = computed(() => {
     const s = this.lead().adminStatus;
-    return s ? `badge badge--admin-status badge--admin-${s.toLowerCase()}` : 'badge badge--admin-status badge--admin-empty';
+    return s ? `trk trk--${s.toLowerCase()}` : 'trk trk--empty';
   });
 
   protected toggle(event: Event): void {

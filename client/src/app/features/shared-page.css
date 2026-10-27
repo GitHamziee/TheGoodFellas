@@ -1374,8 +1374,8 @@ tbody tr.clickable:hover {
 /* Status badge with its payment badge tucked right beside it, one cell instead of two */
 .status-stack {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 0.4rem;
 }
 
@@ -1965,6 +1965,23 @@ tr.expand-row td {
 button.badge--admin-status { border: 0; font: inherit; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem; }
 button.badge--admin-status svg { width: 12px; height: 12px; }
 button.badge--admin-empty { background: transparent; color: var(--gray-500); box-shadow: none; border: 1px dashed var(--gray-400); }
+
+/* Status cell: pipeline badges on the first line, the admin's tracking picker below as a
+   dropdown-shaped field (square-ish, dot + chevron) so it reads as something to click. */
+.status-line { display: flex; align-items: center; flex-wrap: wrap; gap: 0.35rem; }
+.trk {
+  display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.28rem 0.5rem 0.28rem 0.6rem;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text);
+  font: inherit; font-size: 0.76rem; font-weight: 600; cursor: pointer; line-height: 1.2;
+}
+.trk:hover:not(:disabled) { border-color: var(--gray-400); background: var(--gray-50); }
+.trk svg { width: 13px; height: 13px; color: var(--gray-500); }
+.trk-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gray-400); flex: none; }
+.trk--client_paid .trk-dot, .trk--approved .trk-dot, .trk--approval_confirmed .trk-dot { background: var(--success-600); }
+.trk--client_unpaid .trk-dot, .trk--declined .trk-dot { background: var(--danger-600); }
+.trk--underwriting_review .trk-dot { background: var(--warning-600); }
+.trk--empty { color: var(--gray-500); font-weight: 500; border-style: dashed; background: transparent; }
+.trk--empty .trk-dot { display: none; }
 
 /* ---------- Empty + loading states ---------- */
 .empty-state {
