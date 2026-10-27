@@ -885,6 +885,9 @@ function humanizeAdminStatus(value: string): string {
   return value.toLowerCase().split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
+/** Outcomes that can't be set once a lead has been marked paid. */
+const PRE_PAYMENT_STATUSES: string[] = ['UNDERWRITING_REVIEW', 'APPROVED', 'DECLINED'];
+
 const ADMIN_STATUS_VALUES = [
   'CLIENT_PAID',
   'CLIENT_UNPAID',
@@ -911,8 +914,11 @@ export async function setLeadAdminStatus(
 
   // Sent-back, new and draft leads can't be labelled (clearing is always allowed).
   if (adminStatus !== null) {
-    const current = await prisma.lead.findUnique({ where: { id: leadId }, select: { status: true } });
+    const current = await prisma.lead.findUnique({ where: { id: leadId }, select: { status: true, paymentStatus: true } });
     if (!current) return { error: 'Lead not found', status: 404 };
+    if (current.paymentStatus === 'PAID' && PRE_PAYMENT_STATUSES.includes(adminStatus as string)) {
+      return { error: 'Underwriting Review, Approved and Declined no longer apply once a lead is paid', status: 400 };
+    }
     if (!(TRACKABLE_STATUSES as readonly string[]).includes(current.status)) {
       return { error: 'Tracking status can only be set on leads in the admin queue or assigned to a client', status: 400 };
     }

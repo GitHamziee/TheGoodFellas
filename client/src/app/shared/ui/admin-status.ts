@@ -8,6 +8,8 @@ import { LeadService } from '../../core/services/lead.service';
 import { uiZoom } from '../../core/ui-zoom';
 import { Modal } from './modal';
 
+const PRE_PAYMENT_STATUSES: LeadAdminStatus[] = ['UNDERWRITING_REVIEW', 'APPROVED', 'DECLINED'];
+
 @Component({
   selector: 'app-admin-status-badge',
   template: `@if (label(); as text) {<span [class]="cls()">{{ text }}</span>}`,
@@ -36,7 +38,7 @@ export class AdminStatusBadge {
         @if (lead().adminStatus) {
           <button type="button" class="menu-item" (click)="pick(null)">Clear status</button>
         }
-        @for (o of options; track o.value) {
+        @for (o of choices(); track o.value) {
           <button type="button" class="menu-item" (click)="pick(o.value)">
             {{ o.label }}
             @if (o.value === lead().adminStatus) {<svg lucideCheck class="tick"></svg>}
@@ -87,6 +89,10 @@ export class AdminStatusControl {
   readonly changed = output<Lead>();
 
   readonly options = ADMIN_STATUS_OPTIONS;
+  /** Once a lead is paid, the pre-payment outcomes no longer apply. */
+  readonly choices = computed(() =>
+    this.lead().paymentStatus === 'PAID' ? this.options.filter((o) => !PRE_PAYMENT_STATUSES.includes(o.value)) : this.options
+  );
   readonly busy = signal(false);
   readonly error = signal<string | null>(null);
   protected readonly open = signal(false);
