@@ -118,7 +118,7 @@ export class RetentionHistory implements OnInit {
   readonly kindTone = (k: RetentionTimelineKind) => KIND_TONE[k] ?? '';
 
   readonly stateOptions = computed(() =>
-    (Object.keys(STATE_LABEL) as RetentionHistoryState[]).map((value) => ({
+    (Object.keys(STATE_LABEL) as RetentionHistoryState[]).filter((value) => value !== 'PENDING').map((value) => ({
       value,
       label: STATE_LABEL[value],
       count: this.leads().filter((l) => l.state === value).length,
