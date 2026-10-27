@@ -42,7 +42,7 @@ import {
 import { DayBar, rangeBounds, rangeLabel } from '../../../shared/ui/day-bar';
 import { LeadQuickEdit } from '../../../shared/lead-quick-edit';
 import { Select } from '../../../shared/ui/select';
-import { CHARGE_BACK_MONTH_OPTIONS, CHARGE_BACK_REASON_OPTIONS, MONEY_STATUSES } from '../../../core/lead-options';
+import { CHARGE_BACK_MONTH_OPTIONS, CHARGE_BACK_REASON_OPTIONS, MONEY_STATUSES, TRACKABLE_STATUSES } from '../../../core/lead-options';
 import { LeadDetail } from '../../../shared/lead-detail';
 import { RowMenu } from '../../../shared/ui/row-menu';
 import { AdminStatusControl } from '../../../shared/ui/admin-status';
@@ -99,6 +99,7 @@ interface LookupUser {
 })
 export class AdminLeads implements OnInit {
   protected readonly MONEY_STATUSES = MONEY_STATUSES;
+  protected readonly TRACKABLE_STATUSES = TRACKABLE_STATUSES;
   private readonly liveReload = reloadOnChange(() => this.refresh());
   private readonly leadService = inject(LeadService);
   private readonly userService = inject(UserService);

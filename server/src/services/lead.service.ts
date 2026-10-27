@@ -876,6 +876,9 @@ export async function setLeadPaymentStatus(leadId: string): Promise<ServiceResul
 /** Any lead that has been handed to a client can be marked paid / charged back, whatever its decision status. */
 const MONEY_STATUSES = ['ASSIGNED', 'ACCEPTED', 'ASSIGNED_EXTERNAL', 'REJECTED'] as const;
 
+/** Leads the admin can label: the admin queue (incl. charged back) plus everything handed to a client. Not new, draft or sent-back leads. */
+const TRACKABLE_STATUSES = [...MONEY_STATUSES, 'SUBMITTED', 'CHARGED_BACK'] as const;
+
 const ADMIN_STATUS_VALUES = [
   'CLIENT_PAID',
   'CLIENT_UNPAID',
@@ -900,13 +903,12 @@ export async function setLeadAdminStatus(
     return { error: `adminStatus must be one of ${ADMIN_STATUS_VALUES.join(', ')} or null`, status: 400 };
   }
 
-  // Tracking only applies once a lead has been handed to a client; sent-back and pre-assignment
-  // leads can't be labelled (clearing is always allowed).
+  // Sent-back, new and draft leads can't be labelled (clearing is always allowed).
   if (adminStatus !== null) {
     const current = await prisma.lead.findUnique({ where: { id: leadId }, select: { status: true } });
     if (!current) return { error: 'Lead not found', status: 404 };
-    if (!(MONEY_STATUSES as readonly string[]).includes(current.status)) {
-      return { error: 'Tracking status can only be set on leads assigned to a client', status: 400 };
+    if (!(TRACKABLE_STATUSES as readonly string[]).includes(current.status)) {
+      return { error: 'Tracking status can only be set on leads in the admin queue or assigned to a client', status: 400 };
     }
   }
 
@@ -1720,10 +1722,17 @@ export async function batchDecideAsAdmin(
         { status: 'ASSIGNED', clientId: { not: null } },
         { status: 'ASSIGNED_EXTERNAL', externalClientId: { not: null } },
       ],
+      // A paid lead has income recorded against it — declining it would send it back still PAID.
+      ...(decision === 'REJECT' ? { paymentStatus: 'UNPAID' as const } : {}),
     },
     select: { id: true, leadType: true, closerId: true, juniorCloserId: true, retentionId: true, customerName: true },
   });
-  if (eligible.length === 0) return { error: 'None of the selected leads are awaiting a response', status: 400 };
+  if (eligible.length === 0) {
+    return {
+      error: decision === 'REJECT' ? 'Paid leads cannot be declined — mark them unpaid first' : 'None of the selected leads are awaiting a response',
+      status: 400,
+    };
+  }
 
   const awaiting = { status: { in: ['ASSIGNED', 'ASSIGNED_EXTERNAL'] as ('ASSIGNED' | 'ASSIGNED_EXTERNAL')[] } };
 

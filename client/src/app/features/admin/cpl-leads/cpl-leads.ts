@@ -44,7 +44,7 @@ import { AdminStatusControl } from '../../../shared/ui/admin-status';
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 import { DayBar, rangeBounds, rangeLabel } from '../../../shared/ui/day-bar';
 import { LeadQuickEdit } from '../../../shared/lead-quick-edit';
-import { MONEY_STATUSES } from '../../../core/lead-options';
+import { MONEY_STATUSES, TRACKABLE_STATUSES } from '../../../core/lead-options';
 import { apiErrorMessage } from '../../../core/api';
 
 interface LookupUser {
@@ -91,6 +91,7 @@ const STATUS_FILTERS = [
 })
 export class AdminCplLeads implements OnInit {
   protected readonly MONEY_STATUSES = MONEY_STATUSES;
+  protected readonly TRACKABLE_STATUSES = TRACKABLE_STATUSES;
   private readonly liveReload = reloadOnChange(() => this.refresh());
   private readonly leadService = inject(LeadService);
   private readonly userService = inject(UserService);

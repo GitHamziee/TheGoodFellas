@@ -5,6 +5,9 @@ import { US_STATES } from './us-states';
 /** Leads handed to a client can be marked paid / charged back whatever their decision status. */
 export const MONEY_STATUSES: LeadStatus[] = ['ASSIGNED', 'ACCEPTED', 'ASSIGNED_EXTERNAL', 'REJECTED'];
 
+/** Leads the admin can label: the admin queue plus everything handed to a client. */
+export const TRACKABLE_STATUSES: LeadStatus[] = [...MONEY_STATUSES, 'SUBMITTED', 'CHARGED_BACK'];
+
 export const ADMIN_STATUS_OPTIONS: { value: LeadAdminStatus; label: string }[] = [
   { value: 'CLIENT_PAID', label: 'Client Paid' },
   { value: 'CLIENT_UNPAID', label: 'Client Unpaid' },
