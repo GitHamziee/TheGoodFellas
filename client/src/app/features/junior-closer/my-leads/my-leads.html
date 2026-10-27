@@ -116,8 +116,7 @@
                     <span class="empty">—</span>
                   }
                 </td>
-                <td><app-status-badge [status]="displayStatus(lead)" />
-<app-admin-status-badge [status]="lead.adminStatus" /></td>
+                <td><app-admin-status-badge [status]="lead.adminStatus" /></td>
                 <td class="right hide-sm">
                   <span class="chip"><svg lucideClock></svg>{{ timeAgo(lead.createdAt) }}</span>
                 </td>
@@ -151,8 +150,7 @@
       <div class="detail">
         <div>
           <div class="k">Progress</div>
-          <div class="v"><app-status-badge [status]="displayStatus(lead)" />
-<app-admin-status-badge [status]="lead.adminStatus" /></div>
+          <div class="v"><app-admin-status-badge [status]="lead.adminStatus" /></div>
         </div>
       </div>
     </div>

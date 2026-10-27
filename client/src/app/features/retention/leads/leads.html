@@ -88,11 +88,9 @@
                     }
                     {{ lead.customerName }}
                     @if (chargeBacksOnly()) {
-                      <app-status-badge [status]="lead.status" />
-<app-admin-status-badge [status]="lead.adminStatus" />
+                      <app-admin-status-badge [status]="lead.adminStatus" />
                     } @else if ((lead.status === 'DRAFT' && !lead.callbackById) || lead.status === 'RETURNED_TO_RETENTION') {
-                      <app-status-badge [status]="lead.status" />
-<app-admin-status-badge [status]="lead.adminStatus" />
+                      <app-admin-status-badge [status]="lead.adminStatus" />
                     }
                   </div>
                   @if (lead.status === 'RETURNED_TO_RETENTION' && lead.returnReason) {

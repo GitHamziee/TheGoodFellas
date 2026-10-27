@@ -92,8 +92,7 @@
                 </td>
                 <td class="hide-md">{{ lead.juniorCloser?.name || '—' }}</td>
                 <td class="hide-md">{{ lead.closer?.name || '—' }}</td>
-                <td><app-status-badge [status]="lead.status" />
-<app-admin-status-badge [status]="lead.adminStatus" /></td>
+                <td><app-admin-status-badge [status]="lead.adminStatus" /></td>
                 <td class="right hide-sm">
                   <span class="chip"><svg lucideClock></svg>{{ timeAgo(lead.createdAt) }}</span>
                 </td>

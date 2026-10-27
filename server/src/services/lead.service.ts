@@ -831,7 +831,7 @@ export async function returnLeadForEdit(
 
   const updated = await prisma.lead.updateMany({
     where: { id: leadId, status: lead.status },
-    data: { status, returnReason: reason.trim() },
+    data: { status, returnReason: reason.trim(), adminStatus: null },
   });
   if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
 
@@ -899,6 +899,16 @@ export async function setLeadAdminStatus(
     return { error: `adminStatus must be one of ${ADMIN_STATUS_VALUES.join(', ')} or null`, status: 400 };
   }
 
+  // Tracking only applies once a lead has been handed to a client; sent-back and pre-assignment
+  // leads can't be labelled (clearing is always allowed).
+  if (adminStatus !== null) {
+    const current = await prisma.lead.findUnique({ where: { id: leadId }, select: { status: true } });
+    if (!current) return { error: 'Lead not found', status: 404 };
+    if (!(MONEY_STATUSES as readonly string[]).includes(current.status)) {
+      return { error: 'Tracking status can only be set on leads assigned to a client', status: 400 };
+    }
+  }
+
   // Approval Confirmed / Declined carry the old accept / reject transition for a lead that is
   // still awaiting its client's decision; on any other lead they are just the label.
   if (adminStatus === 'APPROVAL_CONFIRMED' || adminStatus === 'DECLINED') {
@@ -909,6 +919,11 @@ export async function setLeadAdminStatus(
     if (awaiting) {
       const decided = await batchDecideAsAdmin([leadId], adminStatus === 'APPROVAL_CONFIRMED' ? 'ACCEPT' : 'REJECT', undefined, actorId);
       if ('error' in decided) return decided;
+      // A declined lead leaves the tracking stage (batchDecideAsAdmin already cleared its label).
+      if (adminStatus === 'DECLINED') {
+        const result = await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE });
+        return { data: { lead: result } };
+      }
     }
   }
 
@@ -1733,7 +1748,7 @@ export async function batchDecideAsAdmin(
   // RETENTION leads to the Retention queue — each for a re-write (reason carried in
   // returnReason); everything else lands REJECTED in the admin queue as before.
   const trimmed = isNonEmptyString(reason) ? reason.trim() : null;
-  const cleared = { clientId: null, externalClientId: null, rejectionReason: trimmed };
+  const cleared = { clientId: null, externalClientId: null, rejectionReason: trimmed, adminStatus: null };
   const isCpaToCloser = (l: (typeof eligible)[number]) => l.leadType === 'CPA' && !!l.closerId;
   const isCplToJunior = (l: (typeof eligible)[number]) => l.leadType === 'CPL' && !!l.juniorCloserId;
   const isToRetention = (l: (typeof eligible)[number]) => l.leadType === 'RETENTION' && !!l.retentionId;
