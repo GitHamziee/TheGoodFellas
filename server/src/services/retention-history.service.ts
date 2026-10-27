@@ -37,6 +37,8 @@ export interface TimelineEntry {
   actor: string | null;
   target: string | null;
   note: string | null;
+  /** Draft number 1–12 for a CHARGED_BACK entry, when recorded. */
+  chargeMonth?: number | null;
 }
 
 const ROW_SELECT = {
@@ -48,7 +50,7 @@ const ROW_SELECT = {
   closer: { select: { name: true } },
   retention: { select: { name: true } },
   incomePayment: { select: { createdAt: true } },
-  chargeBacks: { select: { id: true, createdAt: true, reason: true }, orderBy: { createdAt: 'asc' as const } },
+  chargeBacks: { select: { id: true, createdAt: true, reason: true, chargeMonth: true }, orderBy: { createdAt: 'asc' as const } },
   events: { orderBy: { createdAt: 'asc' as const } },
 } as const;
 
@@ -61,7 +63,7 @@ type LeadRecord = {
   closer: { name: string } | null;
   retention: { name: string } | null;
   incomePayment: { createdAt: Date } | null;
-  chargeBacks: { id: string; createdAt: Date; reason: string }[];
+  chargeBacks: { id: string; createdAt: Date; reason: string; chargeMonth: number | null }[];
   events: {
     type: LeadEventType;
     actorId: string | null;
@@ -163,7 +165,7 @@ function buildTimeline(r: LeadRecord, names: Map<string, string>): TimelineEntry
     entries.push({ at: r.incomePayment.createdAt, kind: 'PAID', actor: null, target: null, note: null });
   }
   for (const cb of r.chargeBacks) {
-    entries.push({ at: cb.createdAt, kind: 'CHARGED_BACK', actor: null, target: null, note: cb.reason });
+    entries.push({ at: cb.createdAt, kind: 'CHARGED_BACK', actor: null, target: null, note: cb.reason, chargeMonth: cb.chargeMonth });
   }
 
   return entries.sort((a, b) => a.at.getTime() - b.at.getTime());
@@ -171,7 +173,16 @@ function buildTimeline(r: LeadRecord, names: Map<string, string>): TimelineEntry
 
 export async function listRetentionHistory(): Promise<RetentionHistoryRow[]> {
   const records = (await prisma.lead.findMany({
-    where: { leadType: 'RETENTION' },
+    where: {
+      leadType: 'RETENTION',
+      // Only leads that have been handed to a client (or external client) at some point.
+      OR: [
+        { status: { in: ['ASSIGNED', 'ACCEPTED', 'ASSIGNED_EXTERNAL', 'CHARGED_BACK'] } },
+        { events: { some: { type: { in: ['ASSIGNED_TO_CLIENT', 'ASSIGNED_EXTERNAL'] } } } },
+        { chargeBacks: { some: {} } },
+        { incomePayment: { isNot: null } },
+      ],
+    },
     select: ROW_SELECT,
     orderBy: { createdAt: 'desc' },
   })) as LeadRecord[];

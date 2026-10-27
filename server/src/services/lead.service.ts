@@ -933,11 +933,20 @@ export async function listQueueForAdmin(viewer?: AdminViewer) {
  * setLeadPaymentStatus does when reverting a mistaken PAID; clientId is cleared like a
  * REJECTED lead's, and the ChargeBack row is what remembers which client it was.
  */
+/** Draft number 1–12 the charge-back hit; anything else is rejected. */
+function parseChargeMonth(value: unknown): number | null {
+  const n = typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : NaN;
+  return Number.isInteger(n) && n >= 1 && n <= 12 ? n : null;
+}
+
 export async function markLeadChargedBack(
   leadId: string,
   pkrAmount: unknown,
-  reason: unknown
+  reason: unknown,
+  chargeMonth: unknown
 ): Promise<ServiceResult<{ lead: unknown }>> {
+  const month = parseChargeMonth(chargeMonth);
+  if (month === null) return { error: 'Pick the month of the charge-back', status: 400 };
   if (!isNonEmptyString(reason)) return { error: 'A reason is required', status: 400 };
 
   const amountNum = typeof pkrAmount === 'number' ? pkrAmount : typeof pkrAmount === 'string' ? Number(pkrAmount) : NaN;
@@ -964,7 +973,7 @@ export async function markLeadChargedBack(
     // Deliberately NOT mirrored into Expenses: a charge-back is made good by a replacement
     // lead, so it doesn't count as money lost.
     await tx.chargeBack.create({
-      data: { leadId, clientId, pkrAmount: pkr, reason: reason.trim() },
+      data: { leadId, clientId, pkrAmount: pkr, reason: reason.trim(), chargeMonth: month },
     });
   });
   if (!applied) return STALE_TRANSITION_ERROR;
@@ -983,11 +992,14 @@ export async function markLeadChargedBack(
 export async function batchChargeBack(
   leadIds: unknown,
   pkrAmount: unknown,
-  reason: unknown
+  reason: unknown,
+  chargeMonth: unknown
 ): Promise<ServiceResult<{ count: number }>> {
   if (!Array.isArray(leadIds) || leadIds.length === 0 || !leadIds.every((id) => typeof id === 'string')) {
     return { error: 'Select at least one lead', status: 400 };
   }
+  const month = parseChargeMonth(chargeMonth);
+  if (month === null) return { error: 'Pick the month of the charge-back', status: 400 };
   if (!isNonEmptyString(reason)) return { error: 'A reason is required', status: 400 };
 
   const amountNum = typeof pkrAmount === 'number' ? pkrAmount : typeof pkrAmount === 'string' ? Number(pkrAmount) : NaN;
@@ -1017,6 +1029,7 @@ export async function batchChargeBack(
         clientId: l.clientId!,
         pkrAmount: share + (i === 0 ? remainder : 0),
         reason: trimmedReason,
+        chargeMonth: month,
       })),
     });
   });

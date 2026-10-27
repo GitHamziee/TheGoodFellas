@@ -517,6 +517,8 @@ model ChargeBack {
   clientId  String
   pkrAmount Int
   reason    String
+  // Which draft the charge-back hit, 1st..12th. Null on rows that predate the field.
+  chargeMonth Int?
   createdAt DateTime @default(now())
 
   lead   Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)

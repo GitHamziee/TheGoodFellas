@@ -37,4 +37,5 @@ export interface RetentionTimelineEntry {
   actor: string | null;
   target: string | null;
   note: string | null;
+  chargeMonth?: number | null;
 }

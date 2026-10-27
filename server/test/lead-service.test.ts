@@ -229,7 +229,7 @@ describe('payment writes never record money twice', () => {
   it('markLeadChargedBack writes no ChargeBack row when the lead had already moved', async () => {
     db.lead.findUnique.mockResolvedValueOnce({ ...FULL_LEAD, status: 'ACCEPTED', paymentStatus: 'PAID' });
     db.lead.updateMany.mockResolvedValueOnce({ count: 0 });
-    const result = await markLeadChargedBack('lead-1', 100, 'refund');
+    const result = await markLeadChargedBack('lead-1', 100, 'refund', 1);
     expect(result).toMatchObject({ status: 409 });
     expect(db.chargeBack.create).not.toHaveBeenCalled();
   });
@@ -240,7 +240,7 @@ describe('payment writes never record money twice', () => {
       { id: 'b', clientId: 'c', customerName: 'B' },
     ]);
     db.lead.updateMany.mockResolvedValueOnce({ count: 2 });
-    expect(await batchChargeBack(['a', 'b'], 101, 'refund')).toEqual({ data: { count: 2 } });
+    expect(await batchChargeBack(['a', 'b'], 101, 'refund', 2)).toEqual({ data: { count: 2 } });
     const rows = db.chargeBack.createMany.mock.calls[0][0].data as { pkrAmount: number }[];
     expect(rows.map((r) => r.pkrAmount)).toEqual([51, 50]);
   });
@@ -251,7 +251,7 @@ describe('payment writes never record money twice', () => {
       { id: 'b', clientId: 'c', customerName: 'B' },
     ]);
     db.lead.updateMany.mockResolvedValueOnce({ count: 1 });
-    expect(await batchChargeBack(['a', 'b'], 100, 'refund')).toMatchObject({ status: 409 });
+    expect(await batchChargeBack(['a', 'b'], 100, 'refund', 2)).toMatchObject({ status: 409 });
     expect(db.chargeBack.createMany).not.toHaveBeenCalled();
   });
 });

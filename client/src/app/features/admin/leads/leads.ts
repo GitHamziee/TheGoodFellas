@@ -42,7 +42,7 @@ import {
 import { DayBar, rangeBounds, rangeLabel } from '../../../shared/ui/day-bar';
 import { LeadQuickEdit } from '../../../shared/lead-quick-edit';
 import { Select } from '../../../shared/ui/select';
-import { CHARGE_BACK_REASON_OPTIONS } from '../../../core/lead-options';
+import { CHARGE_BACK_MONTH_OPTIONS, CHARGE_BACK_REASON_OPTIONS } from '../../../core/lead-options';
 import { LeadDetail } from '../../../shared/lead-detail';
 import { RowMenu } from '../../../shared/ui/row-menu';
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
@@ -156,6 +156,8 @@ export class AdminLeads implements OnInit {
   readonly chargeBackModalOpen = signal(false);
   readonly chargeBackSubmitting = signal(false);
   chargeBackPkrAmount: number | null = null;
+  chargeBackMonth: number | null = null;
+  readonly chargeBackMonthOptions = CHARGE_BACK_MONTH_OPTIONS;
   chargeBackReasonChoice = '';
   chargeBackReasonNote = '';
   readonly chargeBackReasonOptions = CHARGE_BACK_REASON_OPTIONS;
@@ -719,6 +721,7 @@ export class AdminLeads implements OnInit {
     if (this.chargeableSelectedCount() === 0) return;
     this.error.set(null);
     this.chargeBackPkrAmount = null;
+    this.chargeBackMonth = null;
     this.chargeBackReasonChoice = '';
     this.chargeBackReasonNote = '';
     this.chargeBackModalOpen.set(true);
@@ -733,6 +736,10 @@ export class AdminLeads implements OnInit {
       this.error.set('Enter the PKR amount charged back.');
       return;
     }
+    if (!this.chargeBackMonth) {
+      this.error.set('Pick the month of the charge-back.');
+      return;
+    }
     const reason = this.chargeBackReasonChoice === 'OTHER' ? this.chargeBackReasonNote.trim() : this.chargeBackReasonChoice;
     if (!reason) {
       this.error.set(this.chargeBackReasonChoice === 'OTHER' ? 'Type the reason for the charge-back.' : 'Pick a reason for the charge-back.');
@@ -743,7 +750,7 @@ export class AdminLeads implements OnInit {
     this.chargeBackSubmitting.set(true);
     try {
       const leadIds = this.selectedLeads().filter((l) => this.isEligibleForBatchChargeBack(l)).map((l) => l.id);
-      const { count } = await this.leadService.batchChargeBack(leadIds, this.chargeBackPkrAmount, reason);
+      const { count } = await this.leadService.batchChargeBack(leadIds, this.chargeBackPkrAmount, reason, this.chargeBackMonth);
       const amount = this.chargeBackPkrAmount;
       await this.refresh();
       this.clearSelection();

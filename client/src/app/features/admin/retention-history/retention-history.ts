@@ -10,6 +10,7 @@ import {
   RetentionTimelineEntry,
   RetentionTimelineKind,
 } from '../../../core/models/retention-history.model';
+import { chargeBackMonthLabel } from '../../../core/lead-options';
 import { Modal } from '../../../shared/ui/modal';
 import { EmptyState, Pagination, SearchBox, SkeletonRows, StatTile } from '../../../shared/ui/ui';
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
@@ -38,7 +39,7 @@ const KIND_LABEL: Record<RetentionTimelineKind, string> = {
   RETURNED_TO_RETENTION: 'Sent back to retention',
   ASSIGNED_TO_CLIENT: 'Assigned to client',
   ASSIGNED_EXTERNAL: 'Handed to external client',
-  ACCEPTED: 'Accepted',
+  ACCEPTED: 'Approved by Admin',
   REJECTED: 'Rejected',
   PAID: 'Marked paid',
   CHARGED_BACK: 'Charged back',
@@ -113,6 +114,7 @@ export class RetentionHistory implements OnInit {
   readonly stateLabel = (s: RetentionHistoryState) => STATE_LABEL[s];
   readonly stateBadge = (s: RetentionHistoryState) => STATE_BADGE[s];
   readonly kindLabel = (k: RetentionTimelineKind) => KIND_LABEL[k];
+  readonly monthLabel = chargeBackMonthLabel;
   readonly kindTone = (k: RetentionTimelineKind) => KIND_TONE[k] ?? '';
 
   readonly stateOptions = computed(() =>

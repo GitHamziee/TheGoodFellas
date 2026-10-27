@@ -133,6 +133,18 @@ export const DRAFT_REASON_LABEL: Record<DraftReason, string> = Object.fromEntrie
   DRAFT_REASON_OPTIONS.map((o) => [o.value, o.label]),
 ) as Record<DraftReason, string>;
 
+const ORDINALS = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th', '11th', '12th'];
+
+/** Which draft a charge-back hit (stored as the number 1–12). */
+export const CHARGE_BACK_MONTH_OPTIONS: { value: number; label: string }[] = ORDINALS.map((o, i) => ({
+  value: i + 1,
+  label: `Chargeback – ${o} Draft`,
+}));
+
+export function chargeBackMonthLabel(month: number | null | undefined): string | null {
+  return month ? (CHARGE_BACK_MONTH_OPTIONS[month - 1]?.label ?? null) : null;
+}
+
 /** Preset reasons for an admin charging a lead back. The stored ChargeBack.reason is plain
  * text: the preset label, or whatever the admin typed when they picked OTHER. */
 export const CHARGE_BACK_REASON_OPTIONS: { value: string; label: string }[] = [

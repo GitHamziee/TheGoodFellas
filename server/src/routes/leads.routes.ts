@@ -296,8 +296,8 @@ router.patch(
   '/batch-charge-back',
   requireRole('ADMIN', 'MANAGER'),
   asyncHandler(async (req, res) => {
-    const { leadIds, pkrAmount, reason } = req.body ?? {};
-    const result = await leadService.batchChargeBack(leadIds, pkrAmount, reason);
+    const { leadIds, pkrAmount, reason, chargeMonth } = req.body ?? {};
+    const result = await leadService.batchChargeBack(leadIds, pkrAmount, reason, chargeMonth);
     return sendResult(res, result, 'Leads marked charged back');
   })
 );
@@ -306,8 +306,8 @@ router.patch(
   '/:id/charge-back',
   requireRole('ADMIN', 'MANAGER'),
   asyncHandler(async (req, res) => {
-    const { pkrAmount, reason } = req.body ?? {};
-    const result = await leadService.markLeadChargedBack(req.params.id, pkrAmount, reason);
+    const { pkrAmount, reason, chargeMonth } = req.body ?? {};
+    const result = await leadService.markLeadChargedBack(req.params.id, pkrAmount, reason, chargeMonth);
     return sendResult(res, result, 'Lead marked charged back');
   })
 );

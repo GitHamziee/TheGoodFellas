@@ -222,9 +222,9 @@ export class LeadService {
   }
 
   /** Records a chargeback against an ACCEPTED + PAID lead — frees it up for reassignment. */
-  async chargeBackLead(id: string, pkrAmount: number, reason: string): Promise<Lead> {
+  async chargeBackLead(id: string, pkrAmount: number, reason: string, chargeMonth: number): Promise<Lead> {
     const res = await firstValueFrom(
-      this.http.patch<ApiSuccess<{ lead: Lead }>>(`${BASE}/${id}/charge-back`, { pkrAmount, reason })
+      this.http.patch<ApiSuccess<{ lead: Lead }>>(`${BASE}/${id}/charge-back`, { pkrAmount, reason, chargeMonth })
     );
     return res.data.lead;
   }
@@ -281,9 +281,9 @@ export class LeadService {
   }
 
   /** Charges back many ACCEPTED + PAID leads at once — one PKR total and one reason for the batch. */
-  async batchChargeBack(leadIds: string[], pkrAmount: number, reason: string): Promise<{ count: number }> {
+  async batchChargeBack(leadIds: string[], pkrAmount: number, reason: string, chargeMonth: number): Promise<{ count: number }> {
     const res = await firstValueFrom(
-      this.http.patch<ApiSuccess<{ count: number }>>(`${BASE}/batch-charge-back`, { leadIds, pkrAmount, reason })
+      this.http.patch<ApiSuccess<{ count: number }>>(`${BASE}/batch-charge-back`, { leadIds, pkrAmount, reason, chargeMonth })
     );
     return res.data;
   }

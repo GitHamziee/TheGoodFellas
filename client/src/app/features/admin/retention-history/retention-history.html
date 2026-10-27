@@ -152,6 +152,9 @@
         @for (e of timeline(); track $index) {
           <li>
             <span class="dot" [class]="'dot ' + kindTone(e.kind)"></span>
+            @if (e.kind === 'CHARGED_BACK' && monthLabel(e.chargeMonth); as month) {
+              <div class="tl-detail">{{ month }}</div>
+            }
             <div class="tl-head">
               <span class="tl-title">{{ kindLabel(e.kind) }}</span>
               <span class="tl-when">{{ formatDateTime(e.at) }}</span>
