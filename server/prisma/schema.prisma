@@ -89,6 +89,17 @@ enum PaymentStatus {
   PAID
 }
 
+// Admin-set tracking label, independent of LeadStatus and PaymentStatus. Changeable at any
+// point in a lead's lifecycle (even before it is accepted) and on CPA, CPL and RETENTION alike.
+enum LeadAdminStatus {
+  CLIENT_PAID
+  CLIENT_UNPAID
+  APPROVAL_CONFIRMED
+  UNDERWRITING_REVIEW
+  APPROVED
+  DECLINED
+}
+
 enum LeadNeed {
   BURIAL
   CREMATION
@@ -368,6 +379,9 @@ model Lead {
   // refusing a lead — different author, different audience, and a lead can carry both.
   returnReason    String?
   paymentStatus   PaymentStatus @default(UNPAID)
+  // Admin's free-form tracking label, settable at any point in the lifecycle on any lead type.
+  // Null until the admin picks one. Never gates or changes `status` or `paymentStatus`.
+  adminStatus     LeadAdminStatus?
   // Set when admin marks an ACCEPTED lead PAID — the lead is then considered closed.
   // Cleared if admin flips it back to UNPAID.
   closedAt        DateTime?

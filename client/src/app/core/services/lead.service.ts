@@ -4,6 +4,7 @@ import { firstValueFrom } from 'rxjs';
 import { API_BASE_URL } from '../config';
 import {
   Lead,
+  LeadAdminStatus,
   LeadHistoryRow,
   LeadInboxPreview,
   LeadIntakeEdit,
@@ -268,6 +269,14 @@ export class LeadService {
   async markUnpaid(id: string): Promise<Lead> {
     const res = await firstValueFrom(
       this.http.patch<ApiSuccess<{ lead: Lead }>>(`${BASE}/${id}/payment-status`, { paymentStatus: 'UNPAID' })
+    );
+    return res.data.lead;
+  }
+
+  /** Sets (or clears, with null) the admin's tracking label — allowed on any lead at any time. */
+  async setAdminStatus(id: string, adminStatus: LeadAdminStatus | null): Promise<Lead> {
+    const res = await firstValueFrom(
+      this.http.patch<ApiSuccess<{ lead: Lead }>>(`${BASE}/${id}/admin-status`, { adminStatus })
     );
     return res.data.lead;
   }

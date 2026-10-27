@@ -1950,6 +1950,7 @@ tr.expand-row td {
 .badge--paid      { background: var(--success-50); color: var(--success-700); }
 .badge--unpaid    { background: var(--gray-100);   color: var(--gray-600); }
 .badge--neutral   { background: var(--gray-100);   color: var(--gray-600); }
+.badge--admin-status { background: var(--gray-100); color: var(--gray-700, var(--gray-600)); border: 1px solid var(--gray-200, transparent); }
 
 /* ---------- Empty + loading states ---------- */
 .empty-state {

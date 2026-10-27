@@ -343,6 +343,7 @@
                     @if (lead.status === 'ACCEPTED' || lead.status === 'ASSIGNED_EXTERNAL') {
                       <app-payment-badge [status]="lead.paymentStatus" />
                     }
+                    <app-admin-status-badge [status]="lead.adminStatus" />
                   </div>
                 </td>
                 <td class="right hide-md">
@@ -372,6 +373,7 @@
 @if (detailLead(); as lead) {
   <app-modal title="Lead details" [subtitle]="lead.customerName" [wide]="true" (close)="detailLead.set(null)">
     <app-lead-detail [lead]="lead" [unmasked]="true" />
+    <app-admin-status-control [lead]="lead" (changed)="onAdminStatusChanged($event)" />
     <div footer>
       @if (lead.status === 'SUBMITTED' || lead.status === 'REJECTED') {
         @if (lead.status === 'REJECTED') {

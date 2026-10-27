@@ -1,6 +1,15 @@
-import { AccountOwnership, AccountType, CardType, DCode, DraftReason, IncomeSource, LeadNeed, PayerType, PaymentMethod, PlanType, RetiredIncomeType } from './models/lead.model';
+import { AccountOwnership, AccountType, CardType, DCode, DraftReason, IncomeSource, LeadAdminStatus, LeadNeed, PayerType, PaymentMethod, PlanType, RetiredIncomeType } from './models/lead.model';
 
 import { US_STATES } from './us-states';
+
+export const ADMIN_STATUS_OPTIONS: { value: LeadAdminStatus; label: string }[] = [
+  { value: 'CLIENT_PAID', label: 'Client Paid' },
+  { value: 'CLIENT_UNPAID', label: 'Client Unpaid' },
+  { value: 'APPROVAL_CONFIRMED', label: 'Approval Confirmed' },
+  { value: 'UNDERWRITING_REVIEW', label: 'Underwriting Review' },
+  { value: 'APPROVED', label: 'Approved' },
+  { value: 'DECLINED', label: 'Declined' },
+];
 
 /** Shared by Junior intake and Closer enrichment — same field, same options, both forms. */
 export const MARITAL_STATUS_OPTIONS: { value: string; label: string }[] = [

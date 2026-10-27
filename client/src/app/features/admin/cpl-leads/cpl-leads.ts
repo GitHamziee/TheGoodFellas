@@ -40,6 +40,7 @@ import {
 } from '../../../shared/ui/ui';
 import { LeadDetail } from '../../../shared/lead-detail';
 import { RowMenu } from '../../../shared/ui/row-menu';
+import { AdminStatusBadge, AdminStatusControl } from '../../../shared/ui/admin-status';
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 import { DayBar, rangeBounds, rangeLabel } from '../../../shared/ui/day-bar';
 import { LeadQuickEdit } from '../../../shared/lead-quick-edit';
@@ -71,6 +72,8 @@ const STATUS_FILTERS = [
     DayBar,
     StatusBadge,
     PaymentBadge,
+    AdminStatusBadge,
+    AdminStatusControl,
     SearchBox,
     Pagination,
     EmptyState,
@@ -609,6 +612,11 @@ export class AdminCplLeads implements OnInit {
     } finally {
       this.busyId.set(null);
     }
+  }
+
+  onAdminStatusChanged(updated: Lead): void {
+    this.leads.update((rows) => rows.map((l) => (l.id === updated.id ? updated : l)));
+    if (this.detailLead()?.id === updated.id) this.detailLead.set(updated);
   }
 
   openBatchModal(): void {

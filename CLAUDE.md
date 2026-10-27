@@ -138,6 +138,7 @@ Three different Prisma `select` fragments, chosen per role/status combination:
 | `/api/leads/:id/assign-external` | PATCH | ADMIN | → ASSIGNED_EXTERNAL, `{ externalClientId }` |
 | `/api/leads/:id` | PATCH/GET | ADMIN / any (ownership+masking enforced) | Edit only permitted while REJECTED, any field |
 | `/api/leads/:id/payment-status` | PATCH | ADMIN | ACCEPTED/ASSIGNED_EXTERNAL only — `{ paymentStatus: 'UNPAID' }` **only**, reverts a mistaken PAID and clears `closedAt`; rejects `'PAID'` |
+| `/api/leads/:id/admin-status` | PATCH | ADMIN, MANAGER | `{ adminStatus }` — tracking label (`CLIENT_PAID`, `CLIENT_UNPAID`, `APPROVAL_CONFIRMED`, `UNDERWRITING_REVIEW`, `APPROVED`, `DECLINED`, or `null` to clear). Any lead, any type, any workflow status; independent of `status`/`paymentStatus` and never gates a transition |
 | `/api/leads/batch-payment` | PATCH | ADMIN | `{ leadIds, pkrAmount, note? }` — the only path to PAID, one or many leads; one PKR total for the batch; creates an `IncomePayment`, ineligible ids silently skipped |
 | `/api/leads/:id/return` | PATCH | ADMIN | SUBMITTED/REJECTED only — `{ target: 'JUNIOR_CLOSER' \| 'CLOSER', reason }` |
 | `/api/leads/returned/mine` | GET | JUNIOR_CLOSER | Leads sent back to them — intake fields only |

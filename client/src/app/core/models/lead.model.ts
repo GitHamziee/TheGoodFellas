@@ -18,6 +18,14 @@ export type LeadStatus =
   // An ACCEPTED + PAID lead was clawed back by the client — see ChargeBack below.
   | 'CHARGED_BACK';
 export type PaymentStatus = 'UNPAID' | 'PAID';
+/** Admin's tracking label — independent of LeadStatus/PaymentStatus, settable at any point. */
+export type LeadAdminStatus =
+  | 'CLIENT_PAID'
+  | 'CLIENT_UNPAID'
+  | 'APPROVAL_CONFIRMED'
+  | 'UNDERWRITING_REVIEW'
+  | 'APPROVED'
+  | 'DECLINED';
 export type DraftReason =
   | 'LOST_ON_SOCIAL'
   | 'LOST_ON_ACCOUNT'
@@ -160,6 +168,7 @@ export interface Lead {
   /** What the admin asked to be corrected. Cleared on resubmit. */
   returnReason?: string | null;
   paymentStatus: PaymentStatus;
+  adminStatus?: LeadAdminStatus | null;
   closedAt?: string | null;
   /** Set only when marked paid through the batch "Mark Paid" action — see IncomePayment. */
   incomePaymentId?: string | null;

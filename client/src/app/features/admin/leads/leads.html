@@ -298,6 +298,7 @@
                     @if (lead.status === 'ACCEPTED' || lead.status === 'ASSIGNED_EXTERNAL') {
                       <app-payment-badge [status]="lead.paymentStatus" />
                     }
+                    <app-admin-status-badge [status]="lead.adminStatus" />
                   </div>
                 </td>
                 <td class="right">
@@ -331,6 +332,7 @@
     (close)="selected.set(null)"
   >
     <app-lead-detail [lead]="lead" [unmasked]="true" />
+    <app-admin-status-control [lead]="lead" (changed)="onAdminStatusChanged($event)" />
 
     <div footer>
       @if (lead.status === 'SUBMITTED' || lead.status === 'REJECTED' || lead.status === 'CHARGED_BACK') {

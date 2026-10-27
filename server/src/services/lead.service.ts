@@ -864,6 +864,38 @@ export async function setLeadPaymentStatus(leadId: string): Promise<ServiceResul
   return { data: { lead: result } };
 }
 
+const ADMIN_STATUS_VALUES = [
+  'CLIENT_PAID',
+  'CLIENT_UNPAID',
+  'APPROVAL_CONFIRMED',
+  'UNDERWRITING_REVIEW',
+  'APPROVED',
+  'DECLINED',
+] as const;
+
+/**
+ * Sets (or clears, with null) the admin's tracking label on a lead. Deliberately unguarded by
+ * lead status or type — it can change at any point in the lifecycle and never touches
+ * `status` or `paymentStatus`, so there is no transition race to protect against.
+ */
+export async function setLeadAdminStatus(
+  leadId: string,
+  adminStatus: unknown
+): Promise<ServiceResult<{ lead: unknown }>> {
+  if (adminStatus !== null && !(ADMIN_STATUS_VALUES as readonly unknown[]).includes(adminStatus)) {
+    return { error: `adminStatus must be one of ${ADMIN_STATUS_VALUES.join(', ')} or null`, status: 400 };
+  }
+
+  const updated = await prisma.lead.updateMany({
+    where: { id: leadId },
+    data: { adminStatus: adminStatus as (typeof ADMIN_STATUS_VALUES)[number] | null },
+  });
+  if (updated.count === 0) return { error: 'Lead not found', status: 404 };
+
+  const result = await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE });
+  return { data: { lead: result } };
+}
+
 /**
  * Marks a batch of leads paid together, recording one PKR amount for however many of
  * the selected leads are actually eligible (ACCEPTED/ASSIGNED_EXTERNAL + still UNPAID —
