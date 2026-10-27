@@ -196,6 +196,7 @@ export interface Lead {
  * though the full Lead carries it. */
 export interface LeadHistoryRow {
   id: string;
+  adminStatus?: LeadAdminStatus | null;
   customerName: string;
   status: LeadStatus;
   createdAt: string;
@@ -252,6 +253,7 @@ export type LeadIntakeEdit = Pick<
  */
 export interface TeamLeadLeadRow {
   id: string;
+  adminStatus?: LeadAdminStatus | null;
   customerName: string;
   status: LeadStatus;
   createdAt: string;
@@ -265,6 +267,7 @@ export interface TeamLeadLeadRow {
 /** Masked preview for a Client's not-yet-approved ("New Leads") lead — no PII/financial fields. */
 export interface LeadPreview {
   id: string;
+  adminStatus?: LeadAdminStatus | null;
   customerName: string;
   state: string;
   zipcode?: string | null;
@@ -285,6 +288,7 @@ export interface LeadPreview {
  */
 export interface LeadInboxPreview {
   id: string;
+  adminStatus?: LeadAdminStatus | null;
   customerName: string;
   state: string;
   need?: LeadNeed | null;

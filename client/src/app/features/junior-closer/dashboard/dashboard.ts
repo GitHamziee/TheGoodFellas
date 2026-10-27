@@ -1,3 +1,4 @@
+import { AdminStatusBadge } from '../../../shared/ui/admin-status';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
@@ -25,7 +26,7 @@ import { reloadOnChange } from '../../../core/live-reload';
 
 @Component({
   selector: 'app-junior-dashboard',
-  imports: [
+  imports: [AdminStatusBadge, 
     RouterLink,
     PeriodFilter,
     StatTile,

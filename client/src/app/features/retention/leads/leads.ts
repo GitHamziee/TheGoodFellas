@@ -1,3 +1,4 @@
+import { AdminStatusBadge } from '../../../shared/ui/admin-status';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -30,7 +31,7 @@ type PendingTab = 'new' | 'drafts' | 'callbacks';
 
 @Component({
   selector: 'app-retention-leads',
-  imports: [
+  imports: [AdminStatusBadge, 
     FormsModule,
     RouterLink,
     Select,
@@ -54,6 +55,11 @@ export class RetentionLeads implements OnInit {
   private readonly zoom = inject(ZoomPhoneService);
 
   readonly pending = signal<Lead[]>([]);
+  /** Charge-backs toggle: this person's own leads that have ever been charged back (from the
+   *  history feed — they've left the work queue, so there's nothing to open or dial). */
+  readonly chargeBacksOnly = signal(false);
+  private readonly chargeBackLeads = signal<Lead[]>([]);
+  readonly chargeBackCount = computed(() => this.chargeBackLeads().length);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
 
@@ -103,9 +109,17 @@ export class RetentionLeads implements OnInit {
     return split;
   });
 
-  private readonly pendingRows = computed(() => this.pendingSplit()[this.pendingTab()]);
+  private readonly pendingRows = computed(() =>
+    this.chargeBacksOnly() ? this.chargeBackLeads() : this.pendingSplit()[this.pendingTab()],
+  );
+
+  toggleChargeBacks(): void {
+    this.chargeBacksOnly.update((v) => !v);
+    this.pendingView.page.set(1);
+  }
 
   setPendingTab(tab: PendingTab): void {
+    this.chargeBacksOnly.set(false);
     this.pendingTab.set(tab);
     this.pendingView.page.set(1);
   }
@@ -130,7 +144,9 @@ export class RetentionLeads implements OnInit {
   async refresh(): Promise<void> {
     if (!isSilentReload()) this.loading.set(true);
     try {
-      this.pending.set(await this.leadService.retentionQueue());
+      const [queue, history] = await Promise.all([this.leadService.retentionQueue(), this.leadService.retentionHistory()]);
+      this.pending.set(queue);
+      this.chargeBackLeads.set(history.filter((l) => l.chargeBacks?.length));
     } catch {
       this.error.set('Could not load the leads. Refresh to try again.');
     } finally {

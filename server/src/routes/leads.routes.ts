@@ -493,8 +493,8 @@ router.delete(
 router.get(
   '/retention/history',
   requireRole('RETENTION'),
-  asyncHandler(async (_req, res) => {
-    const leads = await leadService.listRetentionHistory();
+  asyncHandler(async (req, res) => {
+    const leads = await leadService.listRetentionHistory(req.user!.id);
     return apiSuccess(res, { leads });
   })
 );

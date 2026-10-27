@@ -1,4 +1,6 @@
+import { AdminStatusBadge } from '../../../shared/ui/admin-status';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import {
   LucideBanknoteArrowUp,
   LucideCircleCheck,
@@ -22,7 +24,7 @@ import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
  */
 @Component({
   selector: 'app-retention-history',
-  imports: [
+  imports: [AdminStatusBadge, 
     PeriodFilter,
     NoCopy,
     StatTile,
@@ -48,7 +50,20 @@ export class RetentionHistory implements OnInit {
   readonly allPast = signal<Lead[]>([]);
   readonly period = signal<Period>('day');
   readonly anchor = signal(pacificIsoDate(pacificToday()));
-  readonly past = computed(() => inPeriod(this.allPast(), this.period(), this.anchor(), (l) => l.updatedAt ?? l.createdAt));
+  /** Charge-backs toggle: only leads that have ever been charged back, placed in the period
+   *  by their latest charge-back date rather than when they were last worked. */
+  readonly chargeBacksOnly = signal(false);
+  readonly highlightId = signal<string | null>(inject(ActivatedRoute).snapshot.queryParamMap.get('highlight'));
+  readonly past = computed(() =>
+    this.chargeBacksOnly()
+      ? inPeriod(
+          this.allPast().filter((l) => l.chargeBacks?.length),
+          this.period(),
+          this.anchor(),
+          (l) => l.chargeBacks[0].createdAt,
+        )
+      : inPeriod(this.allPast(), this.period(), this.anchor(), (l) => l.updatedAt ?? l.createdAt),
+  );
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
 
@@ -108,6 +123,10 @@ export class RetentionHistory implements OnInit {
     if (!isSilentReload()) this.loading.set(true);
     try {
       this.allPast.set(await this.leadService.retentionHistory());
+      if (this.highlightId()) {
+        setTimeout(() => document.getElementById('hl-' + this.highlightId())?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+        setTimeout(() => this.highlightId.set(null), 6000);
+      }
     } catch {
       this.error.set('Could not load the history. Refresh to try again.');
     } finally {

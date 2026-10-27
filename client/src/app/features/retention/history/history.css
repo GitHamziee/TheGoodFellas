@@ -10,3 +10,18 @@
 .toolbar {
   margin-bottom: 1.25rem;
 }
+
+tr.row-highlight td {
+  background: rgba(212, 175, 55, 0.18);
+  animation: row-highlight-fade 6s ease-out forwards;
+}
+
+@keyframes row-highlight-fade {
+  0%,
+  70% {
+    background: rgba(212, 175, 55, 0.18);
+  }
+  100% {
+    background: transparent;
+  }
+}

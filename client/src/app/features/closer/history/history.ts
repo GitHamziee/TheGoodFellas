@@ -1,3 +1,4 @@
+import { AdminStatusBadge } from '../../../shared/ui/admin-status';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import {
   LucideCircleCheck,
@@ -31,7 +32,7 @@ import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 
 @Component({
   selector: 'app-closer-history',
-  imports: [
+  imports: [AdminStatusBadge, 
     Modal,
     Detail,
     StatTile,

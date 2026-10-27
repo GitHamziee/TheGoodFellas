@@ -1,3 +1,4 @@
+import { AdminStatusBadge } from '../../../shared/ui/admin-status';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { LucideClock, LucideLock, LucideSend } from '@lucide/angular';
 import { LeadService } from '../../../core/services/lead.service';
@@ -20,7 +21,7 @@ type DateRange = '' | 'day' | 'week' | 'month';
 
 @Component({
   selector: 'app-team-lead-submitted-leads',
-  imports: [
+  imports: [AdminStatusBadge, 
     Modal,
     Detail,
     StatTile,

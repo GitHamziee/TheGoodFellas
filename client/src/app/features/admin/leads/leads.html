@@ -74,7 +74,6 @@
               <th>Customer</th>
               <th class="hide-sm">Closer / Retention</th>
               <th>Status</th>
-              <th>Tracking</th>
               <th class="hide-md">Reason / notes</th>
               <th>
                 <button type="button" class="btn btn--sm btn--ghost" (click)="pendingNewestFirst.set(!pendingNewestFirst())" title="Click to flip the order">
@@ -114,8 +113,12 @@
                     <span class="empty">Unassigned</span>
                   }
                 </td>
-                <td><app-status-badge [status]="lead.status" /></td>
-                <td (click)="$event.stopPropagation()"><app-admin-status-control [lead]="lead" (changed)="onAdminStatusChanged($event)" /></td>
+                <td>
+                  <div class="status-stack" (click)="$event.stopPropagation()">
+                    <app-status-badge [status]="lead.status" />
+                    <app-admin-status-control [lead]="lead" (changed)="onAdminStatusChanged($event)" />
+                  </div>
+                </td>
                 <td class="hide-md">
                   @if (lead.status === 'REJECTED' && lead.rejectionReason) {
                     <span class="cell-sub">{{ lead.rejectionReason }}</span>
@@ -226,7 +229,6 @@
               <th class="sortable" (click)="view.toggleSort('status')">
                 Status <span class="arrow">{{ sortArrow('status') }}</span>
               </th>
-              <th>Tracking</th>
               <th class="sortable right" (click)="view.toggleSort('updatedAt')">
                 {{ singleDay() ? 'Time' : 'Updated' }} <span class="arrow">{{ sortArrow('updatedAt') }}</span>
               </th>
@@ -301,9 +303,9 @@
                     @if (lead.status === 'ACCEPTED' || lead.status === 'ASSIGNED_EXTERNAL') {
                       <app-payment-badge [status]="lead.paymentStatus" />
                     }
+                    <span (click)="$event.stopPropagation()"><app-admin-status-control [lead]="lead" (changed)="onAdminStatusChanged($event)" /></span>
                   </div>
                 </td>
-                <td (click)="$event.stopPropagation()"><app-admin-status-control [lead]="lead" (changed)="onAdminStatusChanged($event)" /></td>
                 <td class="right">
                   @if (singleDay()) {
                     <span class="cell-sub">{{ timeOf(lead.updatedAt) }}</span>

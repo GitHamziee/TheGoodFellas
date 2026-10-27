@@ -1950,7 +1950,21 @@ tr.expand-row td {
 .badge--paid      { background: var(--success-50); color: var(--success-700); }
 .badge--unpaid    { background: var(--gray-100);   color: var(--gray-600); }
 .badge--neutral   { background: var(--gray-100);   color: var(--gray-600); }
-.badge--admin-status { background: var(--gray-100); color: var(--gray-700, var(--gray-600)); border: 1px solid var(--gray-200, transparent); }
+/* Admin tracking label — outlined (like the other secondary badges) so it reads next to the
+   pipeline status without competing with it. */
+.badge--admin-status { background: var(--gray-100); color: var(--gray-600); box-shadow: inset 0 0 0 1px var(--gray-400); }
+.badge--admin-client_paid, .badge--admin-approved, .badge--admin-approval_confirmed {
+  background: var(--success-50); color: var(--success-700); box-shadow: inset 0 0 0 1px var(--success-600);
+}
+.badge--admin-client_unpaid, .badge--admin-declined {
+  background: var(--danger-50); color: var(--danger-700); box-shadow: inset 0 0 0 1px var(--danger-600);
+}
+.badge--admin-underwriting_review {
+  background: var(--warning-50); color: var(--warning-700); box-shadow: inset 0 0 0 1px var(--warning-600);
+}
+button.badge--admin-status { border: 0; font: inherit; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem; }
+button.badge--admin-status svg { width: 12px; height: 12px; }
+button.badge--admin-empty { background: transparent; color: var(--gray-500); box-shadow: none; border: 1px dashed var(--gray-400); }
 
 /* ---------- Empty + loading states ---------- */
 .empty-state {

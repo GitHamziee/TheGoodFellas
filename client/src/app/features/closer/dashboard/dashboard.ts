@@ -1,3 +1,4 @@
+import { AdminStatusBadge } from '../../../shared/ui/admin-status';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
@@ -22,7 +23,7 @@ const STALE_AFTER_DAYS = 3;
 
 @Component({
   selector: 'app-closer-dashboard',
-  imports: [
+  imports: [AdminStatusBadge, 
     RouterLink,
     PeriodFilter,
     StatTile,

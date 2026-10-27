@@ -18,15 +18,25 @@
           <button
             type="button"
             class="pill"
-            [class.active]="pendingTab() === tab.value"
+            [class.active]="!chargeBacksOnly() && pendingTab() === tab.value"
             (click)="setPendingTab(tab.value)"
           >
             {{ tab.label }}
             <span class="n">{{ pendingSplit()[tab.value].length }}</span>
           </button>
         }
+        <button
+          type="button"
+          class="pill"
+          [class.active]="chargeBacksOnly()"
+          [attr.aria-pressed]="chargeBacksOnly()"
+          (click)="toggleChargeBacks()"
+        >
+          Charge-backs
+          <span class="n">{{ chargeBackCount() }}</span>
+        </button>
       </div>
-      @if (pendingTab() !== 'callbacks') {
+      @if (pendingTab() !== 'callbacks' && !chargeBacksOnly()) {
         <app-select
           [options]="teammateOptions()"
           [ngModel]="teammateFilter()"
@@ -40,7 +50,7 @@
     @if (loading()) {
       <app-skeleton-rows [count]="4" />
     } @else if (pendingView.total() === 0) {
-      <app-empty-state [title]="pendingTab() === 'callbacks' ? 'No callbacks' : pendingTab() === 'drafts' ? 'No drafts' : 'Nothing pending'">
+      <app-empty-state [title]="chargeBacksOnly() ? 'No charge-backs' : pendingTab() === 'callbacks' ? 'No callbacks' : pendingTab() === 'drafts' ? 'No drafts' : 'Nothing pending'">
         <svg lucideSend></svg>
       </app-empty-state>
     } @else {
@@ -54,7 +64,7 @@
               <th class="hide-sm">State</th>
               <th class="hide-md">Assigned to</th>
               <th class="sortable hide-sm" (click)="pendingView.toggleSort('createdAt')">
-                Date <span class="arrow">{{ sortArrow(pendingView, 'createdAt') }}</span>
+                {{ chargeBacksOnly() ? 'Charged back' : 'Date' }} <span class="arrow">{{ sortArrow(pendingView, 'createdAt') }}</span>
               </th>
               <th class="right">Action</th>
             </tr>
@@ -64,6 +74,7 @@
               <tr>
                 <td>
                   <div class="cell-main name-row">
+                    @if (!chargeBacksOnly()) {
                     <button
                       type="button"
                       class="dial-btn"
@@ -74,9 +85,14 @@
                     >
                       <svg lucidePhoneCall></svg>
                     </button>
+                    }
                     {{ lead.customerName }}
-                    @if ((lead.status === 'DRAFT' && !lead.callbackById) || lead.status === 'RETURNED_TO_RETENTION') {
+                    @if (chargeBacksOnly()) {
                       <app-status-badge [status]="lead.status" />
+<app-admin-status-badge [status]="lead.adminStatus" />
+                    } @else if ((lead.status === 'DRAFT' && !lead.callbackById) || lead.status === 'RETURNED_TO_RETENTION') {
+                      <app-status-badge [status]="lead.status" />
+<app-admin-status-badge [status]="lead.adminStatus" />
                     }
                   </div>
                   @if (lead.status === 'RETURNED_TO_RETENTION' && lead.returnReason) {
@@ -101,14 +117,16 @@
                   }
                 </td>
                 <td class="hide-sm">
-                  <span class="chip"><svg lucideClock></svg>{{ timeAgo(lead.createdAt) }}</span>
+                  <span class="chip"><svg lucideClock></svg>{{ timeAgo(chargeBacksOnly() ? lead.chargeBacks[0].createdAt : lead.createdAt) }}</span>
                 </td>
                 <td>
-                  <div class="row-actions">
-                    <a class="btn btn--sm btn--ghost" [routerLink]="['/retention/leads', lead.id]">
-                      <svg lucideSquarePen></svg> Open
-                    </a>
-                  </div>
+                  @if (!chargeBacksOnly()) {
+                    <div class="row-actions">
+                      <a class="btn btn--sm btn--ghost" [routerLink]="['/retention/leads', lead.id]">
+                        <svg lucideSquarePen></svg> Open
+                      </a>
+                    </div>
+                  }
                 </td>
               </tr>
             }

@@ -91,6 +91,7 @@ async function resolveSuggestedClientId(raw: unknown): Promise<{ suggestedClient
 // since that's workflow metadata, not customer PII.
 const JUNIOR_VIEW_SELECT = {
   id: true,
+  adminStatus: true,
   customerName: true,
   status: true,
   createdAt: true,
@@ -106,6 +107,7 @@ const JUNIOR_VIEW_SELECT = {
 // NEW and assigned to them, they get full detail (below).
 const CLOSER_HISTORY_SELECT = {
   id: true,
+  adminStatus: true,
   customerName: true,
   status: true,
   createdAt: true,
@@ -119,6 +121,7 @@ const CLOSER_HISTORY_SELECT = {
 // enrich the lead — that's the "theirs to work" moment, not just seeing it listed.
 const CLOSER_INBOX_PREVIEW_SELECT = {
   id: true,
+  adminStatus: true,
   customerName: true,
   state: true,
   need: true,
@@ -136,6 +139,7 @@ const CLOSER_INBOX_PREVIEW_SELECT = {
 // which is what the anti-data-theft masking rule actually exists to protect.
 const JUNIOR_EDIT_SELECT = {
   id: true,
+  adminStatus: true,
   status: true,
   createdAt: true,
   updatedAt: true,
@@ -150,6 +154,7 @@ const JUNIOR_EDIT_SELECT = {
 // lead since Team Lead oversees Junior Closer *and* Closer performance.
 const TEAM_LEAD_SELECT = {
   id: true,
+  adminStatus: true,
   customerName: true,
   status: true,
   createdAt: true,
@@ -178,12 +183,15 @@ export async function leadsInManagerScope(leadIds: string[]): Promise<boolean> {
 // queue, and details of a submitted lead are for Clients only.
 const RETENTION_HISTORY_SELECT = {
   id: true,
+  adminStatus: true,
   customerName: true,
   status: true,
   createdAt: true,
   updatedAt: true,
   retention: { select: { id: true, name: true } },
   client: { select: { id: true, name: true } },
+  // Dates only — no PKR amount, no reason. Drives the History page's Charge-backs toggle.
+  chargeBacks: { select: { createdAt: true }, orderBy: { createdAt: 'desc' } },
 } as const;
 
 // Retention's queue LIST — masked like CLOSER_INBOX_PREVIEW_SELECT (no phone, no carrier, no
@@ -192,6 +200,7 @@ const RETENTION_HISTORY_SELECT = {
 // shows them so a sent-back lead says what to fix and a draft says why it was parked.
 const RETENTION_QUEUE_PREVIEW_SELECT = {
   id: true,
+  adminStatus: true,
   customerName: true,
   state: true,
   status: true,
@@ -1364,14 +1373,14 @@ export async function removeRetentionCallback(
 }
 
 /**
- * Leads the Retention team has already worked past the queue (submitted, assigned,
- * accepted, rejected, etc.) — shared team history, not scoped to the caller, same
- * "any teammate can see it" philosophy as listRetentionQueue above. Workers never
- * see a submitted lead's details — only the list-row fields in RETENTION_HISTORY_SELECT.
+ * Leads this Retention person has worked past the queue (submitted, assigned, accepted,
+ * rejected, etc.) — scoped to the caller: whoever submits a lead becomes its retentionId,
+ * so each person sees only their own. Workers never see a submitted lead's details — only
+ * the list-row fields in RETENTION_HISTORY_SELECT.
  */
-export async function listRetentionHistory() {
+export async function listRetentionHistory(requesterId: string) {
   const leads = await prisma.lead.findMany({
-    where: { leadType: 'RETENTION', retentionId: { not: null }, status: { notIn: ['NEW', 'DRAFT'] } },
+    where: { leadType: 'RETENTION', retentionId: requesterId, status: { notIn: ['NEW', 'DRAFT'] } },
     select: RETENTION_HISTORY_SELECT,
     orderBy: { updatedAt: 'desc' },
   });

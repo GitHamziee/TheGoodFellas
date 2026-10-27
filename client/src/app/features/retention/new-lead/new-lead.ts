@@ -243,8 +243,8 @@ export class RetentionNewLead implements OnInit {
       const payload = Object.fromEntries(
         Object.entries(this.form).filter(([, v]) => v !== '' && v !== null && v !== undefined),
       ) as RetentionSubmitInput;
-      await this.leadService.createLeadAsRetention(payload);
-      this.router.navigateByUrl('/retention/leads');
+      const lead = await this.leadService.createLeadAsRetention(payload);
+      this.router.navigate(['/retention/history'], { queryParams: { highlight: lead.id } });
     } catch (err) {
       this.error.set(apiErrorMessage(err, 'Could not submit the lead.'));
     } finally {

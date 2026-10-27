@@ -1,3 +1,4 @@
+import { AdminStatusBadge } from '../../../shared/ui/admin-status';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
@@ -33,7 +34,7 @@ import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 
 @Component({
   selector: 'app-my-leads',
-  imports: [
+  imports: [AdminStatusBadge, 
     RouterLink,
     Modal,
     Detail,
