@@ -93,7 +93,7 @@ const KIND_TONE: Partial<Record<RetentionTimelineKind, string>> = {
   `,
 })
 export class RetentionHistory implements OnInit {
-  private readonly liveReload = reloadOnChange(() => this.ngOnInit());
+  private readonly liveReload = reloadOnChange(() => this.refresh());
   private readonly leadService = inject(LeadService);
 
   readonly leads = signal<RetentionHistoryRow[]>([]);
@@ -166,11 +166,23 @@ export class RetentionHistory implements OnInit {
     this.selected.set(row);
     this.timeline.set([]);
     this.detailError.set(null);
-    this.detailLoading.set(true);
+    await this.loadDetail(row.id);
+  }
+
+  /** Live refresh: reload the list, and the timeline too if a lead's popup is open. */
+  private async refresh(): Promise<void> {
+    const open = this.selected();
+    await Promise.all([this.ngOnInit(), open ? this.loadDetail(open.id) : Promise.resolve()]);
+  }
+
+  private async loadDetail(id: string): Promise<void> {
+    if (!isSilentReload()) this.detailLoading.set(true);
     try {
-      const detail = await this.leadService.retentionLifecycleDetail(row.id);
+      const detail = await this.leadService.retentionLifecycleDetail(id);
+      if (this.selected()?.id !== id) return;
       this.selected.set(detail.lead);
       this.timeline.set(detail.timeline);
+      this.detailError.set(null);
     } catch (err) {
       this.detailError.set(apiErrorMessage(err, 'Could not load this lead’s timeline.'));
     } finally {
