@@ -97,6 +97,7 @@
                 </td>
                 <td>
                   <div class="status-stack" (click)="$event.stopPropagation()">
+                    <div class="status-line"><app-status-badge [status]="lead.status" hideDecided /></div>
                     @if (MONEY_STATUSES.includes(lead.status)) {
                       <app-admin-status-control [lead]="lead" (changed)="onAdminStatusChanged($event)" />
                     }
@@ -283,6 +284,7 @@
                 <td>
                   <div class="status-stack">
                     <div class="status-line">
+                      <app-status-badge [status]="lead.status" hideDecided />
                       @if (MONEY_STATUSES.includes(lead.status)) {
                         <app-payment-badge [status]="lead.paymentStatus" />
                       }

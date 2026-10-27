@@ -1,4 +1,4 @@
-import { Component, computed, input, output } from '@angular/core';
+import { Component, booleanAttribute, computed, input, output } from '@angular/core';
 import { LucideChevronLeft, LucideChevronRight, LucideSearch } from '@lucide/angular';
 import { LeadStatus, PaymentStatus } from '../../core/models/lead.model';
 
@@ -169,10 +169,12 @@ const STATUS_LABEL: Record<LeadStatus, string> = {
 
 @Component({
   selector: 'app-status-badge',
-  template: `<span [class]="cls()">{{ text() }}</span>`,
+  template: `@if (!(hideDecided() && (status() === 'ACCEPTED' || status() === 'REJECTED'))) {<span [class]="cls()">{{ text() }}</span>}`,
 })
 export class StatusBadge {
   readonly status = input.required<LeadStatus>();
+  /** Where the tracking status sits beside it, "Approved" / "Rejected" would just repeat it. */
+  readonly hideDecided = input(false, { transform: booleanAttribute });
   readonly cls = computed(() => `badge badge--${this.status().toLowerCase()}`);
   readonly text = computed(() => STATUS_LABEL[this.status()] ?? this.status());
 }
