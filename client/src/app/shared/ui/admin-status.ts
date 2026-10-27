@@ -89,9 +89,11 @@ export class AdminStatusControl {
   readonly changed = output<Lead>();
 
   readonly options = ADMIN_STATUS_OPTIONS;
-  /** Once a lead is paid, the pre-payment outcomes no longer apply. */
+  /** A paid lead sitting at Approval Confirmed can't go back to the pre-payment outcomes; "Approved" keeps every option. */
   readonly choices = computed(() =>
-    this.lead().paymentStatus === 'PAID' ? this.options.filter((o) => !PRE_PAYMENT_STATUSES.includes(o.value)) : this.options
+    this.lead().paymentStatus === 'PAID' && this.lead().adminStatus === 'APPROVAL_CONFIRMED'
+      ? this.options.filter((o) => !PRE_PAYMENT_STATUSES.includes(o.value))
+      : this.options
   );
   readonly busy = signal(false);
   readonly error = signal<string | null>(null);
