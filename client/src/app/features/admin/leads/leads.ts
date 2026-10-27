@@ -45,7 +45,7 @@ import { Select } from '../../../shared/ui/select';
 import { CHARGE_BACK_MONTH_OPTIONS, CHARGE_BACK_REASON_OPTIONS } from '../../../core/lead-options';
 import { LeadDetail } from '../../../shared/lead-detail';
 import { RowMenu } from '../../../shared/ui/row-menu';
-import { AdminStatusBadge, AdminStatusControl } from '../../../shared/ui/admin-status';
+import { AdminStatusControl } from '../../../shared/ui/admin-status';
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 import { apiErrorMessage } from '../../../core/api';
 
@@ -78,7 +78,6 @@ interface LookupUser {
     DayBar,
     StatusBadge,
     PaymentBadge,
-    AdminStatusBadge,
     AdminStatusControl,
     SearchBox,
     Pagination,

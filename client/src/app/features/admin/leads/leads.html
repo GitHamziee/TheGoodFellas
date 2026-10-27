@@ -74,6 +74,7 @@
               <th>Customer</th>
               <th class="hide-sm">Closer / Retention</th>
               <th>Status</th>
+              <th>Tracking</th>
               <th class="hide-md">Reason / notes</th>
               <th>
                 <button type="button" class="btn btn--sm btn--ghost" (click)="pendingNewestFirst.set(!pendingNewestFirst())" title="Click to flip the order">
@@ -114,6 +115,7 @@
                   }
                 </td>
                 <td><app-status-badge [status]="lead.status" /></td>
+                <td (click)="$event.stopPropagation()"><app-admin-status-control [lead]="lead" (changed)="onAdminStatusChanged($event)" /></td>
                 <td class="hide-md">
                   @if (lead.status === 'REJECTED' && lead.rejectionReason) {
                     <span class="cell-sub">{{ lead.rejectionReason }}</span>
@@ -224,6 +226,7 @@
               <th class="sortable" (click)="view.toggleSort('status')">
                 Status <span class="arrow">{{ sortArrow('status') }}</span>
               </th>
+              <th>Tracking</th>
               <th class="sortable right" (click)="view.toggleSort('updatedAt')">
                 {{ singleDay() ? 'Time' : 'Updated' }} <span class="arrow">{{ sortArrow('updatedAt') }}</span>
               </th>
@@ -298,9 +301,9 @@
                     @if (lead.status === 'ACCEPTED' || lead.status === 'ASSIGNED_EXTERNAL') {
                       <app-payment-badge [status]="lead.paymentStatus" />
                     }
-                    <app-admin-status-badge [status]="lead.adminStatus" />
                   </div>
                 </td>
+                <td (click)="$event.stopPropagation()"><app-admin-status-control [lead]="lead" (changed)="onAdminStatusChanged($event)" /></td>
                 <td class="right">
                   @if (singleDay()) {
                     <span class="cell-sub">{{ timeOf(lead.updatedAt) }}</span>
@@ -332,7 +335,6 @@
     (close)="selected.set(null)"
   >
     <app-lead-detail [lead]="lead" [unmasked]="true" />
-    <app-admin-status-control [lead]="lead" (changed)="onAdminStatusChanged($event)" />
 
     <div footer>
       @if (lead.status === 'SUBMITTED' || lead.status === 'REJECTED' || lead.status === 'CHARGED_BACK') {

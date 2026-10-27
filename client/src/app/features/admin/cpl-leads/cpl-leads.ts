@@ -40,7 +40,7 @@ import {
 } from '../../../shared/ui/ui';
 import { LeadDetail } from '../../../shared/lead-detail';
 import { RowMenu } from '../../../shared/ui/row-menu';
-import { AdminStatusBadge, AdminStatusControl } from '../../../shared/ui/admin-status';
+import { AdminStatusControl } from '../../../shared/ui/admin-status';
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 import { DayBar, rangeBounds, rangeLabel } from '../../../shared/ui/day-bar';
 import { LeadQuickEdit } from '../../../shared/lead-quick-edit';
@@ -72,7 +72,6 @@ const STATUS_FILTERS = [
     DayBar,
     StatusBadge,
     PaymentBadge,
-    AdminStatusBadge,
     AdminStatusControl,
     SearchBox,
     Pagination,
