@@ -157,6 +157,10 @@ export const routes: Routes = [
         loadComponent: () => import('./features/admin/drafts/drafts').then((m) => m.AdminDrafts),
       },
       {
+        path: 'callbacks',
+        loadComponent: () => import('./features/admin/callbacks/callbacks').then((m) => m.AdminCallbacks),
+      },
+      {
         path: 'clients',
         loadComponent: () => import('./features/admin/clients/clients').then((m) => m.AdminClients),
       },
@@ -295,6 +299,10 @@ export const routes: Routes = [
       {
         path: 'drafts',
         loadComponent: () => import('./features/admin/drafts/drafts').then((m) => m.AdminDrafts),
+      },
+      {
+        path: 'callbacks',
+        loadComponent: () => import('./features/admin/callbacks/callbacks').then((m) => m.AdminCallbacks),
       },
       {
         path: 'state-sheet',

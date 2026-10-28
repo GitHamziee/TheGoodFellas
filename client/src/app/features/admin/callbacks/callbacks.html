@@ -1,0 +1,123 @@
+<div class="page">
+  @if (error()) {
+    <div class="error">{{ error() }}</div>
+  }
+
+  @if (loading()) {
+    <div class="card"><app-skeleton-rows [count]="6" /></div>
+  } @else {
+    <div class="filters">
+      <app-select [options]="personOptions()" [searchable]="true" [ngModel]="personFilter()" (ngModelChange)="personFilter.set($event)" name="fPerson" ariaLabel="Marked by" />
+      @if (personFilter()) {
+        <button type="button" class="btn btn--sm btn--ghost" (click)="personFilter.set('')">
+          <svg lucideX></svg> Clear filters
+        </button>
+      }
+    </div>
+
+    <div class="stats-row">
+      <app-stat-tile [value]="stats().total" label="Active callbacks" tone="tone-gold">
+        <svg lucidePhoneCall></svg>
+      </app-stat-tile>
+      <app-stat-tile [value]="stats().soon" label="Lapsing within 6 hours" [tone]="stats().soon ? 'tone-danger' : 'tone-c'">
+        <svg lucideTriangleAlert></svg>
+      </app-stat-tile>
+      <app-stat-tile [value]="stats().people" label="People with callbacks" tone="tone-f">
+        <svg lucideUsers></svg>
+      </app-stat-tile>
+    </div>
+
+    @if (leads().length === 0) {
+      <div class="card">
+        <app-empty-state title="No callbacks">
+          <svg lucidePhoneCall></svg>
+        </app-empty-state>
+      </div>
+    } @else {
+      <div class="toolbar">
+        <app-search-box
+          [value]="view.search()"
+          placeholder="Search by customer, phone, state, or person…"
+          (valueChange)="view.setSearch($event)"
+        />
+      </div>
+
+      <div class="card card--flush">
+        @if (view.total() === 0) {
+          <app-empty-state title="No callbacks match that search">
+            <svg lucidePhoneCall></svg>
+          </app-empty-state>
+        } @else {
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th class="sortable" (click)="view.toggleSort('customerName')">
+                    Customer <span class="arrow">{{ sortArrow('customerName') }}</span>
+                  </th>
+                  <th class="hide-sm">Marked by</th>
+                  <th class="hide-md">Assigned to</th>
+                  <th class="sortable hide-md" (click)="view.toggleSort('callbackAt')">
+                    Marked <span class="arrow">{{ sortArrow('callbackAt') }}</span>
+                  </th>
+                  <th class="right">Lapses</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (lead of view.rows(); track lead.id) {
+                  <tr class="clickable" (click)="selected.set(lead)">
+                    <td>
+                      <div class="cell-main">{{ lead.customerName }}</div>
+                      <div class="cell-sub">{{ formatPhone(lead.phone) }} · {{ lead.state }}</div>
+                    </td>
+                    <td class="hide-sm">
+                      @if (lead.callbackBy; as p) {
+                        <div class="person">
+                          <span class="avatar-sm" [class]="getAvatarTone(p.id)">{{ getInitials(p.name) }}</span>
+                          <span class="nm">{{ p.name }}</span>
+                        </div>
+                      } @else {
+                        <span class="empty">—</span>
+                      }
+                    </td>
+                    <td class="hide-md">
+                      @if (lead.retention; as r) {
+                        <div class="person">
+                          <span class="avatar-sm" [class]="getAvatarTone(r.id)">{{ getInitials(r.name) }}</span>
+                          <span class="nm">{{ r.name }}</span>
+                        </div>
+                      } @else {
+                        <span class="empty">None</span>
+                      }
+                    </td>
+                    <td class="hide-md">
+                      <div class="cell-main">{{ lead.callbackAt ? timeAgo(lead.callbackAt) : '—' }}</div>
+                    </td>
+                    <td class="right">
+                      <span class="chip" [class.left--soon]="isSoon(lead)">
+                        <svg lucideClock></svg>{{ leftText(lead) }}
+                      </span>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          <app-pagination
+            [page]="view.page()"
+            [totalPages]="view.totalPages()"
+            [total]="view.total()"
+            (pageChange)="view.page.set($event)"
+          />
+        }
+      </div>
+    }
+  }
+</div>
+
+@if (selected(); as lead) {
+  <app-modal title="Callback" [subtitle]="lead.customerName" [wide]="true" (close)="selected.set(null)">
+    <app-lead-detail [lead]="lead" [unmasked]="true" />
+  </app-modal>
+}

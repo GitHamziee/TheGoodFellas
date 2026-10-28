@@ -1579,6 +1579,16 @@ export async function removeRetentionCallback(
 /** A Callback is held for this long, then lapses back into its owner's drafts. */
 export const RETENTION_CALLBACK_HOURS = 48;
 
+/** Every active Callback across Retention - Admin/Manager oversight, view-only. Callbacks are
+ * private to whoever marked them everywhere else; this is the one place they are all listed. */
+export async function listCallbacksForAdmin(viewer: 'ADMIN' | 'MANAGER') {
+  return prisma.lead.findMany({
+    where: { leadType: 'RETENTION', callbackById: { not: null }, ...managerScope(viewer) },
+    include: { ...adminInclude(viewer), callbackBy: { select: { id: true, name: true } } },
+    orderBy: { callbackAt: 'asc' },
+  });
+}
+
 /** Lapses every Callback older than RETENTION_CALLBACK_HOURS: the lead becomes a DRAFT (reason
  * CALLBACK) assigned to the person who held it, with a fresh exclusive window, and the callback
  * flag is cleared. Run on a timer; each lead is guarded on the same callback it read, so a

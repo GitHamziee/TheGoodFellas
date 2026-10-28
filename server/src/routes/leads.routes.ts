@@ -234,6 +234,15 @@ router.get(
   })
 );
 
+router.get(
+  '/admin/callbacks',
+  requireRole('ADMIN', 'MANAGER'),
+  asyncHandler(async (req, res) => {
+    const leads = await leadService.listCallbacksForAdmin(req.user!.role as 'ADMIN' | 'MANAGER');
+    return apiSuccess(res, { leads });
+  })
+);
+
 // Distinct path from the Closer-only '/drafts' above — same router, different role.
 router.get(
   '/admin/drafts',

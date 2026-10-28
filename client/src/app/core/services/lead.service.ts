@@ -237,6 +237,12 @@ export class LeadService {
     return res.data.leads;
   }
 
+  /** Every active Retention callback - Admin/Manager oversight, view-only. */
+  async adminCallbacks(): Promise<Lead[]> {
+    const res = await firstValueFrom(this.http.get<ApiSuccess<{ leads: Lead[] }>>(`${BASE}/admin/callbacks`));
+    return res.data.leads;
+  }
+
   /** Charged-back leads waiting to be reassigned to a different client/external client. */
   async chargeBacks(): Promise<Lead[]> {
     const res = await firstValueFrom(this.http.get<ApiSuccess<{ leads: Lead[] }>>(`${BASE}/charge-backs`));

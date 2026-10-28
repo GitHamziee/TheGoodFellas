@@ -171,6 +171,7 @@ export interface Lead {
   draftReasonNote?: string | null;
 
   /** RETENTION only — who marked this queue lead as a Callback. While set, only they see it. */
+  callbackBy?: LeadParty | null;
   callbackById?: string | null;
   callbackAt?: string | null;
 
