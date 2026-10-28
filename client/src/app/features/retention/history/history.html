@@ -41,7 +41,7 @@
             type="button"
             class="pill"
             [class.active]="!chargeBacksOnly() && view.status() === filter.value"
-            (click)="view.setStatus(filter.value)"
+            (click)="chargeBacksOnly.set(false); view.setStatus(filter.value)"
           >
             {{ filter.label }}
             <span class="n">{{ statusCounts()[filter.value] }}</span>
