@@ -23,6 +23,7 @@ const PAGE_PATHS = {
     QA_JUNIOR_CLOSER: "/qa-junior/chat",
     QA_CLOSER: "/qa-closer/chat",
     RETENTION: "/retention/chat",
+    RETENTION_MANAGER: "/retention-manager/chat",
   },
   HISTORY: { JUNIOR_CLOSER: "/junior/my-leads", CLOSER: "/closer/history" },
 } as const satisfies Record<string, Partial<Record<Role, string>>>;

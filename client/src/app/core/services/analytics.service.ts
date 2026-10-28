@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { API_BASE_URL } from '../config';
-import { LeadParty, LeadStatus, LeadType, PaymentStatus, PlanType } from '../models/lead.model';
+import { LeadNote, LeadParty, LeadStatus, LeadType, PaymentStatus, PlanType } from '../models/lead.model';
 import { CallReviewDetail, QaLane, QaTransferDetail } from '../models/review.model';
 import type { ApiSuccess } from '../api';
 
@@ -119,6 +119,9 @@ export interface ChargeBackRecent {
   closer: LeadParty | null;
   /** ADMIN only — omitted for MANAGER. */
   pkrAmount?: number;
+  /** Latest note on the lead + total count. */
+  notes?: LeadNote[];
+  _count?: { notes: number };
   reason: string;
   createdAt: string;
 }

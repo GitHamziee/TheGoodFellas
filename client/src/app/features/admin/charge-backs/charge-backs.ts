@@ -6,6 +6,7 @@ import {
   LucideCircleCheck,
   LucideClock,
   LucideSquarePen,
+  LucideSend,
   LucideUserCheck,
   LucideUsers,
   LucideX,
@@ -29,6 +30,7 @@ import {
   timeAgo,
 } from '../../../core/format-utils';
 import { Modal } from '../../../shared/ui/modal';
+import { NotePeek } from '../../../shared/ui/lead-notes';
 import { PageHero, EmptyState, Pagination, SearchBox, SkeletonRows, StatTile, StatusBadge } from '../../../shared/ui/ui';
 import { LeadDetail } from '../../../shared/lead-detail';
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
@@ -74,6 +76,7 @@ const PLAN_COLORS: Record<string, string> = {
     LeadDetail,
     StatTile,
     StatusBadge,
+    NotePeek,
     SearchBox,
     Pagination,
     EmptyState,
@@ -81,6 +84,7 @@ const PLAN_COLORS: Record<string, string> = {
     LucideBanknoteX,
     LucideBuilding2,
     LucideCircleCheck,
+    LucideSend,
     LucideUserCheck,
     LucideSquarePen,
     LucideClock,
@@ -147,6 +151,8 @@ export class AdminChargeBacks implements OnInit {
   private readonly auth = inject(AuthService);
 
   /** PKR amounts are ADMIN-only (the server omits them for MANAGER) — charts fall back to counts. */
+  /** Retention Manager works charged-back leads (edit / assign) but has no closers to show; the server limits him to charged-back Retention leads. */
+  readonly readOnly = computed(() => this.auth.role() === 'RETENTION_MANAGER');
   readonly showPkr = computed(() => this.auth.user()?.role === 'ADMIN');
 
   /** Charged-back leads still awaiting reassignment — the only ones actions apply to. */
@@ -425,6 +431,8 @@ export class AdminChargeBacks implements OnInit {
   });
 
   async ngOnInit(): Promise<void> {
+    // Retention Manager never assigns, so he has no use for (or access to) the client lists.
+    if (this.readOnly()) return this.refresh();
     const [clients, externalClients] = await Promise.all([
       this.userService.listClients(),
       this.externalClientService.list(),
@@ -498,6 +506,22 @@ export class AdminChargeBacks implements OnInit {
       this.notice.set(`${lead.customerName} reassigned to ${client?.name ?? 'client'}.`);
     } catch (err) {
       this.error.set(apiErrorMessage(err, 'Could not assign the lead.'));
+    } finally {
+      this.busyId.set(null);
+    }
+  }
+
+  /** Retention Manager is done working the lead — it moves to the admin queue, where only Admin assigns it. */
+  async submitToAdmin(lead: Lead, event?: Event): Promise<void> {
+    event?.stopPropagation();
+    this.error.set(null);
+    this.busyId.set(lead.id);
+    try {
+      await this.leadService.submitToAdmin(lead.id);
+      this.leads.update((rows) => rows.filter((l) => l.id !== lead.id));
+      this.notice.set(`${lead.customerName} sent to admin.`);
+    } catch (err) {
+      this.error.set(apiErrorMessage(err, 'Could not send the lead to admin.'));
     } finally {
       this.busyId.set(null);
     }

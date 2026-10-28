@@ -4,6 +4,7 @@ import { LucideChevronDown, LucideCheck, LucideCircleX } from '@lucide/angular';
 import { apiErrorMessage } from '../../core/api';
 import { ADMIN_STATUS_OPTIONS } from '../../core/lead-options';
 import { Lead, LeadAdminStatus } from '../../core/models/lead.model';
+import { AuthService } from '../../core/services/auth.service';
 import { LeadService } from '../../core/services/lead.service';
 import { uiZoom } from '../../core/ui-zoom';
 import { Modal } from './modal';
@@ -28,11 +29,17 @@ export class AdminStatusBadge {
   selector: 'app-admin-status-control',
   imports: [FormsModule, Modal, LucideChevronDown, LucideCheck, LucideCircleX],
   template: `
-    <button type="button" [class]="cls()" [disabled]="busy()" aria-haspopup="menu" [attr.aria-expanded]="open()" (click)="toggle($event)">
-      <span class="trk-dot"></span>
-      {{ label() ?? 'Set tracking' }}
-      <svg lucideChevronDown></svg>
-    </button>
+    @if (readOnly()) {
+      @if (label(); as text) {
+        <span [class]="cls()"><span class="trk-dot"></span>{{ text }}</span>
+      }
+    } @else {
+      <button type="button" [class]="cls()" [disabled]="busy()" aria-haspopup="menu" [attr.aria-expanded]="open()" (click)="toggle($event)">
+        <span class="trk-dot"></span>
+        {{ label() ?? 'Set tracking' }}
+        <svg lucideChevronDown></svg>
+      </button>
+    }
     @if (open()) {
       <div class="panel" role="menu" [style.top.px]="top()" [style.left.px]="left()">
         @if (lead().adminStatus) {
@@ -84,6 +91,9 @@ export class AdminStatusBadge {
 export class AdminStatusControl {
   private readonly leadService = inject(LeadService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  /** Retention Manager reads the tracking label but never changes it. */
+  private readonly auth = inject(AuthService);
+  protected readonly readOnly = computed(() => this.auth.role() === 'RETENTION_MANAGER');
 
   readonly lead = input.required<Lead>();
   readonly changed = output<Lead>();

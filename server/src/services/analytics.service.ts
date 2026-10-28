@@ -379,8 +379,10 @@ export async function overallAnalytics() {
 // Breaks chargeback events down by client (who caused it) and by closer (whose sale got
 // clawed back) — the ChargeBack table is the audit trail, since Lead.clientId gets
 // cleared and reassigned once a chargeback happens (see lead.service#markLeadChargedBack).
-export async function chargeBackAnalytics(viewer: 'ADMIN' | 'MANAGER') {
+export async function chargeBackAnalytics(viewer: 'ADMIN' | 'MANAGER' | 'RETENTION_MANAGER') {
   const chargeBacks = await prisma.chargeBack.findMany({
+    // RETENTION_MANAGER only ever sees charge-backs on RETENTION leads.
+    where: viewer === 'RETENTION_MANAGER' ? { lead: { leadType: 'RETENTION' } } : undefined,
     select: {
       id: true,
       leadId: true,
@@ -400,6 +402,13 @@ export async function chargeBackAnalytics(viewer: 'ADMIN' | 'MANAGER') {
           // Who holds the lead now — only set once an admin has reassigned it.
           client: { select: { id: true, name: true } },
           externalClient: { select: { id: true, name: true } },
+          // Latest note + count, for the at-a-glance cell on the Charge Backs page.
+          notes: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            select: { id: true, body: true, createdAt: true, author: { select: { id: true, name: true } } },
+          },
+          _count: { select: { notes: true } },
         },
       },
     },
@@ -446,6 +455,8 @@ export async function chargeBackAnalytics(viewer: 'ADMIN' | 'MANAGER') {
       // Where the lead sits today — a charge-back row is kept forever, even after the lead
       // is sent back for correction or reassigned, so the page can show what became of it.
       leadStatus: cb.lead.status,
+      notes: cb.lead.notes,
+      _count: cb.lead._count,
       client: cb.client,
       closer: cb.lead.closer,
       pkrAmount: cb.pkrAmount,

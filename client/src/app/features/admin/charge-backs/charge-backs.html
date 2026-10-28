@@ -2,7 +2,9 @@
   <app-page-hero
     eyebrow="Money"
     title="Charge Backs"
-    sub="Every lead a client's customer reversed after payment — which client, which closer, why it happened, and what's still waiting to be given to someone else."
+    [sub]="readOnly()
+      ? 'Every lead a client\'s customer reversed after payment — which client, why it happened, and what\'s still waiting to be given to someone else.'
+      : 'Every lead a client\'s customer reversed after payment — which client, which closer, why it happened, and what\'s still waiting to be given to someone else.'"
     tone="red"
     [count]="loading() ? '–' : stats().total"
     countLabel="charge-backs on record"
@@ -148,7 +150,7 @@
         </div>
 
         <!-- By closer -->
-        @if (byCloser().length) {
+        @if (!readOnly() && byCloser().length) {
           <div class="card">
             <div class="inline-head">
               <h2>Closers</h2>
@@ -171,7 +173,7 @@
       <div class="toolbar">
         <app-search-box
           [value]="view.search()"
-          placeholder="Search customer, client, closer, or reason…"
+          [placeholder]="readOnly() ? 'Search customer, client, or reason…' : 'Search customer, client, closer, or reason…'"
           (valueChange)="view.setSearch($event)"
         />
       </div>
@@ -190,7 +192,9 @@
                     Customer <span class="arrow">{{ sortArrow('customerName') }}</span>
                   </th>
                   <th class="hide-sm">Client</th>
-                  <th class="hide-md">Closer</th>
+                  @if (!readOnly()) {
+                    <th class="hide-md">Closer</th>
+                  }
                   <th class="hide-sm">Plan</th>
                   <th class="sortable hide-md" (click)="view.toggleSort('createdAt')">
                     Date <span class="arrow">{{ sortArrow('createdAt') }}</span>
@@ -218,6 +222,7 @@
                       @if (row.reason) {
                         <div class="cell-sub reason-quote">“{{ row.reason }}”</div>
                       }
+                      <app-note-peek [leadId]="row.leadId" [name]="row.customerName" [notes]="row.notes" [count]="row._count?.notes" />
                     </td>
                     <td class="hide-sm">
                       <div class="person">
@@ -225,7 +230,8 @@
                         <span class="nm">{{ row.client.name }}</span>
                       </div>
                     </td>
-                    <td class="hide-md">
+                    @if (!readOnly()) {
+                      <td class="hide-md">
                       @if (row.closer; as closer) {
                         <div class="person">
                           <span class="avatar-sm" [class]="getAvatarTone(closer.id)">{{ getInitials(closer.name) }}</span>
@@ -238,6 +244,7 @@
                         <span class="chip">CPL</span>
                       }
                     </td>
+                    }
                     <td class="hide-sm">
                       @if (row.planType) {
                         <span class="plan-pill">{{ planLabelOf(row.planType) }}</span>
@@ -271,12 +278,18 @@
                             (click)="openEdit(lead, $event)">
                             <svg lucideSquarePen></svg>
                           </button>
-                          <button type="button" class="btn btn--sm btn--ghost" (click)="openAssignExternal(lead, $event)">
-                            <svg lucideBuilding2></svg> Assign External
-                          </button>
-                          <button type="button" class="btn btn--sm" (click)="openAssign(lead, $event)">
-                            <svg lucideUserCheck></svg> Assign
-                          </button>
+                          @if (readOnly()) {
+                            <button type="button" class="btn btn--sm" [disabled]="busyId() === lead.id" (click)="submitToAdmin(lead, $event)">
+                              <svg lucideSend></svg> Submit to admin
+                            </button>
+                          } @else {
+                            <button type="button" class="btn btn--sm btn--ghost" (click)="openAssignExternal(lead, $event)">
+                              <svg lucideBuilding2></svg> Assign External
+                            </button>
+                            <button type="button" class="btn btn--sm" (click)="openAssign(lead, $event)">
+                              <svg lucideUserCheck></svg> Assign
+                            </button>
+                          }
                         </div>
                       }
                     </td>
@@ -307,12 +320,18 @@
         <button type="button" class="btn btn--ghost" (click)="detailLead.set(null); openEdit(lead)">
           <svg lucideSquarePen></svg> Edit
         </button>
-        <button type="button" class="btn btn--ghost" (click)="detailLead.set(null); openAssignExternal(lead)">
-          <svg lucideBuilding2></svg> Assign to external
-        </button>
-        <button type="button" class="btn" (click)="detailLead.set(null); openAssign(lead)">
-          <svg lucideUserCheck></svg> Assign to client
-        </button>
+        @if (readOnly()) {
+          <button type="button" class="btn" [disabled]="busyId() === lead.id" (click)="detailLead.set(null); submitToAdmin(lead)">
+            <svg lucideSend></svg> Submit to admin
+          </button>
+        } @else {
+          <button type="button" class="btn btn--ghost" (click)="detailLead.set(null); openAssignExternal(lead)">
+            <svg lucideBuilding2></svg> Assign to external
+          </button>
+          <button type="button" class="btn" (click)="detailLead.set(null); openAssign(lead)">
+            <svg lucideUserCheck></svg> Assign to client
+          </button>
+        }
       </div>
     }
   </app-modal>

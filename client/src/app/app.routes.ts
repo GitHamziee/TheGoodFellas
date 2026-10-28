@@ -539,5 +539,36 @@ export const routes: Routes = [
     ],
   },
 
+  // Same admin pages as /admin, read-only (they hide every pipeline action for this role), plus
+  // the per-lead notes. Retention staff own a lead for a month; once it is charged back after
+  // that, it lands here to be worked.
+  {
+    path: 'retention-manager',
+    canMatch: [authGuard, roleGuard('RETENTION_MANAGER')],
+    loadComponent: () => import('./layout/portal-shell/portal-shell').then((m) => m.PortalShell),
+    children: [
+      { path: '', pathMatch: 'full', redirectTo: 'charge-backs' },
+      {
+        path: 'charge-backs',
+        loadComponent: () => import('./features/admin/charge-backs/charge-backs').then((m) => m.AdminChargeBacks),
+      },
+      {
+        path: 'leads',
+        loadComponent: () => import('./features/admin/leads/leads').then((m) => m.AdminLeads),
+      },
+      { path: 'cpl-leads', redirectTo: 'charge-backs' },
+      {
+        path: 'retention-history',
+        loadComponent: () =>
+          import('./features/admin/retention-history/retention-history').then((m) => m.RetentionHistory),
+      },
+      {
+        path: 'chat',
+        loadComponent: () => import('./features/chat/chat').then((m) => m.Chat),
+      },
+      { path: 'settings', redirectTo: 'charge-backs' },
+    ],
+  },
+
   { path: '**', redirectTo: '' },
 ];

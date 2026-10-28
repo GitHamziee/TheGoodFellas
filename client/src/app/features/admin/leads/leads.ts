@@ -37,6 +37,7 @@ import {
   SearchBox,
   SkeletonRows,
   StatusBadge,
+  StatTile,
   PageHero,
 } from '../../../shared/ui/ui';
 import { DayBar, rangeBounds, rangeLabel } from '../../../shared/ui/day-bar';
@@ -47,6 +48,8 @@ import { LeadDetail } from '../../../shared/lead-detail';
 import { RowMenu } from '../../../shared/ui/row-menu';
 import { AdminStatusControl } from '../../../shared/ui/admin-status';
 import { LifecycleButton } from '../../../shared/ui/lifecycle-button';
+import { NotePeek } from '../../../shared/ui/lead-notes';
+import { AuthService } from '../../../core/services/auth.service';
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 import { apiErrorMessage } from '../../../core/api';
 
@@ -70,6 +73,7 @@ interface LookupUser {
   selector: 'app-admin-leads',
   imports: [
     PageHero,
+    StatTile,
     RowMenu,
     FormsModule,
     Modal,
@@ -81,6 +85,7 @@ interface LookupUser {
     PaymentBadge,
     AdminStatusControl,
     LifecycleButton,
+    NotePeek,
     SearchBox,
     Pagination,
     EmptyState,
@@ -105,6 +110,9 @@ export class AdminLeads implements OnInit {
   private readonly liveReload = reloadOnChange(() => this.refresh());
   private readonly leadService = inject(LeadService);
   private readonly userService = inject(UserService);
+  private readonly auth = inject(AuthService);
+  /** Retention Manager browses and annotates; every pipeline action is hidden (and 403s server-side). */
+  readonly readOnly = computed(() => this.auth.role() === 'RETENTION_MANAGER');
   private readonly externalClientService = inject(ExternalClientService);
 
   readonly leads = signal<Lead[]>([]);
@@ -125,7 +133,8 @@ export class AdminLeads implements OnInit {
   readonly editLead = signal<Lead | null>(null);
 
   /** Day shown in the log below — Pacific yyyy-MM-dd, '' for every day. Starts on today. */
-  readonly day = signal(pacificIsoDate());
+  // Retention Manager works charged-back leads whenever they happened, so no day pre-selected.
+  readonly day = signal(this.readOnly() ? '' : pacificIsoDate());
   /** End of a date range (inclusive); '' means just `day`. */
   readonly dayTo = signal('');
 
@@ -291,6 +300,21 @@ export class AdminLeads implements OnInit {
   /** Count per status pill, so the filter row doubles as a breakdown. */
 
   /** Hero headline: the day being viewed, so it never repeats the topbar's page title. */
+  /** Retention Manager's at-a-glance numbers over the loaded (Retention-only) leads. */
+  readonly rmStats = computed(() => {
+    const rows = this.leads();
+    const chargedBack = rows.filter((l) => l.status === 'CHARGED_BACK');
+    return {
+      total: rows.length,
+      chargedBack: chargedBack.length,
+      unworked: chargedBack.filter((l) => !(l._count?.notes ?? 0)).length,
+      // Charged back at some point, since reassigned or re-approved.
+      wonBack: rows.filter(
+        (l) => (l.chargeBacks?.length ?? 0) > 0 && ['ASSIGNED', 'ACCEPTED', 'ASSIGNED_EXTERNAL'].includes(l.status),
+      ).length,
+    };
+  });
+
   readonly heroTitle = computed(() => {
     const iso = this.day();
     if (!iso) return 'Every day, all in one place';
@@ -443,6 +467,7 @@ export class AdminLeads implements OnInit {
   });
 
   async ngOnInit(): Promise<void> {
+    if (this.readOnly()) return this.refresh();
     const [clients, externalClients] = await Promise.all([
       this.userService.listClients(),
       this.externalClientService.list(),

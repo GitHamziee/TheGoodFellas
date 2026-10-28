@@ -17,8 +17,9 @@ export type RoomKey = ChatRoom | `g_${string}`;
  *                   sits in both of their channels (talks to Closer, Junior Closer, and
  *                   Admin there) plus its own channel, labelled "Management" (Team Lead +
  *                   Manager + Admin — see ROOM_LABEL below)
- *   RETENTION     → RETENTION only, labelled "Retention Department" (Retention + Manager
- *                   + Admin — same pattern as TEAM_LEADS)
+ *   RETENTION,
+ *   RETENTION_MANAGER → RETENTION only, labelled "Retention Department" (Retention +
+ *                   Retention Manager + Manager + Admin — same pattern as TEAM_LEADS)
  *   ADMIN         → all four (this is how each group talks to admin)
  *   MANAGER       → all four, same as ADMIN (everything but Clients/Team/External
  *                   Clients/Expenses — chat isn't part of that exclusion)
@@ -34,6 +35,7 @@ export function roomsFor(role: Role): ChatRoom[] {
     case "TEAM_LEAD":
       return ["CLOSERS", "JUNIOR_CLOSERS", "TEAM_LEADS"];
     case "RETENTION":
+    case "RETENTION_MANAGER":
       return ["RETENTION"];
     case "ADMIN":
     case "MANAGER":
@@ -63,6 +65,7 @@ export const GROUP_EXCLUDED_ROLES: readonly Role[] = [
   "QA_JUNIOR_CLOSER",
   "QA_CLOSER",
   "RETENTION",
+  "RETENTION_MANAGER",
 ];
 
 const ALL_ROLES: Role[] = [
@@ -75,6 +78,7 @@ const ALL_ROLES: Role[] = [
   "QA_CLOSER",
   "RETENTION",
   "MANAGER",
+  "RETENTION_MANAGER",
 ];
 
 /** Roles whose built-in rule includes this channel. */

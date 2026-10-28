@@ -42,6 +42,8 @@ import { LeadDetail } from '../../../shared/lead-detail';
 import { RowMenu } from '../../../shared/ui/row-menu';
 import { AdminStatusControl } from '../../../shared/ui/admin-status';
 import { LifecycleButton } from '../../../shared/ui/lifecycle-button';
+import { NotePeek } from '../../../shared/ui/lead-notes';
+import { AuthService } from '../../../core/services/auth.service';
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 import { DayBar, rangeBounds, rangeLabel } from '../../../shared/ui/day-bar';
 import { LeadQuickEdit } from '../../../shared/lead-quick-edit';
@@ -76,6 +78,7 @@ const STATUS_FILTERS = [
     PaymentBadge,
     AdminStatusControl,
     LifecycleButton,
+    NotePeek,
     SearchBox,
     Pagination,
     EmptyState,
@@ -97,6 +100,9 @@ export class AdminCplLeads implements OnInit {
   private readonly liveReload = reloadOnChange(() => this.refresh());
   private readonly leadService = inject(LeadService);
   private readonly userService = inject(UserService);
+  private readonly auth = inject(AuthService);
+  /** Retention Manager browses and annotates; every pipeline action is hidden (and 403s server-side). */
+  readonly readOnly = computed(() => this.auth.role() === 'RETENTION_MANAGER');
   private readonly externalClientService = inject(ExternalClientService);
 
   readonly leads = signal<Lead[]>([]);
@@ -402,6 +408,7 @@ export class AdminCplLeads implements OnInit {
   });
 
   async ngOnInit(): Promise<void> {
+    if (this.readOnly()) return this.refresh();
     const [clients, externalClients] = await Promise.all([
       this.userService.listClients(),
       this.externalClientService.list(),

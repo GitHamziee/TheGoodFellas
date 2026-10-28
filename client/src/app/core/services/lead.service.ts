@@ -8,6 +8,7 @@ import {
   LeadHistoryRow,
   LeadInboxPreview,
   LeadIntakeEdit,
+  LeadNote,
   TeamLeadLeadRow,
 } from '../models/lead.model';
 import { LeadReviewRow, QaCloserLeadRow, QaJuniorLeadRow, ReviewOutcome } from '../models/review.model';
@@ -208,6 +209,25 @@ export class LeadService {
   async cplLeads(): Promise<Lead[]> {
     const res = await firstValueFrom(this.http.get<ApiSuccess<{ leads: Lead[] }>>(`${BASE}/cpl`));
     return res.data.leads;
+  }
+
+  // ─── Retention Manager notes ────────────────────────────────
+  /** Follow-up notes on a lead, newest first. */
+  async leadNotes(id: string): Promise<LeadNote[]> {
+    const res = await firstValueFrom(this.http.get<ApiSuccess<{ notes: LeadNote[] }>>(`${BASE}/${id}/notes`));
+    return res.data.notes;
+  }
+
+  /** Appends a note — never edits an earlier one. */
+  async addLeadNote(id: string, body: string): Promise<LeadNote> {
+    const res = await firstValueFrom(this.http.post<ApiSuccess<{ note: LeadNote }>>(`${BASE}/${id}/notes`, { body }));
+    return res.data.note;
+  }
+
+  /** Retention Manager hands a worked charged-back lead to the admin queue. */
+  async submitToAdmin(id: string): Promise<Lead> {
+    const res = await firstValueFrom(this.http.patch<ApiSuccess<{ lead: Lead }>>(`${BASE}/${id}/submit-to-admin`, {}));
+    return res.data.lead;
   }
 
   /** Every closer's parked drafts — Admin oversight, full detail, view-only. */

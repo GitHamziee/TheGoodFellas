@@ -85,9 +85,9 @@ router.get(
 // Chargeback reporting — PKR amounts stripped for MANAGER inside chargeBackAnalytics.
 router.get(
   '/charge-backs',
-  requireRole('ADMIN', 'MANAGER'),
+  requireRole('ADMIN', 'MANAGER', 'RETENTION_MANAGER'),
   asyncHandler(async (req, res) => {
-    const chargeBacks = await analyticsService.chargeBackAnalytics(req.user!.role as 'ADMIN' | 'MANAGER');
+    const chargeBacks = await analyticsService.chargeBackAnalytics(req.user!.role as 'ADMIN' | 'MANAGER' | 'RETENTION_MANAGER');
     return apiSuccess(res, { chargeBacks });
   })
 );

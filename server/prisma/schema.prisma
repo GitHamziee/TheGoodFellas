@@ -21,6 +21,9 @@ enum Role {
   // Everything an Admin can do except manage Client accounts, Team accounts, External
   // Clients, and Expenses — see nav-config.ts's MANAGER entry for the exact page list.
   MANAGER
+  // Read-only view of every lead (any type, any status, charge-backs included) plus an
+  // append-only stream of follow-up notes per lead — retains leads, never moves them.
+  RETENTION_MANAGER
 }
 
 // Pass/fail verdict on a QA review — see LeadReview and CallReview below. Internal
@@ -229,6 +232,7 @@ model User {
   callbackLeads        Lead[]        @relation("CallbackLeads")
   suggestedClientLeads Lead[]        @relation("SuggestedClientLeads")
   clientChargeBacks    ChargeBack[]  @relation("ClientChargeBacks")
+  leadNotes            LeadNote[]
   chatMessages         ChatMessage[]
   chatReads            ChatRead[]
   chatGroupsCreated    ChatGroup[]       @relation("ChatGroupCreator")
@@ -405,6 +409,7 @@ model Lead {
   incomePayment   IncomePayment?  @relation(fields: [incomePaymentId], references: [id], onDelete: SetNull)
   chargeBacks     ChargeBack[]
   events          LeadEvent[]
+  notes           LeadNote[]
   qaReviews       LeadReview[]
   callReviews     CallReview[]
 
@@ -519,6 +524,22 @@ model LeadEvent {
   createdAt DateTime      @default(now())
 
   lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId, createdAt])
+}
+
+// A Retention Manager's follow-up note on a lead. Append-only on purpose: a lead can collect
+// any number of notes over its life (one now, another two months later) and each keeps its own
+// author and timestamp, so there is no edit/delete — the stream is the record.
+model LeadNote {
+  id        String   @id @default(cuid())
+  leadId    String
+  authorId  String
+  body      String
+  createdAt DateTime @default(now())
+
+  lead   Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
 
   @@index([leadId, createdAt])
 }

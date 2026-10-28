@@ -79,6 +79,8 @@ export class AuthService {
         return '/retention/leads';
       case 'MANAGER':
         return '/manager/dashboard';
+      case 'RETENTION_MANAGER':
+        return '/retention-manager/charge-backs';
     }
   }
 }

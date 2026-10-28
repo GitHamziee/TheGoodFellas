@@ -181,6 +181,15 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
     { label: 'Toolkit', path: '/qa-closer/toolkit', icon: 'toolkit' },
     { label: 'Chat', path: '/qa-closer/chat', icon: 'chat', badge: 'chat' },
   ],
+  // Read-only view of every lead plus per-lead follow-up notes — no pipeline actions.
+  RETENTION_MANAGER: [
+    { label: 'Charge Backs', path: '/retention-manager/charge-backs', icon: 'chargeback' },
+    group('Leads', 'leads', [
+      { label: 'Retention Leads', path: '/retention-manager/leads' },
+      { label: 'Retention History', path: '/retention-manager/retention-history' },
+    ]),
+    { label: 'Team Chat', path: '/retention-manager/chat', icon: 'chat', badge: 'chat' },
+  ],
   RETENTION: [
     { label: 'Dashboard', path: '/retention/dashboard', icon: 'dashboard' },
     { label: 'New Lead', path: '/retention/new-lead', icon: 'send' },
@@ -201,4 +210,5 @@ export const ROLE_LABEL: Record<Role, string> = {
   QA_CLOSER: 'QA — Closer',
   RETENTION: 'Retention',
   MANAGER: 'Manager',
+  RETENTION_MANAGER: 'Retention Manager',
 };

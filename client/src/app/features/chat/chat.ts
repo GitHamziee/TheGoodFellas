@@ -77,6 +77,7 @@ const GROUP_SECTIONS: { role: GroupCandidate['role']; title: string }[] = [
   { role: 'CLOSER', title: 'Closers' },
   { role: 'JUNIOR_CLOSER', title: 'Junior Closers' },
   { role: 'RETENTION', title: 'Retention' },
+  { role: 'RETENTION_MANAGER', title: 'Retention Managers' },
   { role: 'QA_CLOSER', title: 'QA — Closer' },
   { role: 'QA_JUNIOR_CLOSER', title: 'QA — Junior Closer' },
 ];
@@ -85,7 +86,7 @@ const ROOM_MEMBERS: Record<string, string> = {
   CLOSERS: 'All closers + team lead + managers + admin',
   JUNIOR_CLOSERS: 'All junior closers + team lead + managers + admin',
   TEAM_LEADS: 'All team leads + managers + admin',
-  RETENTION: 'All retention + managers + admin',
+  RETENTION: 'All retention + retention managers + managers + admin',
 };
 
 @Component({

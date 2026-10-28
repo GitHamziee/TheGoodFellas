@@ -1300,6 +1300,30 @@ tbody tr.clickable:hover {
   color: var(--text);
 }
 
+/* Customer name + lifecycle "i" button: one inline unit, so the icon never drops to its own
+   line — a long name wraps inside .name-text while the icon stays beside it. */
+.name-info {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  max-width: 100%;
+}
+
+.name-info > app-lifecycle-button {
+  flex: none;
+}
+
+.notes-col {
+  width: 15rem;
+  max-width: 15rem;
+}
+
+.notes-col .cell-sub {
+  display: block;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .cell-sub {
   font-size: 0.75rem;
   color: var(--gray-500);

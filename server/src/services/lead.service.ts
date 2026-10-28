@@ -168,9 +168,68 @@ const TEAM_LEAD_SELECT = {
 // Manager oversees Closer + Retention leads only; Junior-Closer-originated leads belong to
 // Team Lead. The split is by origin: a lead a Junior Closer started always has juniorCloserId
 // set, while a Closer's self-/AI-sourced lead and every Retention lead never does.
-type AdminViewer = 'ADMIN' | 'MANAGER';
-const managerScope = (viewer?: AdminViewer) => (viewer === 'MANAGER' ? { juniorCloserId: null } : {});
-const adminInclude = (viewer?: AdminViewer) => (viewer === 'ADMIN' ? ADMIN_FULL_INCLUDE : FULL_INCLUDE);
+// RETENTION_MANAGER is scoped to RETENTION leads only (never CPA/CPL) and, like MANAGER, gets no
+// PKR amounts — adminInclude only hands those to ADMIN.
+type AdminViewer = 'ADMIN' | 'MANAGER' | 'RETENTION_MANAGER';
+const managerScope = (viewer?: AdminViewer) =>
+  viewer === 'MANAGER'
+    ? { juniorCloserId: null }
+    : viewer === 'RETENTION_MANAGER'
+      ? { leadType: 'RETENTION' as const }
+      : {};
+// Newest note + total count, so the admin-style lists can show "latest note" at a glance.
+// Internal to ADMIN/MANAGER/RETENTION_MANAGER lists only — never part of FULL_INCLUDE, which
+// CLIENT reads use.
+const NOTES_PREVIEW = {
+  notes: {
+    orderBy: { createdAt: 'desc' },
+    take: 1,
+    select: { id: true, body: true, createdAt: true, author: { select: { id: true, name: true } } },
+  },
+  _count: { select: { notes: true } },
+} as const;
+const ADMIN_LIST_INCLUDE = { ...ADMIN_FULL_INCLUDE, ...NOTES_PREVIEW } as const;
+const STAFF_LIST_INCLUDE = { ...FULL_INCLUDE, ...NOTES_PREVIEW } as const;
+const adminInclude = (viewer?: AdminViewer) => (viewer === 'ADMIN' ? ADMIN_LIST_INCLUDE : STAFF_LIST_INCLUDE);
+
+/**
+ * Retention Manager finishes working a charged-back lead and hands it to the admin queue
+ * (CHARGED_BACK → SUBMITTED). Only the Admin assigns it from there.
+ */
+export async function submitChargedBackToAdmin(leadId: string, actorId: string): Promise<ServiceResult<{ lead: unknown }>> {
+  const lead = await prisma.lead.findUnique({ where: { id: leadId } });
+  if (!lead) return { error: 'Lead not found', status: 404 };
+  if (lead.leadType !== 'RETENTION') return { error: 'Not a retention lead', status: 400 };
+  if (lead.status !== 'CHARGED_BACK') return { error: 'Only charged-back leads can be submitted', status: 400 };
+
+  const updated = await prisma.lead.updateMany({
+    where: { id: leadId, status: 'CHARGED_BACK' },
+    data: { status: 'SUBMITTED', adminStatus: null },
+  });
+  if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
+
+  void recordRetentionEvents([leadId], 'SUBMITTED', { actorId });
+  void notifyRoles(ADMIN_TEAM, {
+    kind: 'info',
+    title: 'Charged-back lead worked',
+    message: `${who(lead.customerName)} was worked by the Retention Manager and is ready for you to assign.`,
+    page: 'ADMIN_LEADS',
+  });
+
+  const result = await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE });
+  return { data: { lead: result } };
+}
+
+/** True when the lead exists and is currently CHARGED_BACK. */
+export async function leadIsChargedBack(leadId: string): Promise<boolean> {
+  return (await prisma.lead.count({ where: { id: leadId, status: 'CHARGED_BACK' } })) > 0;
+}
+
+/** True when every given lead is a RETENTION lead — the only kind a RETENTION_MANAGER may touch. */
+export async function leadsAllRetention(leadIds: string[]): Promise<boolean> {
+  const other = await prisma.lead.count({ where: { id: { in: leadIds }, leadType: { not: 'RETENTION' } } });
+  return other === 0;
+}
 
 /** True when every given lead is one a MANAGER may act on (non-existent ids pass; the action 404s). */
 export async function leadsInManagerScope(leadIds: string[]): Promise<boolean> {
@@ -1846,7 +1905,8 @@ type Requester = {
     | 'QA_JUNIOR_CLOSER'
     | 'QA_CLOSER'
     | 'RETENTION'
-    | 'MANAGER';
+    | 'MANAGER'
+    | 'RETENTION_MANAGER';
 };
 
 /** Fetches a lead, scoped to what the requesting role/status combination is allowed to see. */
@@ -1863,7 +1923,9 @@ export async function getLeadById(leadId: string, requester: Requester): Promise
   // (Junior-Closer-originated leads are Team Lead's); the other exclusions on that role
   // (Clients/Team/External Clients/Expenses) are page-level, not lead-detail masking.
   if (requester.role === 'MANAGER' && lead.juniorCloserId) return { error: 'Forbidden', status: 403 };
-  if (requester.role === 'ADMIN' || requester.role === 'MANAGER') {
+  if (requester.role === 'RETENTION_MANAGER' && lead.leadType !== 'RETENTION') return { error: 'Forbidden', status: 403 };
+  // RETENTION_MANAGER: full unmasked view of any lead (PKR already omitted by FULL_INCLUDE).
+  if (requester.role === 'ADMIN' || requester.role === 'MANAGER' || requester.role === 'RETENTION_MANAGER') {
     return { data: { lead } };
   }
 

@@ -75,6 +75,15 @@ export interface ChargeBack {
 }
 
 /** Full lead record — admin, active-inbox closer, or client after acceptance. */
+/** One Retention Manager follow-up note on a lead. */
+export interface LeadNote {
+  id: string;
+  leadId?: string;
+  body: string;
+  createdAt: string;
+  author: { id: string; name: string };
+}
+
 export interface Lead {
   id: string;
   /** Null when a Closer created the lead from scratch (self- or AI-sourced calls). */
@@ -189,6 +198,9 @@ export interface Lead {
   suggestedClient?: LeadParty | null;
   /** Full chargeback history, newest first. Empty unless the lead has ever been charged back. */
   chargeBacks: ChargeBack[];
+  /** Newest note + total count on admin-style lists (ADMIN/MANAGER/RETENTION_MANAGER only). */
+  notes?: LeadNote[];
+  _count?: { notes: number };
 }
 
 /** Masked row for Junior Closer / Closer history views — Name + status + date only, per

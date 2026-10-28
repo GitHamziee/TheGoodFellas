@@ -34,6 +34,7 @@ const ROLE_TONE: Record<Role, string> = {
   QA_CLOSER: 'tone-neutral',
   RETENTION: 'tone-a',
   MANAGER: 'tone-gold',
+  RETENTION_MANAGER: 'tone-gold',
 };
 
 /** Admin's roster of CLIENT accounts — pricing, licensed states, and carrier availability

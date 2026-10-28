@@ -9,7 +9,8 @@ export type Role =
   | 'QA_JUNIOR_CLOSER'
   | 'QA_CLOSER'
   | 'RETENTION'
-  | 'MANAGER';
+  | 'MANAGER'
+  | 'RETENTION_MANAGER';
 
 /** Which of a client's roster carriers (AppUser.carriers) apply in one licensed state. */
 export interface StateCarriers {

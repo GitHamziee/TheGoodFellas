@@ -6,6 +6,7 @@ import { authenticate, requireRole } from '../middleware/auth';
 import * as leadService from '../services/lead.service';
 import * as sheetSync from '../services/retention-sheet-sync.service';
 import * as retentionHistory from '../services/retention-history.service';
+import * as leadNotes from '../services/lead-note.service';
 
 const router = Router();
 
@@ -23,7 +24,7 @@ router.post(
 
 router.use(authenticate);
 
-// A MANAGER may only act on Closer/Retention leads — Junior-Closer-originated leads are Team
+// A RETENTION_MANAGER is limited to RETENTION leads (see below). A MANAGER may only act on Closer/Retention leads — Junior-Closer-originated leads are Team
 // Lead's. Two hooks between them cover every mutation: router.param for any route with an
 // :id segment (req.params is only populated once a route has matched, so a plain
 // router.use can't see it), and the body check for batch routes that take leadIds.
@@ -33,6 +34,14 @@ async function rejectOutOfManagerScope(
   next: NextFunction,
   ids: string[]
 ): Promise<void> {
+  // RETENTION_MANAGER sees only RETENTION leads — checked for reads too (detail, notes, lifecycle).
+  if (req.user!.role === 'RETENTION_MANAGER' && ids.length > 0) {
+    if (!(await leadService.leadsAllRetention(ids))) {
+      apiError(res, 'Forbidden', 403);
+      return;
+    }
+    return next();
+  }
   if (req.user!.role !== 'MANAGER' || req.method === 'GET' || ids.length === 0) return next();
   if (!(await leadService.leadsInManagerScope(ids))) {
     apiError(res, 'Forbidden', 403);
@@ -191,27 +200,27 @@ router.post(
 // ─── Admin ──────────────────────────────────────────────────────
 router.get(
   '/queue',
-  requireRole('ADMIN', 'MANAGER'),
+  requireRole('ADMIN', 'MANAGER', 'RETENTION_MANAGER'),
   asyncHandler(async (req, res) => {
-    const leads = await leadService.listQueueForAdmin(req.user!.role as 'ADMIN' | 'MANAGER');
+    const leads = await leadService.listQueueForAdmin(req.user!.role as 'ADMIN' | 'MANAGER' | 'RETENTION_MANAGER');
     return apiSuccess(res, { leads });
   })
 );
 
 router.get(
   '/all',
-  requireRole('ADMIN', 'MANAGER'),
+  requireRole('ADMIN', 'MANAGER', 'RETENTION_MANAGER'),
   asyncHandler(async (req, res) => {
-    const leads = await leadService.listAllLeadsForAdmin(req.user!.role as 'ADMIN' | 'MANAGER');
+    const leads = await leadService.listAllLeadsForAdmin(req.user!.role as 'ADMIN' | 'MANAGER' | 'RETENTION_MANAGER');
     return apiSuccess(res, { leads });
   })
 );
 
 router.get(
   '/charge-backs',
-  requireRole('ADMIN', 'MANAGER'),
+  requireRole('ADMIN', 'MANAGER', 'RETENTION_MANAGER'),
   asyncHandler(async (req, res) => {
-    const leads = await leadService.listChargeBacksForAdmin(req.user!.role as 'ADMIN' | 'MANAGER');
+    const leads = await leadService.listChargeBacksForAdmin(req.user!.role as 'ADMIN' | 'MANAGER' | 'RETENTION_MANAGER');
     return apiSuccess(res, { leads });
   })
 );
@@ -220,7 +229,7 @@ router.get(
   '/cpl',
   requireRole('ADMIN', 'MANAGER'),
   asyncHandler(async (req, res) => {
-    const leads = await leadService.listCplLeadsForAdmin(req.user!.role as 'ADMIN' | 'MANAGER');
+    const leads = await leadService.listCplLeadsForAdmin(req.user!.role as 'ADMIN' | 'MANAGER' | 'RETENTION_MANAGER');
     return apiSuccess(res, { leads });
   })
 );
@@ -228,10 +237,28 @@ router.get(
 // Distinct path from the Closer-only '/drafts' above — same router, different role.
 router.get(
   '/admin/drafts',
-  requireRole('ADMIN', 'MANAGER'),
+  requireRole('ADMIN', 'MANAGER', 'RETENTION_MANAGER'),
   asyncHandler(async (req, res) => {
-    const leads = await leadService.listDraftsForAdmin(req.user!.role as 'ADMIN' | 'MANAGER');
+    const leads = await leadService.listDraftsForAdmin(req.user!.role as 'ADMIN' | 'MANAGER' | 'RETENTION_MANAGER');
     return apiSuccess(res, { leads });
+  })
+);
+
+// A RETENTION_MANAGER works only charged-back leads: edit them, then submit them to the admin
+// queue. Assigning is Admin's alone. Everything else on the lead stays closed to the role.
+const chargedBackOnlyForRetentionManager = asyncHandler(async (req, res, next) => {
+  if (req.user!.role === 'RETENTION_MANAGER' && !(await leadService.leadIsChargedBack(req.params.id))) {
+    return apiError(res, 'Only charged-back leads can be worked', 403);
+  }
+  next();
+});
+
+router.patch(
+  '/:id/submit-to-admin',
+  requireRole('RETENTION_MANAGER'),
+  asyncHandler(async (req, res) => {
+    const result = await leadService.submitChargedBackToAdmin(req.params.id, req.user!.id);
+    return sendResult(res, result, 'Lead sent to admin');
   })
 );
 
@@ -338,7 +365,8 @@ router.patch(
 
 router.patch(
   '/:id',
-  requireRole('ADMIN', 'MANAGER'),
+  requireRole('ADMIN', 'MANAGER', 'RETENTION_MANAGER'),
+  chargedBackOnlyForRetentionManager,
   asyncHandler(async (req, res) => {
     const result = await leadService.editLead(req.params.id, req.body ?? {});
     return sendResult(res, result, 'Lead updated');
@@ -368,7 +396,7 @@ router.get(
 // PKR figures. (Not '/retention/history': that path is the Retention role's own history page.)
 router.get(
   '/retention/lifecycle',
-  requireRole('ADMIN', 'MANAGER'),
+  requireRole('ADMIN', 'MANAGER', 'RETENTION_MANAGER'),
   asyncHandler(async (_req, res) => {
     const leads = await retentionHistory.listRetentionHistory();
     return apiSuccess(res, { leads });
@@ -377,7 +405,7 @@ router.get(
 
 router.get(
   '/retention/lifecycle/:id',
-  requireRole('ADMIN', 'MANAGER'),
+  requireRole('ADMIN', 'MANAGER', 'RETENTION_MANAGER'),
   asyncHandler(async (req, res) => {
     const result = await retentionHistory.getRetentionHistory(req.params.id);
     return sendResult(res, result);
@@ -388,7 +416,7 @@ router.get(
 // enforced by router.param('id').
 router.get(
   '/:id/lifecycle',
-  requireRole('ADMIN', 'MANAGER'),
+  requireRole('ADMIN', 'MANAGER', 'RETENTION_MANAGER'),
   asyncHandler(async (req, res) => {
     const result = await retentionHistory.getLeadLifecycle(req.params.id);
     return sendResult(res, result);
@@ -618,6 +646,27 @@ router.patch(
 );
 
 // ─── Shared — any authenticated role, ownership + masking enforced in service layer ──
+// ─── Retention Manager notes ────────────────────────────────────
+// Append-only follow-up notes on any lead. ADMIN/MANAGER can read them; only RETENTION_MANAGER
+// writes. Manager scope (router.param) only gates non-GET, so reads stay open to MANAGER.
+router.get(
+  '/:id/notes',
+  requireRole('RETENTION_MANAGER', 'ADMIN', 'MANAGER'),
+  asyncHandler(async (req, res) => {
+    const result = await leadNotes.listNotes(req.params.id);
+    return sendResult(res, result);
+  })
+);
+
+router.post(
+  '/:id/notes',
+  requireRole('RETENTION_MANAGER'),
+  asyncHandler(async (req, res) => {
+    const result = await leadNotes.addNote(req.params.id, req.user!.id, req.body?.body);
+    return sendResult(res, result, 'Note added', 201);
+  })
+);
+
 router.get(
   '/:id',
   asyncHandler(async (req, res) => {

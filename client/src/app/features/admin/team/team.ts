@@ -32,6 +32,7 @@ const ROLE_TONE: Record<Role, string> = {
   QA_CLOSER: 'tone-neutral',
   RETENTION: 'tone-a',
   MANAGER: 'tone-gold',
+  RETENTION_MANAGER: 'tone-gold',
 };
 
 /** Internal staff roster — Junior Closer, Closer, Team Lead, and Admin accounts. Client
@@ -81,7 +82,7 @@ export class AdminTeam implements OnInit {
 
   /** The internal-staff roles this page manages — CLIENT is deliberately excluded, it lives
    * on the Clients page. */
-  readonly roles: Role[] = ['JUNIOR_CLOSER', 'CLOSER', 'TEAM_LEAD', 'RETENTION', 'QA_JUNIOR_CLOSER', 'QA_CLOSER', 'MANAGER', 'ADMIN'];
+  readonly roles: Role[] = ['JUNIOR_CLOSER', 'CLOSER', 'TEAM_LEAD', 'RETENTION', 'QA_JUNIOR_CLOSER', 'QA_CLOSER', 'MANAGER', 'RETENTION_MANAGER', 'ADMIN'];
   readonly roleLabel = ROLE_LABEL;
   readonly roleTone = ROLE_TONE;
   readonly roleOptions = this.roles.map((r) => ({ value: r, label: ROLE_LABEL[r] }));
@@ -97,6 +98,7 @@ export class AdminTeam implements OnInit {
     { label: 'QA — Junior Closer', value: 'QA_JUNIOR_CLOSER' },
     { label: 'QA — Closer', value: 'QA_CLOSER' },
     { label: 'Managers', value: 'MANAGER' },
+    { label: 'Retention Managers', value: 'RETENTION_MANAGER' },
     { label: 'Admins', value: 'ADMIN' },
   ];
 

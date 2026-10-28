@@ -17,7 +17,7 @@
     <div class="success"><svg lucideCircleCheck></svg>{{ notice() }}</div>
   }
 
-  @if (selectedCount() > 0) {
+  @if (!readOnly() && selectedCount() > 0) {
     <div class="batch-bar">
       <span><strong>{{ selectedCount() }}</strong> lead{{ selectedCount() === 1 ? '' : 's' }} selected</span>
       <div class="row-actions">
@@ -69,8 +69,7 @@
                 <tr class="clickable" (click)="detailLead.set(lead)">
                   <td>
                     <div class="cell-main">
-                      {{ lead.customerName }}
-                    <app-lifecycle-button [leadId]="lead.id" [name]="lead.customerName" />
+                      <span class="name-info"><span class="name-text">{{ lead.customerName }}</span><app-lifecycle-button [leadId]="lead.id" [name]="lead.customerName" /></span>
                       @if (lead.dCode) {
                         <span class="chip">{{ lead.dCode }}</span>
                       }
@@ -117,7 +116,7 @@
   }
 
   <!-- Needs action: every lead waiting on the admin, oldest first, whatever day it came in -->
-  @if (!loading() && pendingLeads().length > 0) {
+  @if (!readOnly() && !loading() && pendingLeads().length > 0) {
     <div class="card card--flush pending-card">
       <div class="card-head">
         <h2>Needs your action</h2>
@@ -130,7 +129,7 @@
               <th>Customer</th>
               <th class="hide-sm">Junior closer</th>
               <th>Status</th>
-              <th class="hide-md">Reason / notes</th>
+              <th class="hide-md notes-col">Reason / notes</th>
               <th>
                 <button type="button" class="btn btn--sm btn--ghost" (click)="pendingNewestFirst.set(!pendingNewestFirst())" title="Click to flip the order">
                   Waiting {{ pendingNewestFirst() ? '↑ newest first' : '↓ oldest first' }}
@@ -144,8 +143,7 @@
               <tr class="clickable" (click)="detailLead.set(lead)">
                 <td>
                   <div class="cell-main">
-                    {{ lead.customerName }}
-                    <app-lifecycle-button [leadId]="lead.id" [name]="lead.customerName" />
+                    <span class="name-info"><span class="name-text">{{ lead.customerName }}</span><app-lifecycle-button [leadId]="lead.id" [name]="lead.customerName" /></span>
                     @if (lead.dCode) {
                       <span class="chip">{{ lead.dCode }}</span>
                     }
@@ -173,7 +171,7 @@
                     }
                   </div>
                 </td>
-                <td class="hide-md">
+                <td class="hide-md notes-col">
                   @if (lead.status === 'REJECTED' && lead.rejectionReason) {
                     <span class="cell-sub">{{ lead.rejectionReason }}</span>
                   } @else if (lead.closerNotes) {
@@ -270,7 +268,8 @@
         <table class="log-table">
           <thead>
             <tr>
-              <th class="checkbox-col">
+              @if (!readOnly()) {
+                <th class="checkbox-col">
                 <input
                   type="checkbox"
                   [checked]="allVisibleEligibleSelected()"
@@ -278,6 +277,7 @@
                   aria-label="Select all eligible leads on this page"
                 />
               </th>
+              }
               <th class="sortable" (click)="view.toggleSort('customerName')">
                 Customer <span class="arrow">{{ sortArrow('customerName') }}</span>
               </th>
@@ -294,7 +294,8 @@
           <tbody>
             @for (lead of view.rows(); track lead.id) {
               <tr class="clickable" [attr.data-status]="lead.status" (click)="detailLead.set(lead)">
-                <td class="checkbox-col" (click)="$event.stopPropagation()">
+                @if (!readOnly()) {
+                  <td class="checkbox-col" (click)="$event.stopPropagation()">
                   <input
                     type="checkbox"
                     [checked]="isSelected(lead)"
@@ -303,10 +304,11 @@
                     [attr.aria-label]="'Select ' + lead.customerName"
                   />
                 </td>
+                }
                 <td>
-                  <div class="cell-main">{{ lead.customerName }}
-                    <app-lifecycle-button [leadId]="lead.id" [name]="lead.customerName" /></div>
+                  <div class="cell-main"><span class="name-info"><span class="name-text">{{ lead.customerName }}</span><app-lifecycle-button [leadId]="lead.id" [name]="lead.customerName" /></span></div>
                   <div class="cell-sub">{{ formatPhone(lead.phone) }} · {{ lead.state }}</div>
+                  <app-note-peek [leadId]="lead.id" [name]="lead.customerName" [notes]="lead.notes" [count]="lead._count?.notes" />
                 </td>
                 <td class="hide-sm">
                   @if (lead.dCode) {
@@ -369,6 +371,7 @@
 @if (detailLead(); as lead) {
   <app-modal title="Lead details" [subtitle]="lead.customerName" [wide]="true" (close)="detailLead.set(null)">
     <app-lead-detail [lead]="lead" [unmasked]="true" />
+    @if (!readOnly()) {
     <div footer>
       @if (lead.status === 'SUBMITTED' || lead.status === 'REJECTED') {
         @if (lead.status === 'REJECTED') {
@@ -409,6 +412,7 @@
         }
       }
     </div>
+    }
   </app-modal>
 }
 
