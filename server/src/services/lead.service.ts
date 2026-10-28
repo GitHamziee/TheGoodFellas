@@ -1617,7 +1617,7 @@ export async function expireRetentionCallbacks(): Promise<number> {
 export async function listRetentionHistory(requesterId: string) {
   const leads = await prisma.lead.findMany({
     where: { leadType: 'RETENTION', retentionId: requesterId, status: { notIn: ['NEW', 'DRAFT'] } },
-    select: { ...RETENTION_HISTORY_SELECT, chargeBacks: { select: { createdAt: true, chargeMonth: true }, orderBy: { createdAt: 'desc' } } },
+    select: { ...RETENTION_HISTORY_SELECT, paymentStatus: true, chargeBacks: { select: { createdAt: true, chargeMonth: true }, orderBy: { createdAt: 'desc' } } },
     orderBy: { updatedAt: 'desc' },
   });
 
@@ -1637,7 +1637,7 @@ export async function listRetentionHistory(requesterId: string) {
     for (const e of events) priorStatus.set(e.leadId, statusOfEvent[e.type as keyof typeof statusOfEvent]);
   }
 
-  return leads.map(({ chargeBacks, ...l }) => ({
+  return leads.map(({ chargeBacks, paymentStatus, ...l }) => ({
     ...l,
     // A charged-back lead was PAID, so ACCEPTED is the fallback for leads that predate LeadEvent.
     status: l.status === 'CHARGED_BACK' ? (priorStatus.get(l.id) ?? 'ACCEPTED') : l.status,
@@ -1646,8 +1646,9 @@ export async function listRetentionHistory(requesterId: string) {
     heldByManager: l.status === 'CHARGED_BACK',
     // Only a lead whose latest charge-back was a 1st draft is theirs; if the latest one hit a
     // later draft the lead now belongs to the manager, so none of its charge-backs show here
-    // (chargeBacks is newest-first).
-    chargeBacks: chargeBacks[0]?.chargeMonth === 1 ? chargeBacks.filter((c) => c.chargeMonth === 1).map((c) => ({ createdAt: c.createdAt })) : [],
+    // (chargeBacks is newest-first). A charge-back resets paymentStatus to UNPAID, so PAID again
+    // means the admin re-approved and re-collected: the charge-back is settled and drops off.
+    chargeBacks: paymentStatus !== 'PAID' && chargeBacks[0]?.chargeMonth === 1 ? chargeBacks.filter((c) => c.chargeMonth === 1).map((c) => ({ createdAt: c.createdAt })) : [],
   }));
 }
 
