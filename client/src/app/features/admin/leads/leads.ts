@@ -54,6 +54,7 @@ const STATUS_FILTERS: { label: string; value: string }[] = [
   { label: 'New', value: 'NEW' },
   { label: 'Assigned', value: 'ASSIGNED' },
   { label: 'Approved', value: 'ACCEPTED' },
+  { label: 'Declined', value: 'REJECTED' },
   { label: 'Sent back', value: 'RETURNED_TO_RETENTION' },
   { label: 'Assigned (External)', value: 'ASSIGNED_EXTERNAL' },
   { label: 'Charged Back', value: 'CHARGED_BACK' },
@@ -284,7 +285,10 @@ export class AdminLeads implements OnInit {
    * Manager has no queue card, so his log keeps every Retention lead. */
   private readonly logged = computed(() =>
     this.byCloser().filter((l) =>
-      this.readOnly() ? true : l.status === 'ASSIGNED' || l.status === 'ACCEPTED' || l.status === 'ASSIGNED_EXTERNAL',
+      this.readOnly() ? true : l.status === 'ASSIGNED' ||
+        l.status === 'ACCEPTED' ||
+        l.status === 'ASSIGNED_EXTERNAL' ||
+        l.status === 'CHARGED_BACK',
     ),
   );
 
