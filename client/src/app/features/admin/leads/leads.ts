@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import { Router } from '@angular/router';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -69,9 +70,13 @@ interface LookupUser {
   email: string;
 }
 
+/** The stat tiles that act as filters when clicked. */
+type TileKey = 'logged' | 'todo' | 'chargedBack' | 'approved' | 'unpaid';
+
 @Component({
   selector: 'app-admin-leads',
   imports: [
+    NgTemplateOutlet,
     RowMenu,
     FormsModule,
     Modal,
@@ -238,13 +243,13 @@ export class AdminLeads implements OnInit {
     l.retention?.name,
   ];
 
-  /** Order of the "Needs your action" queue. Default puts charge-backs (money already clawed
-   * back) on top, then the longest-waiting leads. */
-  readonly pendingSort = signal<'priority' | 'oldest' | 'newest'>('priority');
+  /** Order of the "Needs your action" queue. Default is newest submission on top; "Chargebacks
+   * first" pins charge-backs (money already clawed back) above the rest. */
+  readonly pendingSort = signal<'priority' | 'oldest' | 'newest'>('newest');
   readonly pendingSortOptions = [
+    { value: 'newest', label: 'Sort: Newest first' },
     { value: 'priority', label: 'Sort: Chargebacks first' },
     { value: 'oldest', label: 'Sort: Longest waiting' },
-    { value: 'newest', label: 'Sort: Newest first' },
   ];
 
   /** The queue's own CPA / Retention filter — independent of the log's filters below. */
@@ -316,6 +321,22 @@ export class AdminLeads implements OnInit {
 
   readonly loggedTotal = computed(() => this.logged().length);
 
+  /** Set by the Charged back / Unpaid tiles. Tile counts read the unfiltered lists, so these
+   * narrow only what the tables show. */
+  readonly chargedBackOnly = signal(false);
+  readonly unpaidOnly = signal(false);
+
+  private readonly historySource = computed(() => {
+    const rows = this.byDay();
+    return this.unpaidOnly() ? rows.filter((l) => this.isEligibleForBatchPaid(l)) : rows;
+  });
+
+  /** The To do rows on screen: the queue, narrowed to charge-backs when that tile is selected. */
+  readonly shownPending = computed(() => {
+    const rows = this.pendingLeads();
+    return this.chargedBackOnly() ? rows.filter((l) => l.status === 'CHARGED_BACK') : rows;
+  });
+
   /** Lead count per Pacific day, for the day tabs. */
   readonly dayCounts = computed(() => {
     const counts: Record<string, number> = {};
@@ -327,7 +348,7 @@ export class AdminLeads implements OnInit {
   });
 
   readonly view = createListView<Lead>({
-    source: this.byDay,
+    source: this.historySource,
     searchFields: this.searchFields,
     statusOf: (l) => l.status,
     sorters: {
@@ -393,7 +414,7 @@ export class AdminLeads implements OnInit {
   });
 
   /** The tile row under the title — one number per question the admin asks of the period. */
-  readonly tiles = computed<{ label: string; value: number; sub: string; tone: '' | 'bad' | 'good' | 'warn' }[]>(() => {
+  readonly tiles = computed<{ key?: TileKey; label: string; value: number; sub: string; tone: '' | 'bad' | 'good' | 'warn' }[]>(() => {
     if (this.readOnly()) {
       const r = this.rmStats();
       return [
@@ -412,11 +433,11 @@ export class AdminLeads implements OnInit {
     const prev = this.singleDay() ? (this.dayCounts()[shiftIsoDay(iso, -1)] ?? 0) : null;
     const prevLabel = iso === pacificIsoDate() ? 'yesterday' : 'the day before';
     return [
-      { label: this.periodLabel(), value: s.total, sub: prev === null ? 'in this period' : `${prev} ${prevLabel}`, tone: '' },
-      { label: 'Needs action', value: pending.length, sub: stale ? `${stale} waiting 5+ days` : 'none waiting long', tone: stale ? 'warn' : '' },
-      { label: 'Charged back', value: chargedBack.length, sub: chargedToday ? `${chargedToday} today` : 'waiting for a client', tone: chargedBack.length ? 'bad' : '' },
-      { label: 'Approved', value: s.accepted, sub: `with client: ${s.withClients}`, tone: 'good' },
-      { label: 'Unpaid', value: s.unpaid, sub: s.unpaid ? 'to collect' : 'all settled', tone: s.unpaid ? 'warn' : '' },
+      { key: 'logged', label: this.periodLabel(), value: s.total, sub: prev === null ? 'in this period' : `${prev} ${prevLabel}`, tone: '' },
+      { key: 'todo', label: 'Needs action', value: pending.length, sub: stale ? `${stale} waiting 5+ days` : 'none waiting long', tone: stale ? 'warn' : '' },
+      { key: 'chargedBack', label: 'Charged back', value: chargedBack.length, sub: chargedToday ? `${chargedToday} today` : 'waiting for a client', tone: chargedBack.length ? 'bad' : '' },
+      { key: 'approved', label: 'Approved', value: s.accepted, sub: `with client: ${s.withClients}`, tone: 'good' },
+      { key: 'unpaid', label: 'Unpaid', value: s.unpaid, sub: s.unpaid ? 'to collect' : 'all settled', tone: s.unpaid ? 'warn' : '' },
     ];
   });
 
@@ -441,6 +462,43 @@ export class AdminLeads implements OnInit {
 
   /** Which list is on screen: the assign queue or the history of leads with a client. */
   readonly tab = signal<'todo' | 'history'>('todo');
+
+  /** Stat tile currently acting as a filter. Cleared whenever the admin switches tab or touches
+   * the status dropdown, so a highlighted tile always matches what the list shows. */
+  readonly activeTile = signal<TileKey | null>(null);
+
+  setTab(tab: 'todo' | 'history'): void {
+    this.tab.set(tab);
+    this.resetTileFilters();
+  }
+
+  setStatusFilter(status: string): void {
+    this.view.setStatus(status);
+    this.resetTileFilters();
+  }
+
+  private resetTileFilters(): void {
+    this.activeTile.set(null);
+    this.chargedBackOnly.set(false);
+    this.unpaidOnly.set(false);
+  }
+
+  /** Click a tile to show just those leads; click it again to clear. */
+  selectTile(key: TileKey): void {
+    if (this.activeTile() === key) {
+      this.resetTileFilters();
+      this.view.setStatus('');
+      return;
+    }
+    this.resetTileFilters();
+    this.activeTile.set(key);
+    this.view.setStatus(key === 'approved' ? 'ACCEPTED' : '');
+    this.view.page.set(1);
+    if (key === 'todo' || key === 'chargedBack') this.tab.set('todo');
+    else this.tab.set('history');
+    if (key === 'chargedBack') this.chargedBackOnly.set(true);
+    if (key === 'unpaid') this.unpaidOnly.set(true);
+  }
 
   /** Whole days a lead has been waiting on the admin. */
   waitDays(lead: Lead): number {

@@ -215,12 +215,12 @@ export class AdminCplLeads implements OnInit {
     return { '': all.length, SUBMITTED: n('SUBMITTED'), REJECTED: n('REJECTED'), CHARGED_BACK: n('CHARGED_BACK') };
   });
 
-  /** Default puts charge-backs (money already clawed back) on top, then the longest-waiting. */
-  readonly pendingSort = signal<'priority' | 'oldest' | 'newest'>('priority');
+  /** Default is newest submission on top; "Chargebacks first" pins charge-backs above the rest. */
+  readonly pendingSort = signal<'priority' | 'oldest' | 'newest'>('newest');
   readonly pendingSortOptions = [
+    { value: 'newest', label: 'Sort: Newest first' },
     { value: 'priority', label: 'Sort: Chargebacks first' },
     { value: 'oldest', label: 'Sort: Longest waiting' },
-    { value: 'newest', label: 'Sort: Newest first' },
   ];
 
   readonly pendingLeads = computed(() => {

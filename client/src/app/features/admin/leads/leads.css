@@ -43,6 +43,20 @@
   border-radius: var(--radius-xl);
   background: var(--surface);
 }
+.lp-tile--btn {
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+.lp-tile--btn:hover { border-color: var(--gray-400); }
+.lp-tile--active,
+.lp-tile--active:hover {
+  border-color: var(--ink-900);
+  box-shadow: 0 0 0 1px var(--ink-900);
+  background: var(--gray-50);
+}
 .lp-tile__label { font-size: 0.82rem; color: var(--gray-500); font-weight: 500; }
 .lp-tile__row { display: flex; align-items: baseline; gap: 0.5rem; min-width: 0; }
 .lp-tile__value {

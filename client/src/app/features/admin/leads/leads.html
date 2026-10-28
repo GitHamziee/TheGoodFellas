@@ -9,14 +9,29 @@
 
   <div class="lp-tiles" [class.lp-tiles--four]="tiles().length === 4">
     @for (t of tiles(); track t.label) {
-      <div class="lp-tile">
-        <span class="lp-tile__label">{{ t.label }}</span>
-        <span class="lp-tile__row">
-          <span class="lp-tile__value" [attr.data-tone]="t.tone">{{ loading() ? '–' : t.value }}</span>
-          <span class="lp-tile__sub">{{ t.sub }}</span>
-        </span>
-      </div>
+      @if (t.key; as key) {
+        <button
+          type="button"
+          class="lp-tile lp-tile--btn"
+          [class.lp-tile--active]="activeTile() === key"
+          [attr.aria-pressed]="activeTile() === key"
+          (click)="selectTile(key)"
+        >
+          <ng-container *ngTemplateOutlet="tileBody; context: { $implicit: t }" />
+        </button>
+      } @else {
+        <div class="lp-tile">
+          <ng-container *ngTemplateOutlet="tileBody; context: { $implicit: t }" />
+        </div>
+      }
     }
+    <ng-template #tileBody let-t>
+      <span class="lp-tile__label">{{ t.label }}</span>
+      <span class="lp-tile__row">
+        <span class="lp-tile__value" [attr.data-tone]="t.tone">{{ loading() ? '–' : t.value }}</span>
+        <span class="lp-tile__sub">{{ t.sub }}</span>
+      </span>
+    </ng-template>
   </div>
 
   @if (error() && !batchModalOpen() && !chargeBackModalOpen()) {
@@ -52,10 +67,10 @@
        One list at a time. The Retention Manager has no queue, so no tabs. -->
   @if (!readOnly()) {
     <div class="lp-tabs" role="tablist">
-      <button type="button" role="tab" [attr.aria-selected]="tab() === 'todo'" (click)="tab.set('todo')">
+      <button type="button" role="tab" [attr.aria-selected]="tab() === 'todo'" (click)="setTab('todo')">
         To do <span class="lp-tabs__n">{{ pendingLeads().length }}</span>
       </button>
-      <button type="button" role="tab" [attr.aria-selected]="tab() === 'history'" (click)="tab.set('history')">
+      <button type="button" role="tab" [attr.aria-selected]="tab() === 'history'" (click)="setTab('history')">
         History <span class="lp-tabs__n">{{ view.total() }}</span>
       </button>
     </div>
@@ -100,7 +115,7 @@
             </tr>
           </thead>
           <tbody>
-            @for (lead of pendingLeads(); track lead.id) {
+            @for (lead of shownPending(); track lead.id) {
               <tr class="clickable" [id]="'hl-' + lead.id" [class.row-highlight]="lead.id === linkHighlightId()" (click)="selected.set(lead)">
                 <td>
                   <div class="lp-name">
@@ -161,7 +176,7 @@
           </tbody>
         </table>
       </div>
-      @if (!loading() && pendingLeads().length === 0) {
+      @if (!loading() && shownPending().length === 0) {
         <app-empty-state [title]="pendingSearch().trim() || pendingSource() ? 'No leads match' : 'Nothing waiting to be assigned'">
           <svg lucideFileText></svg>
         </app-empty-state>
@@ -199,7 +214,7 @@
       <app-select
         [options]="statusOptions()"
         [ngModel]="view.status()"
-        (ngModelChange)="view.setStatus($event)"
+        (ngModelChange)="setStatusFilter($event)"
         ariaLabel="Filter by status"
       />
       @if (hasFilters()) {
