@@ -200,6 +200,8 @@ export interface Lead {
   suggestedClient?: LeadParty | null;
   /** Full chargeback history, newest first. Empty unless the lead has ever been charged back. */
   chargeBacks: ChargeBack[];
+  /** Retention history only: charged back on a later draft, so `status` is the restored outcome. */
+  heldByManager?: boolean;
   /** Newest note + total count on admin-style lists (ADMIN/MANAGER/RETENTION_MANAGER only). */
   notes?: LeadNote[];
   _count?: { notes: number };

@@ -1641,6 +1641,9 @@ export async function listRetentionHistory(requesterId: string) {
     ...l,
     // A charged-back lead was PAID, so ACCEPTED is the fallback for leads that predate LeadEvent.
     status: l.status === 'CHARGED_BACK' ? (priorStatus.get(l.id) ?? 'ACCEPTED') : l.status,
+    // Charge-back charged to someone else: the tracking label was cleared, so the page needs
+    // to show the restored outcome as a badge of its own.
+    heldByManager: l.status === 'CHARGED_BACK',
     chargeBacks: chargeBacks.filter((c) => c.chargeMonth === 1).map((c) => ({ createdAt: c.createdAt })),
   }));
 }

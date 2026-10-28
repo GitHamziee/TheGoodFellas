@@ -101,7 +101,7 @@
                   }
                 </td>
                 <td class="hide-md">{{ lead.client?.name || '—' }}</td>
-                <td><app-status-badge [status]="lead.status" hideDecided /><app-admin-status-badge [status]="lead.adminStatus" /></td>
+                <td><app-status-badge [status]="lead.status" [hideDecided]="!lead.heldByManager" /><app-admin-status-badge [status]="lead.adminStatus" /></td>
                 <td class="right hide-sm">
                   <span class="chip"><svg lucideClock></svg>{{ timeAgo(chargeBacksOnly() ? lead.chargeBacks[0].createdAt : lead.updatedAt) }}</span>
                 </td>
