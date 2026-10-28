@@ -56,9 +56,6 @@
   @if (error() && !showCreate()) {
     <div class="error">{{ error() }}</div>
   }
-  @if (notice()) {
-    <div class="success"><svg lucideCircleCheck></svg>{{ notice() }}</div>
-  }
 
   @if (loading()) {
     <div class="card"><app-skeleton-rows [count]="5" /></div>

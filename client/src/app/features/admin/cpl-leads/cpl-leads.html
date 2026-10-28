@@ -1,20 +1,26 @@
-<div class="page">
-  <app-page-hero
-    eyebrow="Live transfers"
-    [title]="heroTitle()"
-    [sub]="heroSub()"
-    [tone]="pendingLeads().length ? 'teal' : 'green'"
-    [count]="loading() ? '–' : summary().total"
-    [countLabel]="singleDay() ? 'logged this day' : 'leads logged'"
-  >
-    <svg lucideTag></svg>
-  </app-page-hero>
+<div class="page lp">
+  <header class="lp-head">
+    <div>
+      <div class="lp-eyebrow">CPL</div>
+      <h1 class="lp-title">{{ periodTitle() }}</h1>
+    </div>
+    <app-day-bar compact [(day)]="day" [(dayTo)]="dayTo" [counts]="dayCounts()" [total]="loggedTotal()" [span]="2" />
+  </header>
+
+  <div class="lp-tiles">
+    @for (t of tiles(); track t.label) {
+      <div class="lp-tile">
+        <span class="lp-tile__label">{{ t.label }}</span>
+        <span class="lp-tile__row">
+          <span class="lp-tile__value" [attr.data-tone]="t.tone">{{ loading() ? '–' : t.value }}</span>
+          <span class="lp-tile__sub">{{ t.sub }}</span>
+        </span>
+      </div>
+    }
+  </div>
 
   @if (error() && !batchModalOpen()) {
     <div class="error">{{ error() }}</div>
-  }
-  @if (notice()) {
-    <div class="success"><svg lucideCircleCheck></svg>{{ notice() }}</div>
   }
 
   @if (!readOnly() && selectedCount() > 0) {
@@ -34,163 +40,103 @@
     </div>
   }
 
-  <!-- Rejected CPLs: declined by a client, kept out of the queue until the admin opens them -->
-  @if (!loading() && (rejectedCount() > 0 || showRejected())) {
-    <div class="toolbar">
-      <button type="button" class="btn btn--sm" [class.btn--ghost]="!showRejected()" (click)="showRejected.set(!showRejected())">
-        <svg lucideCircleX></svg> Rejected CPLs ({{ rejectedCount() }})
+  <!-- To do (waiting to be assigned, any day) vs History (already with a client). One list at a time. -->
+  @if (!readOnly()) {
+    <div class="lp-tabs" role="tablist">
+      <button type="button" role="tab" [attr.aria-selected]="tab() === 'todo'" (click)="tab.set('todo')">
+        To do <span class="lp-tabs__n">{{ pendingLeads().length }}</span>
+      </button>
+      <button type="button" role="tab" [attr.aria-selected]="tab() === 'history'" (click)="tab.set('history')">
+        History <span class="lp-tabs__n">{{ view.total() }}</span>
       </button>
     </div>
   }
-  @if (!loading() && showRejected()) {
-    <div class="card card--flush pending-card">
-      <div class="card-head">
-        <h2>Rejected CPLs</h2>
-        <span class="count">{{ rejectedLeads().length }} to reassign</span>
-      </div>
-      @if (rejectedLeads().length === 0) {
-        <app-empty-state title="No rejected CPLs" hint="Leads a client declines will show up here.">
-          <svg lucideCircleX></svg>
-        </app-empty-state>
-      } @else {
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Customer</th>
-                <th class="hide-sm">Junior closer</th>
-                <th class="hide-md">Reason</th>
-                <th class="hide-md">Rejected</th>
-                <th class="right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (lead of rejectedLeads(); track lead.id) {
-                <tr class="clickable" (click)="detailLead.set(lead)">
-                  <td>
-                    <div class="cell-main">
-                      <span class="name-info"><span class="name-text">{{ lead.customerName }}</span><app-lifecycle-button [leadId]="lead.id" [name]="lead.customerName" /></span>
-                      @if (lead.dCode) {
-                        <span class="chip">{{ lead.dCode }}</span>
-                      }
-                    </div>
-                    <div class="cell-sub">{{ formatPhone(lead.phone) }} · {{ lead.state }}</div>
-                  </td>
-                  <td class="hide-sm">
-                    @if (lead.juniorCloser) {
-                      <div class="person">
-                        <span class="avatar-sm" [class]="getAvatarTone(lead.juniorCloser.id)">{{ getInitials(lead.juniorCloser.name) }}</span>
-                        <span class="nm">{{ lead.juniorCloser.name }}</span>
-                      </div>
-                    } @else {
-                      <span class="empty">—</span>
-                    }
-                  </td>
-                  <td class="hide-md">
-                    @if (lead.rejectionReason) {
-                      <span class="cell-sub">{{ lead.rejectionReason }}</span>
-                    } @else {
-                      <span class="empty">—</span>
-                    }
-                  </td>
-                  <td class="hide-md"><span class="cell-sub">{{ timeAgo(lead.updatedAt) }}</span></td>
-                  <td (click)="$event.stopPropagation()">
-                    <div class="row-actions">
-                      <button type="button" class="btn btn--sm" (click)="openAssign(lead, $event)">
-                        <svg lucideUserCheck></svg> Assign
-                      </button>
-                      <app-row-menu>
-                        <button type="button" class="menu-item" (click)="openEdit(lead)"><svg lucideSquarePen></svg> Edit details</button>
-                        <button type="button" class="menu-item" (click)="openReturn(lead)"><svg lucideUndo2></svg> Send back</button>
-                        <button type="button" class="menu-item" (click)="openAssignExternal(lead)"><svg lucideBuilding2></svg> Assign to external</button>
-                      </app-row-menu>
-                    </div>
-                  </td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        </div>
-      }
-    </div>
-  }
 
-  <!-- Needs action: every lead waiting on the admin, oldest first, whatever day it came in -->
-  @if (!readOnly() && !loading() && pendingLeads().length > 0) {
-    <div class="card card--flush pending-card">
-      <div class="card-head">
-        <h2>Needs your action</h2>
-        <span class="count">{{ pendingLeads().length }} waiting</span>
+  @if (!readOnly() && tab() === 'todo') {
+    <section class="lp-card">
+      <div class="lp-card__head">
+        <div class="lp-seg" role="group" aria-label="Filter the queue by status">
+          @for (t of pendingKindTabs; track t.value) {
+            <button type="button" class="lp-seg__btn" [attr.aria-pressed]="pendingKind() === t.value" (click)="pendingKind.set(t.value)">
+              {{ t.label }} <span class="lp-seg__n">{{ pendingKindCounts()[t.value] }}</span>
+            </button>
+          }
+        </div>
+        <div class="lp-search">
+          <app-search-box
+            [value]="pendingSearch()"
+            placeholder="Search name, phone, state or D-code"
+            (valueChange)="pendingSearch.set($event)"
+          />
+        </div>
+        <div class="lp-sort">
+          <app-select
+            [options]="pendingSortOptions"
+            [ngModel]="pendingSort()"
+            (ngModelChange)="pendingSort.set($event)"
+            ariaLabel="Sort the queue"
+          />
+        </div>
       </div>
       <div class="table-wrap">
-        <table>
+        <table class="lp-table">
           <thead>
             <tr>
               <th>Customer</th>
               <th class="hide-sm">Junior closer</th>
               <th>Status</th>
-              <th class="hide-md notes-col">Reason / notes</th>
-              <th>
-                <button type="button" class="btn btn--sm btn--ghost" (click)="pendingNewestFirst.set(!pendingNewestFirst())" title="Click to flip the order">
-                  Waiting {{ pendingNewestFirst() ? '↑ newest first' : '↓ oldest first' }}
-                </button>
-              </th>
-              <th class="right">Actions</th>
+              <th class="hide-md">Reason</th>
+              <th>Waiting</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
-            @for (lead of visiblePending(); track lead.id) {
+            @for (lead of pendingLeads(); track lead.id) {
               <tr class="clickable" (click)="detailLead.set(lead)">
                 <td>
-                  <div class="cell-main">
+                  <div class="lp-name">
                     <span class="name-info"><span class="name-text">{{ lead.customerName }}</span><app-lifecycle-button [leadId]="lead.id" [name]="lead.customerName" /></span>
+                  </div>
+                  <div class="lp-sub">
+                    {{ formatPhone(lead.phone) }} · {{ lead.state }}
                     @if (lead.dCode) {
-                      <span class="chip">{{ lead.dCode }}</span>
+                      · <span class="lp-src">{{ lead.dCode }}</span>
                     }
                   </div>
-                  <div class="cell-sub">{{ formatPhone(lead.phone) }} · {{ lead.state }}</div>
                   @if (lead.suggestedClient; as suggested) {
-                    <div class="cell-sub">Suggested client: {{ suggested.name }}</div>
+                    <div class="lp-sub">Suggested: {{ suggested.name }}</div>
                   }
                 </td>
                 <td class="hide-sm">
-                  @if (lead.juniorCloser) {
+                  @if (lead.juniorCloser; as jc) {
                     <div class="person">
-                      <span class="avatar-sm" [class]="getAvatarTone(lead.juniorCloser.id)">{{ getInitials(lead.juniorCloser.name) }}</span>
-                      <span class="nm">{{ lead.juniorCloser.name }}</span>
+                      <span class="avatar-sm" [class]="getAvatarTone(jc.id)">{{ getInitials(jc.name) }}</span>
+                      <span class="nm">{{ jc.name }}</span>
                     </div>
-                  } @else {
-                    <span class="chip">CPL @if (lead.dCode) { · {{ lead.dCode }} }</span>
-                  }
-                </td>
-                <td>
-                  <div class="status-stack" (click)="$event.stopPropagation()">
-                    <div class="status-line"><app-status-badge [status]="lead.status" hideDecided /></div>
-                    @if (TRACKABLE_STATUSES.includes(lead.status)) {
-                      <app-admin-status-control [lead]="lead" (changed)="onAdminStatusChanged($event)" />
-                    }
-                  </div>
-                </td>
-                <td class="hide-md notes-col">
-                  @if (lead.status === 'REJECTED' && lead.rejectionReason) {
-                    <span class="cell-sub">{{ lead.rejectionReason }}</span>
-                  } @else if (lead.closerNotes) {
-                    <span class="cell-sub">{{ lead.closerNotes }}</span>
                   } @else {
                     <span class="empty">—</span>
                   }
                 </td>
                 <td>
-                  <span class="chip age" [class.age--warn]="waitDays(lead) >= 2 && waitDays(lead) < 7" [class.age--late]="waitDays(lead) >= 7">{{ waitLabel(lead) }}</span>
-                  <div class="cell-sub">{{ formatDate(lead.createdAt) }}</div>
+                  <div class="status-stack" (click)="$event.stopPropagation()">
+                    <app-status-badge [status]="lead.status" hideDecided />
+                    @if (TRACKABLE_STATUSES.includes(lead.status)) {
+                      <app-admin-status-control [lead]="lead" (changed)="onAdminStatusChanged($event)" />
+                    }
+                  </div>
                 </td>
-                <td (click)="$event.stopPropagation()">
+                <td class="hide-md lp-reason">{{ reasonFor(lead) || '—' }}</td>
+                <td>
+                  <span class="lp-age" [class.lp-age--warn]="waitDays(lead) >= 2 && waitDays(lead) < 5" [class.lp-age--late]="waitDays(lead) >= 5">{{ waitLabel(lead) }}</span>
+                  <div class="lp-sub">{{ formatDate(waitingSince(lead)) }}</div>
+                </td>
+                <td class="right" (click)="$event.stopPropagation()">
                   <div class="row-actions">
                     <button type="button" class="btn btn--sm" (click)="openAssign(lead, $event)">
                       <svg lucideUserCheck></svg> Assign
                     </button>
                     <app-row-menu>
-                      @if (lead.status === 'REJECTED') {
+                      @if (lead.status === 'REJECTED' || lead.status === 'CHARGED_BACK') {
                         <button type="button" class="menu-item" (click)="openEdit(lead)"><svg lucideSquarePen></svg> Edit details</button>
                       }
                       <button type="button" class="menu-item" (click)="openReturn(lead)"><svg lucideUndo2></svg> Send back</button>
@@ -203,153 +149,166 @@
           </tbody>
         </table>
       </div>
-      @if (pendingLeads().length > 5) {
-        <div class="pending-more">
-          <button type="button" class="btn btn--sm btn--ghost" (click)="showAllPending.set(!showAllPending())">
-            {{ showAllPending() ? 'Show fewer' : 'Show all ' + pendingLeads().length }}
-          </button>
-        </div>
+      @if (loading()) {
+        <app-skeleton-rows [count]="5" />
+      } @else if (pendingLeads().length === 0) {
+        <app-empty-state [title]="pendingSearch().trim() || pendingKind() ? 'No leads match' : 'Nothing waiting to be assigned'">
+          <svg lucideFileText></svg>
+        </app-empty-state>
       }
-    </div>
+    </section>
   }
 
-  <!-- Search/filters + day tabs stay pinned while a long day scrolls -->
-  <div class="log-controls">
-  <div class="toolbar">
-    <app-search-box
-      [value]="view.search()"
-      placeholder="Search name, phone, or junior closer…"
-      (valueChange)="view.setSearch($event)"
-    />
-    <app-select
-      [options]="dCodeOptions"
-      [ngModel]="dCodeFilter()"
-      (ngModelChange)="dCodeFilter.set($event)"
-      ariaLabel="Filter by D-code"
-    />
-    <app-select
-      [options]="juniorOptions()"
-      [ngModel]="juniorFilter()"
-      (ngModelChange)="juniorFilter.set($event)"
-      ariaLabel="Filter by Junior Closer"
-    />
-    <app-select
-      [options]="statusOptions()"
-      [ngModel]="view.status()"
-      (ngModelChange)="view.setStatus($event)"
-      ariaLabel="Filter by status"
-    />
-    @if (dCodeFilter() || juniorFilter()) {
-      <button type="button" class="btn btn--sm btn--ghost" (click)="clearCplFilters()">Clear filters</button>
-    }
-  </div>
-  <app-day-bar [(day)]="day" [(dayTo)]="dayTo" [counts]="dayCounts()" [total]="loggedTotal()" [span]="2" />
-  </div>
+  @if (readOnly() || tab() === 'history') {
+  <section class="lp-card">
+    <div class="lp-card__head">
+      <h2>{{ periodLabel() }} <span class="lp-count">{{ view.total() }}</span></h2>
+    </div>
+    <div class="lp-filters">
+      <div class="lp-search">
+        <app-search-box
+          [value]="view.search()"
+          placeholder="Search name, phone, state or D-code"
+          (valueChange)="view.setSearch($event)"
+        />
+      </div>
+      <app-select
+        [options]="dCodeOptions"
+        [ngModel]="dCodeFilter()"
+        (ngModelChange)="dCodeFilter.set($event)"
+        ariaLabel="Filter by D-code"
+      />
+      <app-select
+        [options]="juniorOptions()"
+        [ngModel]="juniorFilter()"
+        (ngModelChange)="juniorFilter.set($event)"
+        ariaLabel="Filter by junior closer"
+      />
+      <app-select
+        [options]="statusOptions()"
+        [ngModel]="view.status()"
+        (ngModelChange)="view.setStatus($event)"
+        ariaLabel="Filter by status"
+      />
+      @if (hasFilters()) {
+        <button type="button" class="lp-clear" (click)="clearFilters()">Clear</button>
+      }
+    </div>
 
-  <div class="card card--flush">
     @if (loading()) {
       <app-skeleton-rows [count]="5" />
     } @else if (view.total() === 0) {
-      @if (view.isFiltered() || dCodeFilter() || juniorFilter()) {
+      @if (hasFilters()) {
         <app-empty-state title="No leads match those filters" hint="Try a different search term or clear the filters.">
-          <svg lucideTag></svg>
+          <svg lucideFileText></svg>
         </app-empty-state>
       } @else if (dayMode()) {
-        <app-empty-state title="Nothing logged for this day" hint="Leads you've handled show up under the day they came in. Pick another day above, or choose All dates.">
-          <svg lucideTag></svg>
+        <app-empty-state title="Nothing logged for this day" hint="Pick another day above, or choose All.">
+          <svg lucideFileText></svg>
         </app-empty-state>
       } @else {
-        <app-empty-state title="No CPL leads yet" hint="Leads land here once a Junior Closer submits one as CPL.">
-          <svg lucideTag></svg>
+        <app-empty-state title="No CPL leads with a client yet">
+          <svg lucideFileText></svg>
         </app-empty-state>
       }
     } @else {
       <div class="table-wrap">
-        <table class="log-table">
+        <table class="lp-table">
           <thead>
             <tr>
               @if (!readOnly()) {
                 <th class="checkbox-col">
-                <input
-                  type="checkbox"
-                  [checked]="allVisibleEligibleSelected()"
-                  (change)="toggleSelectAllVisible()"
-                  aria-label="Select all eligible leads on this page"
-                />
-              </th>
+                  <input
+                    type="checkbox"
+                    [checked]="allVisibleEligibleSelected()"
+                    (change)="toggleSelectAllVisible()"
+                    aria-label="Select all eligible leads on this page"
+                  />
+                </th>
               }
               <th class="sortable" (click)="view.toggleSort('customerName')">
                 Customer <span class="arrow">{{ sortArrow('customerName') }}</span>
               </th>
-              <th class="hide-sm">D-code</th>
-              <th class="hide-md">Decision maker</th>
-              <th class="hide-md">Bank account</th>
               <th class="hide-sm">Junior closer</th>
-              <th>Status</th>
-              <th class="sortable right hide-md" (click)="view.toggleSort('updatedAt')">
+              <th class="hide-md">Client</th>
+              <th class="hide-md">DM / Bank</th>
+              <th class="hide-md">Payment</th>
+              <th>Tracking</th>
+              <th class="hide-sm">Notes</th>
+              <th class="sortable right" (click)="view.toggleSort('updatedAt')">
                 {{ singleDay() ? 'Time' : 'Updated' }} <span class="arrow">{{ sortArrow('updatedAt') }}</span>
               </th>
             </tr>
           </thead>
           <tbody>
             @for (lead of view.rows(); track lead.id) {
-              <tr class="clickable" [attr.data-status]="lead.status" (click)="detailLead.set(lead)">
+              <tr class="clickable" (click)="detailLead.set(lead)">
                 @if (!readOnly()) {
                   <td class="checkbox-col" (click)="$event.stopPropagation()">
-                  <input
-                    type="checkbox"
-                    [checked]="isSelected(lead)"
-                    [disabled]="!isSelectable(lead)"
-                    (change)="toggleSelect(lead, $event)"
-                    [attr.aria-label]="'Select ' + lead.customerName"
-                  />
-                </td>
+                    <input
+                      type="checkbox"
+                      [checked]="isSelected(lead)"
+                      [disabled]="!isSelectable(lead)"
+                      (change)="toggleSelect(lead, $event)"
+                      [attr.aria-label]="'Select ' + lead.customerName"
+                    />
+                  </td>
                 }
                 <td>
-                  <div class="cell-main"><span class="name-info"><span class="name-text">{{ lead.customerName }}</span><app-lifecycle-button [leadId]="lead.id" [name]="lead.customerName" /></span></div>
-                  <div class="cell-sub">{{ formatPhone(lead.phone) }} · {{ lead.state }}</div>
-                  <app-note-peek [leadId]="lead.id" [name]="lead.customerName" [notes]="lead.notes" [count]="lead._count?.notes" />
-                </td>
-                <td class="hide-sm">
-                  @if (lead.dCode) {
-                    <span class="chip">{{ lead.dCode }}</span>
-                  } @else {
-                    <span class="empty">—</span>
-                  }
-                </td>
-                <td class="hide-md">{{ lead.decisionMaker === true ? 'Yes' : lead.decisionMaker === false ? 'No' : '—' }}</td>
-                <td class="hide-md">{{ lead.bankAccount === true ? 'Yes' : lead.bankAccount === false ? 'No' : '—' }}</td>
-                <td class="hide-sm">
-                  @if (lead.juniorCloser) {
-                    <div class="person">
-                      <span class="avatar-sm" [class]="getAvatarTone(lead.juniorCloser.id)">
-                        {{ getInitials(lead.juniorCloser.name) }}
-                      </span>
-                      <span class="nm">{{ lead.juniorCloser.name }}</span>
-                    </div>
-                  } @else {
-                    <span class="empty">—</span>
-                  }
-                </td>
-                <td>
-                  <div class="status-stack">
-                    <div class="status-line">
-                      <app-status-badge [status]="lead.status" hideDecided />
-                      @if (MONEY_STATUSES.includes(lead.status)) {
-                        <app-payment-badge [status]="lead.paymentStatus" />
-                      }
-                    </div>
-                    @if (TRACKABLE_STATUSES.includes(lead.status)) {
-                      <span (click)="$event.stopPropagation()"><app-admin-status-control [lead]="lead" (changed)="onAdminStatusChanged($event)" /></span>
+                  <div class="lp-name">
+                    <span class="name-info"><span class="name-text">{{ lead.customerName }}</span><app-lifecycle-button [leadId]="lead.id" [name]="lead.customerName" /></span>
+                  </div>
+                  <div class="lp-sub">
+                    {{ formatPhone(lead.phone) }} · {{ lead.state }}
+                    @if (lead.dCode) {
+                      · <span class="lp-src">{{ lead.dCode }}</span>
                     }
                   </div>
                 </td>
-                <td class="right hide-md">
-                  @if (singleDay()) {
-                    <span class="cell-sub">{{ timeOf(lead.updatedAt) }}</span>
+                <td class="hide-sm">
+                  @if (lead.juniorCloser; as jc) {
+                    <div class="person">
+                      <span class="avatar-sm" [class]="getAvatarTone(jc.id)">{{ getInitials(jc.name) }}</span>
+                      <span class="nm">{{ jc.name }}</span>
+                    </div>
                   } @else {
-                    <span class="cell-sub">{{ formatDate(lead.updatedAt) }}</span>
+                    <span class="empty">—</span>
                   }
+                </td>
+                <td class="hide-md">
+                  @if (lead.client) {
+                    {{ lead.client.name }}
+                  } @else if (lead.externalClient) {
+                    {{ lead.externalClient.name }} <span class="lp-sub">(external)</span>
+                  } @else {
+                    <span class="empty">Not assigned</span>
+                  }
+                </td>
+                <td class="hide-md">
+                  {{ lead.decisionMaker === true ? 'Yes' : lead.decisionMaker === false ? 'No' : '—' }}
+                  /
+                  {{ lead.bankAccount === true ? 'Yes' : lead.bankAccount === false ? 'No' : '—' }}
+                </td>
+                <td class="hide-md">
+                  @if (MONEY_STATUSES.includes(lead.status)) {
+                    <span class="lp-pay" [attr.data-paid]="lead.paymentStatus === 'PAID'"><i></i>{{ lead.paymentStatus === 'PAID' ? 'Paid' : 'Unpaid' }}</span>
+                  } @else {
+                    <span class="lp-pay lp-pay--none"><i></i>Not billed</span>
+                  }
+                </td>
+                <td (click)="$event.stopPropagation()">
+                  @if (TRACKABLE_STATUSES.includes(lead.status)) {
+                    <app-admin-status-control [lead]="lead" (changed)="onAdminStatusChanged($event)" />
+                  } @else {
+                    <span class="empty">—</span>
+                  }
+                </td>
+                <td class="hide-sm">
+                  <app-note-peek compact [leadId]="lead.id" [name]="lead.customerName" [notes]="lead.notes" [count]="lead._count?.notes" />
+                </td>
+                <td class="right">
+                  <span class="lp-time">{{ singleDay() ? timeOf(lead.updatedAt) : formatDate(lead.updatedAt) }}</span>
+                  <div class="lp-sub">Lead date {{ formatDate(lead.createdAt) }}</div>
                 </td>
               </tr>
             }
@@ -364,7 +323,8 @@
         (pageChange)="view.page.set($event)"
       />
     }
-  </div>
+  </section>
+  }
 </div>
 
 <!-- Detail -->
@@ -373,8 +333,8 @@
     <app-lead-detail [lead]="lead" [unmasked]="true" />
     @if (!readOnly()) {
     <div footer>
-      @if (lead.status === 'SUBMITTED' || lead.status === 'REJECTED') {
-        @if (lead.status === 'REJECTED') {
+      @if (lead.status === 'SUBMITTED' || lead.status === 'REJECTED' || lead.status === 'CHARGED_BACK') {
+        @if (lead.status === 'REJECTED' || lead.status === 'CHARGED_BACK') {
           <button type="button" class="btn btn--ghost" (click)="detailLead.set(null); openEdit(lead)">
             <svg lucideSquarePen></svg> Edit
           </button>

@@ -5,10 +5,8 @@ import {
   LucideBanknoteX,
   LucideBuilding2,
   LucideCircleCheck,
-  LucideCircleX,
   LucideFileText,
   LucideHeadset,
-  LucideLayers,
   LucideSquarePen,
   LucideUndo2,
   LucideUserCheck,
@@ -33,14 +31,11 @@ import { Modal } from '../../../shared/ui/modal';
 import {
   EmptyState,
   Pagination,
-  PaymentBadge,
   SearchBox,
   SkeletonRows,
   StatusBadge,
-  StatTile,
-  PageHero,
 } from '../../../shared/ui/ui';
-import { DayBar, rangeBounds, rangeLabel } from '../../../shared/ui/day-bar';
+import { DayBar, rangeBounds, rangeLabel, shiftIsoDay } from '../../../shared/ui/day-bar';
 import { LeadQuickEdit } from '../../../shared/lead-quick-edit';
 import { Select } from '../../../shared/ui/select';
 import { CHARGE_BACK_MONTH_OPTIONS, CHARGE_BACK_REASON_OPTIONS, MONEY_STATUSES, TRACKABLE_STATUSES } from '../../../core/lead-options';
@@ -52,6 +47,7 @@ import { NotePeek } from '../../../shared/ui/lead-notes';
 import { AuthService } from '../../../core/services/auth.service';
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 import { apiErrorMessage } from '../../../core/api';
+import { toastNotice } from '../../../core/toast-notice';
 
 const STATUS_FILTERS: { label: string; value: string }[] = [
   { label: 'All', value: '' },
@@ -72,8 +68,6 @@ interface LookupUser {
 @Component({
   selector: 'app-admin-leads',
   imports: [
-    PageHero,
-    StatTile,
     RowMenu,
     FormsModule,
     Modal,
@@ -82,7 +76,6 @@ interface LookupUser {
     LeadQuickEdit,
     DayBar,
     StatusBadge,
-    PaymentBadge,
     AdminStatusControl,
     LifecycleButton,
     NotePeek,
@@ -91,18 +84,17 @@ interface LookupUser {
     EmptyState,
     SkeletonRows,
     LucideCircleCheck,
-    LucideCircleX,
     LucideBanknote,
     LucideBanknoteX,
     LucideFileText,
+    LucideHeadset,
     LucideUndo2,
     LucideBuilding2,
     LucideUserCheck,
-    LucideHeadset,
-    LucideLayers,
     LucideSquarePen,
   ],
   templateUrl: './leads.html',
+  styleUrl: './leads.css',
 })
 export class AdminLeads implements OnInit {
   protected readonly MONEY_STATUSES = MONEY_STATUSES;
@@ -121,7 +113,7 @@ export class AdminLeads implements OnInit {
   readonly loading = signal(true);
   readonly busyId = signal<string | null>(null);
   readonly error = signal<string | null>(null);
-  readonly notice = signal<string | null>(null);
+  readonly notice = toastNotice();
   readonly selected = signal<Lead | null>(null);
   readonly closerFilter = signal('');
   readonly sourceFilter = signal('');
@@ -183,8 +175,8 @@ export class AdminLeads implements OnInit {
   });
 
   readonly closerOptions = computed(() => [
-    { value: '', label: 'All closers' },
-    ...this.closers().map((c) => ({ value: c.id, label: c.name })),
+    { value: '', label: 'Closer: All' },
+    ...this.closers().map((c) => ({ value: c.id, label: `Closer: ${c.name}` })),
   ]);
 
   /** CPA and Retention leads share this page (same admin actions, same payment flow). CPL
@@ -197,9 +189,9 @@ export class AdminLeads implements OnInit {
   );
 
   readonly sourceOptions = [
-    { value: '', label: 'All sources' },
-    { value: 'CPA', label: 'CPA' },
-    { value: 'RETENTION', label: 'Retention' },
+    { value: '', label: 'Source: All' },
+    { value: 'CPA', label: 'Source: CPA' },
+    { value: 'RETENTION', label: 'Source: Retention' },
   ];
 
   private readonly byCloser = computed(() => {
@@ -213,7 +205,19 @@ export class AdminLeads implements OnInit {
   /** Waiting on the admin: freshly submitted or bounced back by a client. These sit on top
    * whatever day they came in. */
   isPending(lead: Lead): boolean {
-    return lead.status === 'SUBMITTED' || lead.status === 'REJECTED';
+    // Charged back = waiting for a new client, so it needs assigning too. The Retention Manager
+    // has no "Needs your action" card, so for him charged-back leads stay in the log below.
+    return (
+      lead.status === 'SUBMITTED' ||
+      lead.status === 'REJECTED' ||
+      (lead.status === 'CHARGED_BACK' && !this.readOnly())
+    );
+  }
+
+  /** When the lead started waiting on the admin — a charge-back starts the clock again. */
+  waitingSince(lead: Lead): string {
+    if (lead.status === 'CHARGED_BACK') return lead.chargeBacks[0]?.createdAt ?? lead.updatedAt;
+    return lead.createdAt;
   }
 
   private readonly searchFields = (l: Lead) => [
@@ -227,20 +231,62 @@ export class AdminLeads implements OnInit {
     l.retention?.name,
   ];
 
-  /** The "needs your action" list — search applies, day and status pills don't. Oldest first — the longest-waiting leads lead the list. */
-  readonly pendingNewestFirst = signal(true);
+  /** Order of the "Needs your action" queue. Default puts charge-backs (money already clawed
+   * back) on top, then the longest-waiting leads. */
+  readonly pendingSort = signal<'priority' | 'oldest' | 'newest'>('priority');
+  readonly pendingSortOptions = [
+    { value: 'priority', label: 'Sort: Chargebacks first' },
+    { value: 'oldest', label: 'Sort: Longest waiting' },
+    { value: 'newest', label: 'Sort: Newest first' },
+  ];
+
+  /** The queue's own CPA / Retention filter — independent of the log's filters below. */
+  readonly pendingSource = signal<'' | 'CPA' | 'RETENTION'>('');
+  readonly pendingSourceCounts = computed(() => {
+    const all = this.cpaLeads().filter((l) => this.isPending(l));
+    return {
+      '': all.length,
+      CPA: all.filter((l) => l.leadType === 'CPA').length,
+      RETENTION: all.filter((l) => l.leadType === 'RETENTION').length,
+    };
+  });
+  readonly pendingSourceTabs = [
+    { value: '', label: 'All' },
+    { value: 'CPA', label: 'CPA' },
+    { value: 'RETENTION', label: 'Retention' },
+  ] as const;
+
+  /** The To do list — its own search and source filter apply; History's filters don't. */
+  /** To do's own search — separate from History's, so one tab never silently filters the other. */
+  readonly pendingSearch = signal('');
 
   readonly pendingLeads = computed(() => {
-    const term = this.view.search().trim().toLowerCase();
-    const dir = this.pendingNewestFirst() ? -1 : 1;
-    return this.byCloser()
+    const term = this.pendingSearch().trim().toLowerCase();
+    const sort = this.pendingSort();
+    const source = this.pendingSource();
+    const since = (l: Lead) => new Date(this.waitingSince(l)).getTime();
+    return this.cpaLeads()
       .filter((l) => this.isPending(l))
+      .filter((l) => !source || l.leadType === source)
       .filter((l) => !term || this.searchFields(l).some((f) => f != null && String(f).toLowerCase().includes(term)))
-      .sort((a, b) => dir * (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()));
+      .sort((a, b) => {
+        if (sort === 'priority') {
+          const cb = Number(b.status === 'CHARGED_BACK') - Number(a.status === 'CHARGED_BACK');
+          if (cb) return cb;
+        }
+        return sort === 'newest' ? since(b) - since(a) : since(a) - since(b);
+      });
   });
 
-  /** Everything the admin has already dealt with — the day-by-day log. */
-  private readonly logged = computed(() => this.byCloser().filter((l) => !this.isPending(l)));
+  /** The day-by-day log: only leads that have reached a client (offered, approved, or handed to
+   * an external client). Leads still with a closer (New, sent back) aren't the admin's to track
+   * here, and everything waiting to be assigned is in "Needs your action". The Retention
+   * Manager has no queue card, so his log keeps every Retention lead. */
+  private readonly logged = computed(() =>
+    this.byCloser().filter((l) =>
+      this.readOnly() ? true : l.status === 'ASSIGNED' || l.status === 'ACCEPTED' || l.status === 'ASSIGNED_EXTERNAL',
+    ),
+  );
 
   /** Searching looks across every day, so a customer is findable without knowing when they came in. */
   readonly dayMode = computed(() => !!this.day() && !this.view.search().trim());
@@ -297,9 +343,6 @@ export class AdminLeads implements OnInit {
     };
   });
 
-  /** Count per status pill, so the filter row doubles as a breakdown. */
-
-  /** Hero headline: the day being viewed, so it never repeats the topbar's page title. */
   /** Retention Manager's at-a-glance numbers over the loaded (Retention-only) leads. */
   readonly rmStats = computed(() => {
     const rows = this.leads();
@@ -315,38 +358,88 @@ export class AdminLeads implements OnInit {
     };
   });
 
-  readonly heroTitle = computed(() => {
+  /** Page title: the period being viewed, so it never repeats the topbar's page title. */
+  readonly periodTitle = computed(() => {
     const iso = this.day();
-    if (!iso) return 'Every day, all in one place';
+    if (!iso) return 'All dates';
     if (this.dayTo()) return rangeLabel(iso, this.dayTo());
     const [y, m, d] = iso.split('-').map(Number);
-    const label = new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-US', {
+    return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-US', {
       weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC',
     });
-    return iso === pacificIsoDate() ? `Today · ${label}` : label;
   });
 
-  readonly heroSub = computed(() => {
+  /** "Logged today" / "Logged yesterday" / "Logged Oct 26" / "Logged Oct 1 – Oct 7" / "All leads". */
+  readonly periodLabel = computed(() => {
+    const iso = this.day();
+    if (!this.dayMode()) return 'All leads';
+    if (this.dayTo()) return `Logged ${rangeLabel(iso, this.dayTo())}`;
+    const today = pacificIsoDate();
+    if (iso === today) return 'Logged today';
+    if (iso === shiftIsoDay(today, -1)) return 'Logged yesterday';
+    const [y, m, d] = iso.split('-').map(Number);
+    const short = new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+    return `Logged ${short}`;
+  });
+
+  /** The tile row under the title — one number per question the admin asks of the period. */
+  readonly tiles = computed<{ label: string; value: number; sub: string; tone: '' | 'bad' | 'good' | 'warn' }[]>(() => {
+    if (this.readOnly()) {
+      const r = this.rmStats();
+      return [
+        { label: 'Retention leads', value: r.total, sub: 'on record', tone: '' },
+        { label: 'Charged back', value: r.chargedBack, sub: 'in play', tone: r.chargedBack ? 'bad' : '' },
+        { label: 'No notes yet', value: r.unworked, sub: 'charged back, untouched', tone: r.unworked ? 'warn' : '' },
+        { label: 'Won back', value: r.wonBack, sub: 'back with a client', tone: 'good' },
+      ];
+    }
     const s = this.summary();
-    if (s.total === 0) return this.dayMode() ? (this.dayTo() ? 'Nothing logged in this range yet.' : 'Nothing logged for this day yet.') : 'Nothing logged yet.';
-    return [`${s.accepted} approved`, `${s.withClients} with clients`, `${s.unpaid} unpaid`, s.chargedBack ? `${s.chargedBack} charged back` : '']
-      .filter(Boolean)
-      .join(' · ');
+    const pending = this.pendingLeads();
+    const stale = pending.filter((l) => this.waitDays(l) >= 5).length;
+    const chargedBack = pending.filter((l) => l.status === 'CHARGED_BACK');
+    const chargedToday = chargedBack.filter((l) => this.waitDays(l) === 0).length;
+    const iso = this.day();
+    const prev = this.singleDay() ? (this.dayCounts()[shiftIsoDay(iso, -1)] ?? 0) : null;
+    const prevLabel = iso === pacificIsoDate() ? 'yesterday' : 'the day before';
+    return [
+      { label: this.periodLabel(), value: s.total, sub: prev === null ? 'in this period' : `${prev} ${prevLabel}`, tone: '' },
+      { label: 'Needs action', value: pending.length, sub: stale ? `${stale} waiting 5+ days` : 'none waiting long', tone: stale ? 'warn' : '' },
+      { label: 'Charged back', value: chargedBack.length, sub: chargedToday ? `${chargedToday} today` : 'waiting for a client', tone: chargedBack.length ? 'bad' : '' },
+      { label: 'Approved', value: s.accepted, sub: `with client: ${s.withClients}`, tone: 'good' },
+      { label: 'Unpaid', value: s.unpaid, sub: s.unpaid ? 'to collect' : 'all settled', tone: s.unpaid ? 'warn' : '' },
+    ];
   });
 
+  /** Why a queued lead is waiting — the charge-back reason, the client's decline, or the closer's notes. */
+  reasonFor(lead: Lead): string {
+    if (lead.status === 'CHARGED_BACK') return lead.chargeBacks[0]?.reason ?? '';
+    if (lead.status === 'REJECTED') return lead.rejectionReason ?? '';
+    return lead.closerNotes ?? '';
+  }
 
-  /** Pending list is capped so the day log stays near the top; "Show all" expands it. */
-  readonly showAllPending = signal(false);
-  readonly visiblePending = computed(() => (this.showAllPending() ? this.pendingLeads() : this.pendingLeads().slice(0, 5)));
+  readonly hasFilters = computed(
+    () => !!(this.view.search().trim() || this.sourceFilter() || this.closerFilter() || this.view.status()),
+  );
+
+  clearFilters(): void {
+    this.view.setSearch('');
+    this.sourceFilter.set('');
+    this.closerFilter.set('');
+    this.view.setStatus('');
+    this.view.page.set(1);
+  }
+
+  /** Which list is on screen: the assign queue or the history of leads with a client. */
+  readonly tab = signal<'todo' | 'history'>('todo');
 
   /** Whole days a lead has been waiting on the admin. */
   waitDays(lead: Lead): number {
-    return Math.max(0, Math.floor((Date.now() - new Date(lead.createdAt).getTime()) / 86_400_000));
+    return Math.max(0, Math.floor((Date.now() - new Date(this.waitingSince(lead)).getTime()) / 86_400_000));
   }
 
   waitLabel(lead: Lead): string {
     const d = this.waitDays(lead);
-    return d === 0 ? 'Today' : `${d}d`;
+    return d === 0 ? 'Today' : d === 1 ? '1 day' : `${d} days`;
   }
 
   /** Set after a successful assignment so the admin sees the assigned lead (with its copy action). */
@@ -368,7 +461,7 @@ export class AdminLeads implements OnInit {
     const current = this.view.status();
     return STATUS_FILTERS.filter((f) => !f.value || counts[f.value] > 0 || current === f.value).map((f) => ({
       value: f.value,
-      label: f.value ? `${f.label} (${counts[f.value]})` : `All statuses (${counts['']})`,
+      label: f.value ? `Status: ${f.label} (${counts[f.value]})` : `Status: All (${counts['']})`,
     }));
   });
 

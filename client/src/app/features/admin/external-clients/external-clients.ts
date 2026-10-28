@@ -1,6 +1,6 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { LucideBuilding2, LucideCircleCheck, LucideMapPin, LucideUserPlus, LucideX } from '@lucide/angular';
+import { LucideBuilding2, LucideMapPin, LucideUserPlus, LucideX } from '@lucide/angular';
 import { ExternalClientService } from '../../../core/services/external-client.service';
 import { ExternalClient } from '../../../core/models/external-client.model';
 import { createListView } from '../../../core/list-view';
@@ -11,6 +11,7 @@ import { PageHero, EmptyState, Pagination, SearchBox, SkeletonRows } from '../..
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 import { PhoneInput } from '../../../shared/ui/phone-input';
 import { apiErrorMessage } from '../../../core/api';
+import { toastNotice } from '../../../core/toast-notice';
 
 interface Draft {
   name: string;
@@ -36,7 +37,6 @@ interface Draft {
     SkeletonRows,
     LucideBuilding2,
     LucideUserPlus,
-    LucideCircleCheck,
     LucideMapPin,
     LucideX,
   ],
@@ -49,7 +49,7 @@ export class AdminExternalClients implements OnInit {
   readonly externalClients = signal<ExternalClient[]>([]);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
-  readonly notice = signal<string | null>(null);
+  readonly notice = toastNotice();
   readonly creating = signal(false);
   readonly saving = signal(false);
 

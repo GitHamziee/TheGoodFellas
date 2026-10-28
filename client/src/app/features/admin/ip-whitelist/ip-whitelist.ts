@@ -1,6 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { LucideCircleCheck, LucidePlus, LucideShield, LucideTrash2, LucideWifi } from '@lucide/angular';
+import { LucidePlus, LucideShield, LucideTrash2, LucideWifi } from '@lucide/angular';
 import { IpWhitelistService } from '../../../core/services/ip-whitelist.service';
 import { WhitelistedIp } from '../../../core/models/ip-whitelist.model';
 import { formatDate, pluralize } from '../../../core/format-utils';
@@ -8,6 +8,7 @@ import { Modal } from '../../../shared/ui/modal';
 import { PageHero, EmptyState, SkeletonRows } from '../../../shared/ui/ui';
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 import { apiErrorMessage } from '../../../core/api';
+import { toastNotice } from '../../../core/toast-notice';
 
 @Component({
   selector: 'app-admin-ip-whitelist',
@@ -16,7 +17,6 @@ import { apiErrorMessage } from '../../../core/api';
     Modal,
     EmptyState,
     SkeletonRows,
-    LucideCircleCheck,
     LucidePlus,
     LucideShield,
     LucideTrash2,
@@ -31,7 +31,7 @@ export class AdminIpWhitelist implements OnInit {
   readonly ips = signal<WhitelistedIp[]>([]);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
-  readonly notice = signal<string | null>(null);
+  readonly notice = toastNotice();
   readonly creating = signal(false);
   readonly deletingId = signal<string | null>(null);
   readonly showCreate = signal(false);

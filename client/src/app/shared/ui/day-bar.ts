@@ -1,6 +1,6 @@
-import { Component, HostListener, computed, input, model } from '@angular/core';
+import { Component, HostListener, booleanAttribute, computed, input, model, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { LucideChevronLeft, LucideChevronRight } from '@lucide/angular';
+import { LucideCalendar, LucideChevronLeft, LucideChevronRight } from '@lucide/angular';
 import { pacificIsoDate, pacificStartOfDay, pacificToday } from '../../core/format-utils';
 import { DateInput } from './date-input';
 
@@ -43,8 +43,48 @@ export function shiftIsoDay(iso: string, days: number): string {
  */
 @Component({
   selector: 'app-day-bar',
-  imports: [FormsModule, DateInput, LucideChevronLeft, LucideChevronRight],
+  imports: [FormsModule, DateInput, LucideCalendar, LucideChevronLeft, LucideChevronRight],
   template: `
+    @if (compact()) {
+      <!-- Compact: ‹ [Today n | Yesterday n | All n | Custom] ›, the date range behind Custom. -->
+      <div class="cbar">
+        <div class="cbar__row">
+          <button type="button" class="cbar__arrow" aria-label="Previous day" [disabled]="!day()" (click)="step(-1)">
+            <svg lucideChevronLeft></svg>
+          </button>
+          <div class="cbar__tabs" role="tablist">
+            @for (t of tabs(); track t.iso) {
+              <button type="button" class="ctab" role="tab" [class.active]="day() === t.iso && !dayTo()" (click)="pickDay(t.iso)">
+                {{ t.label }} <span class="ctab__n">{{ countFor(t.iso) }}</span>
+              </button>
+            }
+            <button type="button" class="ctab" role="tab" [class.active]="!day()" (click)="pickDay('')">
+              All <span class="ctab__n">{{ total() }}</span>
+            </button>
+            <button type="button" class="ctab" [class.active]="customOpen() || !!dayTo()" [attr.aria-expanded]="customOpen() || !!dayTo()" (click)="customOpen.set(!customOpen())">
+              <svg lucideCalendar></svg> Custom
+            </button>
+          </div>
+          <button type="button" class="cbar__arrow" aria-label="Next day" [disabled]="!day() || day() >= today()" (click)="step(1)">
+            <svg lucideChevronRight></svg>
+          </button>
+        </div>
+        @if (customOpen() || dayTo()) {
+          <div class="cbar__range">
+            <div class="daybar__pick">
+              <app-date-input min="2000-01-01" [max]="today()" [ngModel]="day()" (ngModelChange)="setFrom($event)" aria-label="From date" />
+            </div>
+            <span class="daybar__sep">to</span>
+            <div class="daybar__pick">
+              <app-date-input [min]="day() || '2000-01-01'" [max]="today()" [ngModel]="dayTo()" (ngModelChange)="setTo($event)" aria-label="To date (optional)" />
+            </div>
+            @if (dayTo()) {
+              <button type="button" class="btn btn--sm btn--ghost" (click)="dayTo.set('')">Clear range</button>
+            }
+          </div>
+        }
+      </div>
+    } @else {
     <div class="daybar">
       <div class="daybar__nav">
         <button type="button" class="btn btn--sm btn--icon btn--ghost" aria-label="Previous day" [disabled]="!day()" (click)="step(-1)">
@@ -81,6 +121,7 @@ export function shiftIsoDay(iso: string, days: number): string {
         }
       </div>
     </div>
+    }
   `,
   styles: `
     .daybar { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 1.1rem; }
@@ -102,6 +143,32 @@ export function shiftIsoDay(iso: string, days: number): string {
     .daybar__range { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
     .daybar__sep { font-size: 0.75rem; font-weight: 600; color: var(--gray-500); }
     .daybar__pick { width: 10.5rem; }
+
+    .cbar { display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem; }
+    .cbar__row { display: flex; align-items: center; gap: 0.5rem; }
+    .cbar__arrow {
+      display: grid; place-items: center; width: 2.4rem; height: 2.4rem; flex: none;
+      border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface);
+      color: var(--text); cursor: pointer;
+    }
+    .cbar__arrow:hover:not(:disabled) { background: var(--gray-50); }
+    .cbar__arrow:disabled { opacity: 0.35; cursor: default; }
+    .cbar__arrow svg { width: 16px; height: 16px; }
+    .cbar__tabs {
+      display: flex; gap: 0.2rem; padding: 0.22rem; flex-wrap: wrap;
+      border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface);
+    }
+    .ctab {
+      display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.42rem 0.8rem;
+      border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text);
+      font: inherit; font-size: 0.82rem; font-weight: 600; cursor: pointer; white-space: nowrap;
+    }
+    .ctab:hover { background: var(--gray-50); }
+    .ctab svg { width: 14px; height: 14px; }
+    .ctab__n { color: var(--gray-500); font-weight: 500; font-variant-numeric: tabular-nums; }
+    .ctab.active { background: var(--ink-900); color: #fff; }
+    .ctab.active .ctab__n { color: rgba(255, 255, 255, 0.6); }
+    .cbar__range { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
   `,
 })
 export class DayBar {
@@ -113,6 +180,9 @@ export class DayBar {
   readonly total = input(0);
   /** How many days back the tab strip reaches (today included). */
   readonly span = input(5);
+  /** Header-sized variant: arrows either side of the tabs, the date range behind a Custom tab. */
+  readonly compact = input(false, { transform: booleanAttribute });
+  protected readonly customOpen = signal(false);
 
   protected readonly today = computed(() => pacificIsoDate(pacificToday()));
 

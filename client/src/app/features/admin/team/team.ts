@@ -1,7 +1,6 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
-  LucideCircleCheck,
   LucideKeyRound,
   LucideMail,
   LucidePhone,
@@ -21,6 +20,7 @@ import { PageHero, EmptyState, Pagination, SearchBox, SkeletonRows, StatTile } f
 import { Select } from '../../../shared/ui/select';
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 import { apiErrorMessage } from '../../../core/api';
+import { toastNotice } from '../../../core/toast-notice';
 
 const ROLE_TONE: Record<Role, string> = {
   ADMIN: 'tone-b',
@@ -54,7 +54,6 @@ const ROLE_TONE: Record<Role, string> = {
     LucideShieldCheck,
     LucideMail,
     LucidePhone,
-    LucideCircleCheck,
     LucideTriangleAlert,
     LucideKeyRound,
   ],
@@ -68,7 +67,7 @@ export class AdminTeam implements OnInit {
   readonly team = signal<AppUser[]>([]);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
-  readonly notice = signal<string | null>(null);
+  readonly notice = toastNotice();
   readonly creating = signal(false);
   readonly savingRole = signal(false);
   readonly resettingPassword = signal(false);

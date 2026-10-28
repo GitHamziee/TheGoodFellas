@@ -20,9 +20,6 @@
   @if (error() && !rejecting()) {
     <div class="error">{{ error() }}</div>
   }
-  @if (notice()) {
-    <div class="success"><svg lucideCircleCheck></svg>{{ notice() }}</div>
-  }
 
   <!-- New leads awaiting a decision -->
   <div class="inline-head">

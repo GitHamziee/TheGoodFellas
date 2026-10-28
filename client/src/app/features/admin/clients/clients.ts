@@ -23,6 +23,7 @@ import { PageHero, EmptyState, Pagination, SearchBox, SkeletonRows, StatTile } f
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 import { PhoneInput } from '../../../shared/ui/phone-input';
 import { apiErrorMessage } from '../../../core/api';
+import { toastNotice } from '../../../core/toast-notice';
 
 const ROLE_TONE: Record<Role, string> = {
   ADMIN: 'tone-b',
@@ -70,7 +71,7 @@ export class AdminClients implements OnInit, OnDestroy {
   readonly clients = signal<AppUser[]>([]);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
-  readonly notice = signal<string | null>(null);
+  readonly notice = toastNotice();
   readonly creating = signal(false);
   readonly resettingPassword = signal(false);
   readonly savingPricing = signal(false);

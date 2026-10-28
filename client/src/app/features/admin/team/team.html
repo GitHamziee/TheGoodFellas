@@ -34,9 +34,6 @@
   @if (error() && !showCreate() && !selected()) {
     <div class="error">{{ error() }}</div>
   }
-  @if (notice()) {
-    <div class="success"><svg lucideCircleCheck></svg>{{ notice() }}</div>
-  }
 
   <div class="toolbar">
     <app-search-box

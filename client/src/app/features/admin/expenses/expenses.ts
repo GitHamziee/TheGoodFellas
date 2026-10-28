@@ -2,7 +2,6 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
   LucideBanknote,
-  LucideCircleCheck,
   LucidePlus,
   LucideReceipt,
   LucideScale,
@@ -16,6 +15,7 @@ import { EmptyState, SearchBox, SkeletonRows } from '../../../shared/ui/ui';
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 import { DateInput } from '../../../shared/ui/date-input';
 import { apiErrorMessage } from '../../../core/api';
+import { toastNotice } from '../../../core/toast-notice';
 
 /** Months shown in the header's income-vs-expenses chart. */
 const MONTHS = 6;
@@ -61,7 +61,6 @@ function monthKey(year: number, month: number): string {
     SearchBox,
     SkeletonRows,
     LucideBanknote,
-    LucideCircleCheck,
     LucidePlus,
     LucideReceipt,
     LucideScale,
@@ -77,7 +76,7 @@ export class AdminExpenses implements OnInit {
   readonly income = signal<IncomePayment[]>([]);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
-  readonly notice = signal<string | null>(null);
+  readonly notice = toastNotice();
   readonly creating = signal(false);
   readonly deletingId = signal<string | null>(null);
   readonly showCreate = signal(false);

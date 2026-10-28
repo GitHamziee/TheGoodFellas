@@ -1,0 +1,221 @@
+/* CPA & Retention Leads — header with the period navigator, a row of stat tiles, then two
+   white cards: the "Needs your action" queue and the period's log. */
+
+.lp-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+}
+.lp-eyebrow {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gray-500);
+}
+.lp-title {
+  margin: 0.2rem 0 0;
+  font-size: 1.75rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+/* Stat tiles */
+.lp-tiles {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+.lp-tiles--four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1100px) { .lp-tiles, .lp-tiles--four { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 680px) { .lp-tiles, .lp-tiles--four { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.lp-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+}
+.lp-tile__label { font-size: 0.82rem; color: var(--gray-500); font-weight: 500; }
+.lp-tile__row { display: flex; align-items: baseline; gap: 0.5rem; min-width: 0; }
+.lp-tile__value {
+  font-size: 1.85rem;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.lp-tile__value[data-tone='bad'] { color: var(--danger-600); }
+.lp-tile__value[data-tone='good'] { color: var(--success-600); }
+.lp-tile__value[data-tone='warn'] { color: var(--warning-600); }
+.lp-tile__sub { font-size: 0.78rem; color: var(--gray-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Cards */
+.lp-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  margin-bottom: 1.25rem;
+  overflow: hidden;
+}
+.lp-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 1rem 1.25rem;
+}
+.lp-card__head h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+.lp-count {
+  min-width: 1.6rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: var(--gray-100);
+  color: var(--gray-500);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.lp-sort { min-width: 13rem; }
+
+/* CPA / Retention filter for the queue */
+.lp-seg {
+  display: inline-flex;
+  gap: 0.2rem;
+  padding: 0.22rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+.lp-seg__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.75rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.lp-seg__btn:hover { background: var(--gray-50); }
+.lp-seg__n { color: var(--gray-500); font-weight: 500; font-variant-numeric: tabular-nums; }
+.lp-seg__btn[aria-pressed='true'] { background: var(--ink-900); color: #fff; }
+.lp-seg__btn[aria-pressed='true'] .lp-seg__n { color: rgba(255, 255, 255, 0.6); }
+
+.lp-filters {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding: 0 1.25rem 1rem;
+}
+.lp-search { flex: 1 1 18rem; min-width: 0; }
+.lp-clear {
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* Tables */
+.lp-table th {
+  padding: 0.7rem 0.7rem;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--gray-500);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.lp-table td {
+  padding: 0.9rem 0.7rem;
+  border-bottom: 1px solid var(--gray-100);
+  vertical-align: middle;
+}
+.lp-table tbody tr:last-child td { border-bottom: 0; }
+/* One line per cell so every row keeps the same height; only the reason text wraps. */
+.lp-table td { white-space: nowrap; }
+.lp-table th:first-child, .lp-table td:first-child { padding-left: 1.25rem; }
+.lp-table th:last-child, .lp-table td:last-child { padding-right: 1.25rem; }
+.lp-table td.lp-reason { white-space: normal; }
+.lp-name { display: flex; align-items: center; flex-wrap: wrap; gap: 0.25rem 0.4rem; font-weight: 700; color: var(--text); }
+.lp-name .name-text { white-space: nowrap; }
+/* Retention marker on the phone/state line, so every row keeps the same two-line height. */
+.lp-src { display: inline-flex; align-items: center; gap: 0.2rem; color: var(--text); font-weight: 600; white-space: nowrap; }
+.lp-src svg { width: 12px; height: 12px; }
+.lp-sub { margin-top: 0.15rem; font-size: 0.76rem; color: var(--gray-500); font-variant-numeric: tabular-nums; }
+.lp-reason { max-width: 30rem; color: var(--text); font-size: 0.85rem; }
+.lp-age {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 6px;
+  background: var(--gray-100);
+  color: var(--text);
+  font-size: 0.76rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.lp-age--warn { background: rgba(212, 175, 55, 0.18); color: var(--gold-700); }
+.lp-age--late { background: rgba(220, 38, 38, 0.1); color: var(--danger-600); }
+.lp-btn-outline { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+.lp-btn-outline:hover:not(:disabled) { background: var(--gray-50); }
+.lp-pay { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.82rem; color: var(--warning-600); white-space: nowrap; }
+.lp-pay i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.lp-pay[data-paid='true'] { color: var(--success-600); }
+.lp-pay--none { color: var(--gray-500); }
+.lp-time { font-size: 0.85rem; color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.lp-time + .lp-sub { white-space: nowrap; }
+
+
+/* To do / History switch — plain underline tabs, one list on screen at a time. */
+.lp-tabs {
+  display: flex;
+  gap: 1.75rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.lp-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: -1px;
+  padding: 0.6rem 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--gray-500);
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.lp-tabs button:hover { color: var(--text); }
+.lp-tabs button[aria-selected='true'] { color: var(--text); border-bottom-color: var(--ink-900); }
+.lp-tabs__n { color: var(--gray-500); font-size: 0.8rem; font-weight: 500; font-variant-numeric: tabular-nums; }

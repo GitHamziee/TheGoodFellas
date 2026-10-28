@@ -19,6 +19,7 @@ import { PageHero, EmptyState, Pagination, SearchBox, SkeletonRows, StatTile } f
 import { LeadDetail } from '../../../shared/lead-detail';
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 import { apiErrorMessage } from '../../../core/api';
+import { toastNotice } from '../../../core/toast-notice';
 
 interface LookupUser {
   id: string;
@@ -64,7 +65,7 @@ export class AdminRetention implements OnInit {
   readonly retentionPeople = signal<LookupUser[]>([]);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
-  readonly notice = signal<string | null>(null);
+  readonly notice = toastNotice();
 
   readonly syncing = signal(false);
 

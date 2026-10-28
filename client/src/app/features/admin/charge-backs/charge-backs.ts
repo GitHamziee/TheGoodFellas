@@ -39,6 +39,7 @@ import { CHARGE_BACK_REASON_OPTIONS, PLAN_TYPE_LABEL, PLAN_TYPE_OPTIONS, US_STAT
 import { PhoneInput } from '../../../shared/ui/phone-input';
 import { ZipInput } from '../../../shared/ui/zip-input';
 import { apiErrorMessage } from '../../../core/api';
+import { toastNotice } from '../../../core/toast-notice';
 
 interface LookupUser {
   id: string;
@@ -162,7 +163,7 @@ export class AdminChargeBacks implements OnInit {
   readonly externalClients = signal<ExternalClient[]>([]);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
-  readonly notice = signal<string | null>(null);
+  readonly notice = toastNotice();
   readonly busyId = signal<string | null>(null);
 
   /** Which lead each modal is acting on — only one is ever open at a time. */

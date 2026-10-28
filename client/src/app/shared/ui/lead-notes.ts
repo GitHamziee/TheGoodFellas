@@ -1,6 +1,6 @@
-import { Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { Component, booleanAttribute, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { LucidePlus, LucideSend, LucideStickyNote } from '@lucide/angular';
+import { LucideMessageSquare, LucidePlus, LucideSend, LucideStickyNote } from '@lucide/angular';
 import { apiErrorMessage } from '../../core/api';
 import { formatDate, formatDateTime, getAvatarTone, getInitials } from '../../core/format-utils';
 import { LeadNote } from '../../core/models/lead.model';
@@ -16,10 +16,23 @@ import { Modal } from './modal';
  */
 @Component({
   selector: 'app-note-peek',
-  imports: [FormsModule, Modal, LucidePlus, LucideSend, LucideStickyNote],
-  host: { '(click)': '$event.stopPropagation()' },
+  imports: [FormsModule, Modal, LucideMessageSquare, LucidePlus, LucideSend, LucideStickyNote],
+  host: { '(click)': '$event.stopPropagation()', '[class.is-compact]': 'compact()' },
   template: `
-    @if (latest(); as n) {
+    @if (compact()) {
+      <!-- Notes column: just the count; hover shows the latest note, click opens them all. -->
+      @if (latest(); as n) {
+        <button type="button" class="count" (click)="open()" [title]="n.author.name + ': ' + n.body">
+          <svg lucideMessageSquare></svg> {{ total() }}
+        </button>
+      } @else if (canAdd()) {
+        <button type="button" class="count count--add" (click)="open()" title="Add note" aria-label="Add note">
+          <svg lucidePlus></svg>
+        </button>
+      } @else {
+        <span class="none">—</span>
+      }
+    } @else if (latest(); as n) {
       <button type="button" class="peek" (click)="open()" title="Open notes">
         <svg lucideStickyNote></svg>
         <span class="txt">
@@ -74,6 +87,17 @@ import { Modal } from './modal';
   `,
   styles: `
     :host { display: block; margin-top: 0.25rem; }
+    :host(.is-compact) { display: inline-block; margin-top: 0; }
+    .count {
+      display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.3rem 0.55rem;
+      border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface);
+      color: var(--text); font: inherit; font-size: 0.8rem; font-weight: 600; cursor: pointer;
+      font-variant-numeric: tabular-nums;
+    }
+    .count:hover { border-color: var(--gray-400); }
+    .count svg { width: 14px; height: 14px; }
+    .count--add { color: var(--gray-500); border-style: dashed; }
+    .none { color: var(--gray-400); }
     .peek {
       display: inline-flex; align-items: flex-start; gap: 0.4rem; max-width: 22rem; padding: 0.25rem 0.5rem;
       border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--gray-50);
@@ -103,6 +127,8 @@ export class NotePeek {
   readonly notes = input<LeadNote[] | undefined>(undefined);
   /** Total notes on the lead as sent with the list row. */
   readonly count = input<number | undefined>(undefined);
+  /** Table-cell variant: a count button instead of the latest note's text. */
+  readonly compact = input(false, { transform: booleanAttribute });
 
   readonly canAdd = computed(() => this.auth.role() === 'RETENTION_MANAGER');
 

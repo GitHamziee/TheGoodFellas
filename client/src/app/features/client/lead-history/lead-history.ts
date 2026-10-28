@@ -32,6 +32,7 @@ import { LeadFullEdit } from '../../../shared/lead-full-edit';
 import { Period, PeriodFilter, inPeriod } from '../../../shared/ui/period-filter';
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 import { apiErrorMessage } from '../../../core/api';
+import { toastNotice } from '../../../core/toast-notice';
 
 @Component({
   selector: 'app-client-lead-history',
@@ -80,7 +81,7 @@ export class ClientLeadHistory implements OnInit {
 
   /** Offered-but-undecided leads of this page's type — shown in the section above the history. */
   readonly newLeads = signal<Lead[]>([]);
-  readonly notice = signal<string | null>(null);
+  readonly notice = toastNotice();
   readonly busyId = signal<string | null>(null);
   readonly selectedNew = signal<Lead | null>(null);
   /** Non-null while the edit dialog is open. */

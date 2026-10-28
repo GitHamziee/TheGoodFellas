@@ -47,7 +47,9 @@ function relativeTime(iso: string): string {
           </div>
           <div class="toast-body">
             <div class="toast-title">{{ n.title }}</div>
-            <div class="toast-msg">{{ n.message }}</div>
+            @if (n.message) {
+              <div class="toast-msg">{{ n.message }}</div>
+            }
             @if (n.link) {
               <div class="toast-cta">View →</div>
             }
