@@ -244,15 +244,8 @@ router.get(
   })
 );
 
-// A RETENTION_MANAGER works only charged-back leads: edit them, then submit them to the admin
-// queue. Assigning is Admin's alone. Everything else on the lead stays closed to the role.
-const chargedBackOnlyForRetentionManager = asyncHandler(async (req, res, next) => {
-  if (req.user!.role === 'RETENTION_MANAGER' && !(await leadService.leadIsChargedBack(req.params.id))) {
-    return apiError(res, 'Only charged-back leads can be worked', 403);
-  }
-  next();
-});
-
+// A RETENTION_MANAGER may edit any retention lead (PATCH /:id, edits are logged), but can only
+// submit a charged-back one to the admin queue. Assigning is Admin's alone.
 router.patch(
   '/:id/submit-to-admin',
   requireRole('RETENTION_MANAGER'),
@@ -366,9 +359,8 @@ router.patch(
 router.patch(
   '/:id',
   requireRole('ADMIN', 'MANAGER', 'RETENTION_MANAGER'),
-  chargedBackOnlyForRetentionManager,
   asyncHandler(async (req, res) => {
-    const result = await leadService.editLead(req.params.id, req.body ?? {});
+    const result = await leadService.editLead(req.params.id, req.body ?? {}, req.user!);
     return sendResult(res, result, 'Lead updated');
   })
 );
@@ -651,9 +643,9 @@ router.patch(
 // writes. Manager scope (router.param) only gates non-GET, so reads stay open to MANAGER.
 router.get(
   '/:id/notes',
-  requireRole('RETENTION_MANAGER', 'ADMIN', 'MANAGER'),
+  requireRole('RETENTION_MANAGER', 'ADMIN', 'MANAGER', 'RETENTION'),
   asyncHandler(async (req, res) => {
-    const result = await leadNotes.listNotes(req.params.id);
+    const result = await leadNotes.listNotes(req.params.id, req.user!);
     return sendResult(res, result);
   })
 );

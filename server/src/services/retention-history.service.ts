@@ -157,7 +157,7 @@ function buildTimeline(r: LeadRecord, names: Map<string, string>): TimelineEntry
     actor: nameOf(e.actorId),
     target: nameOf(e.targetId) ?? (e.type === 'ASSIGNED_TO_CLIENT' || e.type === 'ASSIGNED_EXTERNAL' ? e.note : null),
     // For assignments `note` is only the assignee's name, already shown as the target.
-    note: ['RETURNED_TO_RETENTION', 'RETURNED_TO_CLOSER', 'RETURNED_TO_JUNIOR', 'REJECTED', 'STATUS_SET'].includes(e.type) ? e.note : null,
+    note: ['RETURNED_TO_RETENTION', 'RETURNED_TO_CLOSER', 'RETURNED_TO_JUNIOR', 'REJECTED', 'STATUS_SET', 'EDITED'].includes(e.type) ? e.note : null,
   }));
 
   // Leads that predate LeadEvent: fill the two anchors we can still derive.

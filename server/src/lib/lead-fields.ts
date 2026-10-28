@@ -108,6 +108,14 @@ const FIELD_SCHEMA: Record<string, FieldSpec> = {
   dCode: { type: 'string', enumValues: D_CODE_VALUES },
 };
 
+const SENSITIVE_TYPES: FieldType[] = ['ssn', 'routing', 'accountNumber', 'cardNumber', 'cardExpiry'];
+
+/** True for fields holding identity/bank/card numbers — never echoed into logs. */
+export function isSensitiveField(key: string): boolean {
+  const type = FIELD_SCHEMA[key]?.type;
+  return !!type && SENSITIVE_TYPES.includes(type);
+}
+
 export const SHARED_FIELDS = [
   'customerName', 'maritalStatus', 'phone', 'state', 'zipcode', 'birthState', 'gender',
   'smoker', 'dob', 'age', 'height', 'weight', 'healthConditions',

@@ -15,6 +15,7 @@ export type RetentionTimelineKind =
   | 'RETURNED_TO_CLOSER'
   | 'RETURNED_TO_JUNIOR'
   | 'STATUS_SET'
+  | 'EDITED'
   | 'CHARGED_BACK';
 
 export interface RetentionHistoryRow {

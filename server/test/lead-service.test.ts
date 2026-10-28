@@ -20,6 +20,7 @@ import {
   enrichAndSubmitRetentionLead,
   getLeadById,
   listRetentionQueue,
+  editLead,
   markLeadChargedBack,
   markRetentionCallback,
   removeRetentionCallback,
@@ -284,5 +285,18 @@ describe('payment writes never record money twice', () => {
     expect(await batchChargeBack(['a', 'b'], 100, 'refund', 1)).toEqual({ data: { count: 2 } });
     expect(db.lead.updateMany.mock.calls[0][0].data.status).toBe('RETURNED_TO_RETENTION');
     expect(db.lead.updateMany.mock.calls[1][0].data.status).toBe('CHARGED_BACK');
+  });
+
+  it('a Retention Manager can edit a retention lead in any status', async () => {
+    db.lead.findUnique.mockResolvedValueOnce({ id: 'r1', status: 'ACCEPTED', leadType: 'RETENTION', phone: '555-111-2222' });
+    db.lead.updateMany.mockResolvedValueOnce({ count: 1 });
+    db.lead.findUnique.mockResolvedValueOnce({ id: 'r1' });
+    const res = await editLead('r1', { state: 'Texas' }, { id: 'rm-1', role: 'RETENTION_MANAGER' });
+    expect('error' in res).toBe(false);
+  });
+
+  it('an Admin still cannot edit a lead that is out with a client', async () => {
+    db.lead.findUnique.mockResolvedValueOnce({ id: 'r1', status: 'ACCEPTED', leadType: 'RETENTION' });
+    expect(await editLead('r1', { state: 'Texas' }, { id: 'a-1', role: 'ADMIN' })).toMatchObject({ status: 400 });
   });
 });

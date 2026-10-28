@@ -21,6 +21,15 @@
     <div class="warn"><strong>Admin asked you to fix:</strong> {{ reason }}</div>
   }
 
+  @if (notes().length) {
+    <div class="card manager-notes">
+      <h3>Notes from the Retention Manager</h3>
+      @for (n of notes(); track n.id) {
+        <p><strong>{{ n.author.name }}</strong> · {{ formatDateTime(n.createdAt) }}<br />{{ n.body }}</p>
+      }
+    </div>
+  }
+
   @if (loading()) {
     <div class="card"><app-skeleton-rows [count]="6" /></div>
   } @else {

@@ -339,7 +339,13 @@
   >
     <app-lead-detail [lead]="lead" [unmasked]="true" />
 
-    @if (!readOnly()) {
+    @if (readOnly()) {
+    <div footer>
+      <button type="button" class="btn btn--ghost" (click)="selected.set(null); openEdit(lead)">
+        <svg lucideSquarePen></svg> Edit
+      </button>
+    </div>
+    } @else {
     <div footer>
       @if (lead.status === 'SUBMITTED' || lead.status === 'REJECTED' || lead.status === 'CHARGED_BACK') {
         @if (lead.status === 'REJECTED' || lead.status === 'CHARGED_BACK') {

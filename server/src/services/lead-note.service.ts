@@ -12,9 +12,16 @@ const NOTE_SELECT = {
 } as const;
 
 /** Newest first — the latest follow-up is the one the Retention Manager wants to see. */
-export async function listNotes(leadId: string): Promise<ServiceResult<{ notes: unknown[] }>> {
-  const lead = await prisma.lead.findUnique({ where: { id: leadId }, select: { id: true } });
+export async function listNotes(
+  leadId: string,
+  viewer?: { id: string; role: string }
+): Promise<ServiceResult<{ notes: unknown[] }>> {
+  const lead = await prisma.lead.findUnique({ where: { id: leadId }, select: { id: true, leadType: true, retentionId: true } });
   if (!lead) return { error: 'Lead not found', status: 404 };
+  // A Retention person reads the notes left on their own leads — nobody else's.
+  if (viewer?.role === 'RETENTION' && (lead.leadType !== 'RETENTION' || lead.retentionId !== viewer.id)) {
+    return { error: 'Not your lead', status: 403 };
+  }
 
   const notes = await prisma.leadNote.findMany({
     where: { leadId },

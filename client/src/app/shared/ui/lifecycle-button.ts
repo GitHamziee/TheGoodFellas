@@ -21,6 +21,7 @@ export const KIND_LABEL: Record<RetentionTimelineKind, string> = {
   REJECTED: 'Rejected',
   PAID: 'Marked paid',
   STATUS_SET: 'Status set',
+  EDITED: 'Edited',
   CHARGED_BACK: 'Charged back',
 };
 

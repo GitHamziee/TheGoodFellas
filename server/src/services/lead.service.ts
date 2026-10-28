@@ -8,6 +8,7 @@ import {
   DRAFT_FIELDS,
   FULL_LEAD_DRAFT_FIELDS,
   FULL_LEAD_FIELDS,
+  isSensitiveField,
   JUNIOR_INTAKE_FIELDS,
   RETENTION_INTAKE_FIELDS,
   sanitizeLeadFields,
@@ -218,11 +219,6 @@ export async function submitChargedBackToAdmin(leadId: string, actorId: string):
 
   const result = await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE });
   return { data: { lead: result } };
-}
-
-/** True when the lead exists and is currently CHARGED_BACK. */
-export async function leadIsChargedBack(leadId: string): Promise<boolean> {
-  return (await prisma.lead.count({ where: { id: leadId, status: 'CHARGED_BACK' } })) > 0;
 }
 
 /** True when every given lead is a RETENTION lead — the only kind a RETENTION_MANAGER may touch. */
@@ -820,11 +816,36 @@ export async function batchAssignToRetention(
 
 const EDITABLE_STATUSES = ['REJECTED', 'CHARGED_BACK'] as const;
 
-/** Admin edits lead fields — only permitted while a lead sits REJECTED or CHARGED_BACK, prior to reassignment. */
-export async function editLead(leadId: string, input: Record<string, unknown>): Promise<ServiceResult<{ lead: unknown }>> {
+const fieldLabel = (key: string) => key.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
+const logValue = (v: unknown) => (v === null || v === undefined || v === '' ? '—' : v instanceof Date ? v.toISOString().slice(0, 10) : String(v));
+
+/** "Phone: 555 → 556; SSN changed" for every field the edit actually moved. */
+function describeEdit(before: Record<string, unknown>, data: Record<string, unknown>): string {
+  const parts: string[] = [];
+  for (const [key, next] of Object.entries(data)) {
+    const prev = before[key];
+    if (logValue(prev) === logValue(next)) continue;
+    parts.push(
+      isSensitiveField(key) ? `${fieldLabel(key)} changed` : `${fieldLabel(key)}: ${logValue(prev)} → ${logValue(next)}`
+    );
+  }
+  return parts.join('; ').slice(0, 1500);
+}
+
+/**
+ * Edits lead fields. Admin/Manager: only while a lead sits REJECTED or CHARGED_BACK, prior to
+ * reassignment. Retention Manager: any RETENTION lead, any status (the route pins the scope).
+ * Every edit to a RETENTION lead is written to the lifecycle as an EDITED event, so Admin can
+ * see who changed what.
+ */
+export async function editLead(
+  leadId: string,
+  input: Record<string, unknown>,
+  actor?: { id: string; role: string }
+): Promise<ServiceResult<{ lead: unknown }>> {
   const lead = await prisma.lead.findUnique({ where: { id: leadId } });
   if (!lead) return { error: 'Lead not found', status: 404 };
-  if (!EDITABLE_STATUSES.includes(lead.status as (typeof EDITABLE_STATUSES)[number])) {
+  if (actor?.role !== 'RETENTION_MANAGER' && !EDITABLE_STATUSES.includes(lead.status as (typeof EDITABLE_STATUSES)[number])) {
     return { error: 'Only declined or charged-back leads can be edited', status: 400 };
   }
 
@@ -839,6 +860,11 @@ export async function editLead(leadId: string, input: Record<string, unknown>): 
       data: sanitized.data,
     });
     if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
+
+    if (lead.leadType === 'RETENTION') {
+      const change = describeEdit(lead as unknown as Record<string, unknown>, sanitized.data as Record<string, unknown>);
+      if (change) void recordRetentionEvents([leadId], 'EDITED', { actorId: actor?.id, note: change });
+    }
   }
 
   const result = await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE });

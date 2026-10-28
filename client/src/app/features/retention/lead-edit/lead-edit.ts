@@ -18,7 +18,7 @@ import { RetentionSubmitInput, LeadService } from '../../../core/services/lead.s
 import { UserService } from '../../../core/services/user.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { ZoomPhoneService } from '../../../core/services/zoom-phone.service';
-import { Lead } from '../../../core/models/lead.model';
+import { Lead, LeadNote } from '../../../core/models/lead.model';
 import {
   ACCOUNT_OWNERSHIP_OPTIONS,
   ACCOUNT_TYPE_OPTIONS,
@@ -35,7 +35,7 @@ import {
   SMOKER_OPTIONS,
   US_STATE_OPTIONS,
 } from '../../../core/lead-options';
-import { formatCardExpiry, getInitials, sanitizeDigits, toDateInput, todayDateInput } from '../../../core/format-utils';
+import { formatCardExpiry, formatDateTime, getInitials, sanitizeDigits, toDateInput, todayDateInput } from '../../../core/format-utils';
 import { SkeletonRows } from '../../../shared/ui/ui';
 import { Modal } from '../../../shared/ui/modal';
 import { Select } from '../../../shared/ui/select';
@@ -132,6 +132,9 @@ export class RetentionLeadEdit implements OnInit {
   readonly showDraftReasonError = signal(false);
   readonly draftModalOpen = signal(false);
   readonly lead = signal<Lead | null>(null);
+  /** Follow-up notes the Retention Manager left on this lead (only readable on your own leads). */
+  readonly notes = signal<LeadNote[]>([]);
+  readonly formatDateTime = formatDateTime;
 
   readonly currentUserId = computed(() => this.auth.user()?.id ?? null);
   readonly isMine = computed(() => this.lead()?.retention?.id === this.currentUserId());
@@ -214,6 +217,7 @@ export class RetentionLeadEdit implements OnInit {
     try {
       const lead = await this.leadService.getLead(this.leadId);
       this.lead.set(lead);
+      this.leadService.leadNotes(lead.id).then((n) => this.notes.set(n)).catch(() => undefined);
       this.form = {
         customerName: lead.customerName,
         maritalStatus: lead.maritalStatus ?? undefined,
