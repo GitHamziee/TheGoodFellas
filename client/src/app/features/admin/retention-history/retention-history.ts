@@ -1,4 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { LucideFileText } from '@lucide/angular';
 import { LeadService } from '../../../core/services/lead.service';
 import { apiErrorMessage } from '../../../core/api';
@@ -12,6 +13,7 @@ import {
 } from '../../../core/models/retention-history.model';
 import { chargeBackMonthLabel } from '../../../core/lead-options';
 import { Modal } from '../../../shared/ui/modal';
+import { Select } from '../../../shared/ui/select';
 import { KIND_LABEL, KIND_TONE } from '../../../shared/ui/lifecycle-button';
 import { EmptyState, Pagination, SearchBox, SkeletonRows } from '../../../shared/ui/ui';
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
@@ -61,7 +63,9 @@ function stageOf(l: RetentionHistoryRow): string {
 @Component({
   selector: 'app-retention-history',
   imports: [
+    FormsModule,
     Modal,
+    Select,
     SearchBox,
     Pagination,
     EmptyState,
@@ -69,20 +73,14 @@ function stageOf(l: RetentionHistoryRow): string {
     LucideFileText,
   ],
   templateUrl: './retention-history.html',
+  // Same header / tiles / card vocabulary as the lead pages.
+  styleUrl: '../leads/leads.css',
   styles: `
-    .glance { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); background: var(--surface, #fff); border: 1px solid var(--gray-200, #e5e7eb); border-radius: 12px; margin-bottom: 1rem; overflow: hidden; }
-    .g { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.7rem 1rem; border-left: 3px solid transparent; box-shadow: -1px 0 0 var(--gray-100, #f3f4f6); }
-    .g-num { font-size: 1.45rem; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
-    .g-label { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--gray-500); }
-    .g--bad { border-left-color: var(--danger-600, #dc2626); }
-    .g--bad .g-num { color: var(--danger-600, #dc2626); }
-    .g--warn { border-left-color: #d99a1d; }
-    .g--good { border-left-color: var(--success-600, #16a34a); }
-    .monthly { --paid: #2a78d6; --charged: #eb6834; padding: 0.8rem 1rem 0.6rem; margin-bottom: 1rem; }
+    .monthly { --paid: #2a78d6; --charged: #eb6834; padding: 1rem 1.25rem 0.75rem; }
     @media (prefers-color-scheme: dark) { :root:where(:not([data-theme='light'])) .monthly { --paid: #3987e5; --charged: #d95926; } }
     :root[data-theme='dark'] .monthly { --paid: #3987e5; --charged: #d95926; }
     .m-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.3rem 1rem; margin-bottom: 0.5rem; }
-    .m-title { font-weight: 700; font-size: 0.9rem; }
+    .m-title { margin: 0; font-weight: 800; font-size: 1.05rem; }
     .m-legend { display: flex; gap: 1rem; font-size: 0.78rem; color: var(--gray-600); }
     .m-legend i { display: inline-block; width: 0.6rem; height: 0.6rem; border-radius: 2px; margin-right: 0.35rem; }
     .m-plot { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.5rem; height: 120px; border-bottom: 1px solid var(--gray-200, #e5e7eb); }
@@ -97,7 +95,6 @@ function stageOf(l: RetentionHistoryRow): string {
     .m-grp:hover .m-tip, .m-grp:focus-visible .m-tip { display: block; }
     .m-tip b { font-variant-numeric: tabular-nums; }
     .m-axis { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.5rem; margin-top: 0.3rem; text-align: center; font-size: 0.72rem; color: var(--gray-500); }
-    .pills { margin-bottom: 1rem; }
     .book { display: flex; align-items: center; gap: 0.6rem; min-width: 150px; }
     .book-track { flex: 1; height: 6px; border-radius: 999px; background: var(--gray-100); overflow: hidden; }
     .book-bar { display: block; height: 100%; border-radius: 999px; background: var(--gold-500); }
@@ -173,6 +170,34 @@ export class RetentionHistory implements OnInit {
     };
   });
 
+  readonly tiles = computed<{ label: string; value: string | number; sub: string; tone: '' | 'bad' | 'good' | 'warn' }[]>(() => {
+    const s = this.stats();
+    return [
+      { label: 'Needs reassignment', value: s.needsReassignment, sub: 'charged back', tone: s.needsReassignment ? 'bad' : '' },
+      { label: 'Awaiting decision', value: s.awaitingDecision, sub: 'with client', tone: '' },
+      { label: 'Approved & paid', value: s.active, sub: 'on book', tone: 'good' },
+      { label: 'Charge-back rate', value: `${s.chargeBackRate}%`, sub: `${s.chargedBack} of ${s.everPaid} paid`, tone: s.chargedBack ? 'warn' : '' },
+      { label: 'Avg time on book', value: `${s.avgMonths} mo`, sub: `of ${BOOK_MONTHS}`, tone: '' },
+    ];
+  });
+
+  readonly sortOptions = [
+    { value: 'createdAt:desc', label: 'Sort: Newest first' },
+    { value: 'createdAt:asc', label: 'Sort: Oldest first' },
+    { value: 'chargedBackAt:desc', label: 'Sort: Latest charge-back' },
+    { value: 'monthsOnBook:desc', label: 'Sort: Longest on book' },
+    { value: 'monthsOnBook:asc', label: 'Sort: Shortest on book' },
+    { value: 'customerName:asc', label: 'Sort: Name A–Z' },
+  ];
+  readonly sortValue = computed(() => `${this.view.sortKey()}:${this.view.sortDir()}`);
+
+  setSort(value: string): void {
+    const [key, dir] = value.split(':');
+    this.view.sortKey.set(key);
+    this.view.sortDir.set(dir as 'asc' | 'desc');
+    this.view.page.set(1);
+  }
+
   /** Last six calendar months: leads first marked paid vs charge-backs recorded. */
   readonly monthly = computed(() => {
     const now = new Date();
@@ -207,11 +232,6 @@ export class RetentionHistory implements OnInit {
     initialSort: { key: 'createdAt', dir: 'desc' },
     pageSize: 10,
   });
-
-  sortArrow(key: string): string {
-    if (this.view.sortKey() !== key) return '';
-    return this.view.sortDir() === 'asc' ? '↑' : '↓';
-  }
 
   barPct(months: number | null): number {
     return Math.min(100, Math.round(((months ?? 0) / BOOK_MONTHS) * 100));

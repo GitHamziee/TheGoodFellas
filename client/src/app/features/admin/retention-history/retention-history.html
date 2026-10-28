@@ -1,43 +1,39 @@
 <div class="page">
+  <header class="lp-head">
+    <div>
+      <div class="lp-eyebrow">Retention</div>
+      <h1 class="lp-title">Lead lifecycle</h1>
+    </div>
+  </header>
+
   @if (error()) {
     <div class="error">{{ error() }}</div>
   }
 
+  <div class="lp-tiles">
+    @for (t of tiles(); track t.label) {
+      <div class="lp-tile">
+        <span class="lp-tile__label">{{ t.label }}</span>
+        <span class="lp-tile__row">
+          <span class="lp-tile__value" [attr.data-tone]="t.tone">{{ loading() ? '–' : t.value }}</span>
+          <span class="lp-tile__sub">{{ t.sub }}</span>
+        </span>
+      </div>
+    }
+  </div>
+
   @if (loading()) {
-    <div class="card"><app-skeleton-rows [count]="6" /></div>
+    <section class="lp-card"><app-skeleton-rows [count]="6" /></section>
   } @else if (leads().length === 0) {
-    <div class="card">
+    <section class="lp-card">
       <app-empty-state title="No retention leads yet">
         <svg lucideFileText></svg>
       </app-empty-state>
-    </div>
+    </section>
   } @else {
-    <div class="glance">
-      <div class="g" [class.g--bad]="stats().needsReassignment">
-        <span class="g-num">{{ stats().needsReassignment }}</span>
-        <span class="g-label">Needs reassignment</span>
-      </div>
-      <div class="g">
-        <span class="g-num">{{ stats().awaitingDecision }}</span>
-        <span class="g-label">Awaiting client decision</span>
-      </div>
-      <div class="g g--good">
-        <span class="g-num">{{ stats().active }}</span>
-        <span class="g-label">Approved and paid</span>
-      </div>
-      <div class="g" [class.g--warn]="stats().chargedBack">
-        <span class="g-num">{{ stats().chargeBackRate }}%</span>
-        <span class="g-label">Charge-back rate · {{ stats().chargedBack }} of {{ stats().everPaid }} paid</span>
-      </div>
-      <div class="g">
-        <span class="g-num">{{ stats().avgMonths }} {{ stats().avgMonths === 1 ? 'Month' : 'Months' }}</span>
-        <span class="g-label">Avg time on book</span>
-      </div>
-    </div>
-
-    <div class="card monthly">
+    <section class="lp-card monthly">
       <div class="m-head">
-        <span class="m-title">Paid vs charged back, last {{ monthly().length }} months</span>
+        <h2 class="m-title">Paid vs charged back</h2>
         <span class="m-legend">
           <span><i style="background: var(--paid)"></i>Marked paid</span>
           <span><i style="background: var(--charged)"></i>Charged back</span>
@@ -61,61 +57,56 @@
       <div class="m-axis">
         @for (m of monthly(); track m.full) { <span>{{ m.label }}</span> }
       </div>
-    </div>
+    </section>
 
-    <div class="pills">
-      <button type="button" class="pill" [class.active]="view.status() === ''" (click)="view.setStatus('')">
-        All <span class="n">{{ leads().length }}</span>
-      </button>
-      @for (o of stateOptions(); track o.value) {
-        <button type="button" class="pill" [class.active]="view.status() === o.value" (click)="view.setStatus(o.value)">
-          {{ o.label }} <span class="n">{{ o.count }}</span>
-        </button>
-      }
-    </div>
+    <section class="lp-card">
+      <div class="lp-card__head">
+        <div class="lp-seg" role="group" aria-label="Filter by status">
+          <button type="button" class="lp-seg__btn" [attr.aria-pressed]="view.status() === ''" (click)="view.setStatus('')">
+            All <span class="lp-seg__n">{{ leads().length }}</span>
+          </button>
+          @for (o of stateOptions(); track o.value) {
+            <button type="button" class="lp-seg__btn" [attr.aria-pressed]="view.status() === o.value" (click)="view.setStatus(o.value)">
+              {{ o.label }} <span class="lp-seg__n">{{ o.count }}</span>
+            </button>
+          }
+        </div>
+        <div class="lp-search">
+          <app-search-box
+            [value]="view.search()"
+            placeholder="Search customer or retention person"
+            (valueChange)="view.setSearch($event)"
+          />
+        </div>
+        <div class="lp-sort">
+          <app-select [options]="sortOptions" [ngModel]="sortValue()" (ngModelChange)="setSort($event)" />
+        </div>
+      </div>
 
-    <div class="toolbar">
-      <app-search-box
-        [value]="view.search()"
-        placeholder="Search by customer or retention person…"
-        (valueChange)="view.setSearch($event)"
-      />
-    </div>
-
-    <div class="card card--flush">
       @if (view.total() === 0) {
         <app-empty-state title="No retention leads match">
           <svg lucideFileText></svg>
         </app-empty-state>
       } @else {
         <div class="table-wrap">
-          <table>
+          <table class="lp-table">
             <thead>
               <tr>
-                <th class="sortable" (click)="view.toggleSort('customerName')">
-                  Customer <span class="arrow">{{ sortArrow('customerName') }}</span>
-                </th>
-                <th class="sortable hide-md" (click)="view.toggleSort('createdAt')">
-                  Created <span class="arrow">{{ sortArrow('createdAt') }}</span>
-                </th>
+                <th>Customer</th>
                 <th class="hide-sm">Closer</th>
-                <th class="sortable" (click)="view.toggleSort('monthsOnBook')">
-                  Time on book <span class="arrow">{{ sortArrow('monthsOnBook') }}</span>
-                </th>
-                <th class="sortable hide-sm" (click)="view.toggleSort('chargedBackAt')">
-                  Charged back <span class="arrow">{{ sortArrow('chargedBackAt') }}</span>
-                </th>
-                <th class="hide-md">Reassigned to</th>
-                <th class="hide-md">Retained by</th>
-                <th>Current stage</th>
+                <th>Time on book</th>
+                <th class="hide-sm">Charged back</th>
+                <th class="hide-md">Retention</th>
                 <th>Status</th>
               </tr>
             </thead>
             <tbody>
               @for (lead of view.rows(); track lead.id) {
                 <tr class="clickable" (click)="open(lead)">
-                  <td><div class="cell-main">{{ lead.customerName }}</div></td>
-                  <td class="hide-md">{{ formatDate(lead.createdAt) }}</td>
+                  <td>
+                    <div class="lp-name"><span class="name-text">{{ lead.customerName }}</span></div>
+                    <div class="lp-sub">Created {{ formatDate(lead.createdAt) }}</div>
+                  </td>
                   <td class="hide-sm">
                     @if (lead.closer) {
                       <div class="person">
@@ -135,19 +126,34 @@
                         <span class="book-val">{{ lead.monthsOnBook }} / {{ bookMonths }} mo</span>
                       </div>
                     } @else {
-                      <span class="empty">—</span>
+                      <span class="empty">Not paid yet</span>
                     }
                   </td>
                   <td class="hide-sm">
-                    {{ formatDate(lead.chargedBackAt) }}
-                    @if (lead.chargeBackCount > 1) {
-                      <span class="chip">×{{ lead.chargeBackCount }}</span>
+                    @if (lead.chargedBackAt) {
+                      <div class="lp-time">{{ formatDate(lead.chargedBackAt) }}</div>
+                      @if (lead.chargeBackCount > 1) {
+                        <div class="lp-sub">{{ lead.chargeBackCount }} times</div>
+                      }
+                    } @else {
+                      <span class="empty">—</span>
                     }
                   </td>
-                  <td class="hide-md">{{ lead.reassignedTo ?? '—' }}</td>
-                  <td class="hide-md">{{ lead.retainedBy ?? '—' }}</td>
-                  <td>{{ stage(lead) }}</td>
-                  <td><span class="badge" [class]="'badge ' + stateBadge(lead.state)">{{ stateLabel(lead.state) }}</span></td>
+                  <td class="hide-md">
+                    @if (lead.retainedBy) {
+                      <div class="lp-time">{{ lead.retainedBy }}</div>
+                      <div class="lp-sub">Retained{{ lead.reassignedTo && lead.reassignedTo !== lead.retainedBy ? ' · reassigned to ' + lead.reassignedTo : '' }}</div>
+                    } @else if (lead.reassignedTo) {
+                      <div class="lp-time">{{ lead.reassignedTo }}</div>
+                      <div class="lp-sub">Reassigned</div>
+                    } @else {
+                      <span class="empty">—</span>
+                    }
+                  </td>
+                  <td>
+                    <span class="badge" [class]="'badge ' + stateBadge(lead.state)">{{ stateLabel(lead.state) }}</span>
+                    <div class="lp-sub">{{ stage(lead) }}</div>
+                  </td>
                 </tr>
               }
             </tbody>
@@ -161,7 +167,7 @@
           (pageChange)="view.page.set($event)"
         />
       }
-    </div>
+    </section>
   }
 </div>
 
