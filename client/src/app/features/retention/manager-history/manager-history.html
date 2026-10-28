@@ -90,7 +90,7 @@
                     <span class="chip">{{ actionLabel(action) }}</span>
                   }
                 </td>
-                <td><app-status-badge [status]="lead.status" /><app-admin-status-badge [status]="lead.adminStatus" /></td>
+                <td><app-status-badge [status]="lead.status" hideDecided /><app-admin-status-badge [status]="lead.adminStatus" /></td>
                 <td class="right hide-sm">
                   <span class="chip"><svg lucideClock></svg>{{ timeAgo(lead.workedAt) }}</span>
                 </td>
