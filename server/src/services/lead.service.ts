@@ -1589,6 +1589,25 @@ export async function listCallbacksForAdmin(viewer: 'ADMIN' | 'MANAGER') {
   });
 }
 
+/** One-time fill of `submittedAt` for SUBMITTED leads that predate the column, taken from the
+ * audit trail's latest SUBMITTED event (Retention leads only — others keep the client fallback).
+ * Idempotent: only touches leads whose `submittedAt` is still null. `updatedAt` is written back
+ * unchanged, since Prisma would otherwise bump it to now. */
+export async function backfillSubmittedAt(): Promise<number> {
+  const leads = await prisma.lead.findMany({
+    where: { status: 'SUBMITTED', submittedAt: null },
+    select: { id: true, updatedAt: true, events: { where: { type: 'SUBMITTED' }, orderBy: { createdAt: 'desc' }, take: 1, select: { createdAt: true } } },
+  });
+  let filled = 0;
+  for (const l of leads) {
+    const at = l.events[0]?.createdAt;
+    if (!at) continue;
+    const res = await prisma.lead.updateMany({ where: { id: l.id, submittedAt: null }, data: { submittedAt: at, updatedAt: l.updatedAt } });
+    filled += res.count;
+  }
+  return filled;
+}
+
 /** Lapses every Callback older than RETENTION_CALLBACK_HOURS: the lead becomes a DRAFT (reason
  * CALLBACK) assigned to the person who held it, with a fresh exclusive window, and the callback
  * flag is cleared. Run on a timer; each lead is guarded on the same callback it read, so a

@@ -38,5 +38,9 @@ server.listen(env.port, () => {
   console.log(`TheGoodFellas API listening on http://localhost:${env.port}`);
   void pruneNotifications();
   void expireCallbacks();
+  void leadService.backfillSubmittedAt().catch((err) => {
+    console.error("[leads] submittedAt backfill failed", err);
+    reportError(err);
+  });
   startSheetSyncTimer();
 });
