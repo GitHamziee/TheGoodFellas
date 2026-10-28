@@ -1,20 +1,20 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { LucideClock, LucidePhoneCall, LucideTriangleAlert, LucideUsers, LucideX } from '@lucide/angular';
+import { LucideClock, LucidePhoneCall, LucideUsers, LucideX } from '@lucide/angular';
 import { LeadService } from '../../../core/services/lead.service';
 import { Lead } from '../../../core/models/lead.model';
 import { createListView } from '../../../core/list-view';
 import { formatDate, formatPhone, getAvatarTone, getInitials, timeAgo } from '../../../core/format-utils';
 import { Modal } from '../../../shared/ui/modal';
 import { Select } from '../../../shared/ui/select';
-import { EmptyState, Pagination, SearchBox, SkeletonRows, StatTile } from '../../../shared/ui/ui';
+import { EmptyState, Pagination, SearchBox, SkeletonRows, StatTile, StatusBadge } from '../../../shared/ui/ui';
 import { LeadDetail } from '../../../shared/lead-detail';
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 
 /** Mirrors RETENTION_CALLBACK_HOURS on the server — after this a callback lapses to drafts. */
 const CALLBACK_HOURS = 48;
 /** Flagged as about to lapse once less than this is left. */
-const SOON_HOURS = 6;
+const SOON_HOURS = 1;
 
 @Component({
   selector: 'app-admin-callbacks',
@@ -24,6 +24,7 @@ const SOON_HOURS = 6;
     Select,
     LeadDetail,
     StatTile,
+    StatusBadge,
     SearchBox,
     Pagination,
     EmptyState,
@@ -31,7 +32,6 @@ const SOON_HOURS = 6;
     LucidePhoneCall,
     LucideClock,
     LucideUsers,
-    LucideTriangleAlert,
     LucideX,
   ],
   templateUrl: './callbacks.html',
@@ -91,7 +91,6 @@ export class AdminCallbacks implements OnInit {
     const rows = this.filtered();
     return {
       total: rows.length,
-      soon: rows.filter((l) => this.isSoon(l)).length,
       people: new Set(rows.map((l) => l.callbackBy?.id).filter(Boolean)).size,
     };
   });

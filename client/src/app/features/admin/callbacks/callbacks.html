@@ -19,9 +19,6 @@
       <app-stat-tile [value]="stats().total" label="Active callbacks" tone="tone-gold">
         <svg lucidePhoneCall></svg>
       </app-stat-tile>
-      <app-stat-tile [value]="stats().soon" label="Lapsing within 6 hours" [tone]="stats().soon ? 'tone-danger' : 'tone-c'">
-        <svg lucideTriangleAlert></svg>
-      </app-stat-tile>
       <app-stat-tile [value]="stats().people" label="People with callbacks" tone="tone-f">
         <svg lucideUsers></svg>
       </app-stat-tile>
@@ -60,7 +57,10 @@
                   <th class="sortable hide-md" (click)="view.toggleSort('callbackAt')">
                     Marked <span class="arrow">{{ sortArrow('callbackAt') }}</span>
                   </th>
-                  <th class="right">Lapses</th>
+                  <th class="hide-sm">Status</th>
+                  <th class="sortable right" (click)="view.toggleSort('callbackAt')">
+                    Lapses <span class="arrow">{{ sortArrow('callbackAt') }}</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -92,6 +92,9 @@
                     </td>
                     <td class="hide-md">
                       <div class="cell-main">{{ lead.callbackAt ? timeAgo(lead.callbackAt) : '—' }}</div>
+                    </td>
+                    <td class="hide-sm">
+                      <app-status-badge [status]="lead.status" hideDecided />
                     </td>
                     <td class="right">
                       <span class="chip" [class.left--soon]="isSoon(lead)">
