@@ -1,8 +1,10 @@
 <div class="page page--form">
   <div class="page-head">
     <div>
-      <a class="back-link" routerLink="/retention/leads"><svg lucideArrowLeft></svg> Leads</a>
-      @if (isCallback()) {
+      <a class="back-link" [routerLink]="backPath()"><svg lucideArrowLeft></svg> Leads</a>
+      @if (managerMode()) {
+        <h1>Edit Lead</h1>
+      } @else if (isCallback()) {
         <h1>Callback</h1>
       } @else if (isReturned()) {
         <h1>Correct Lead</h1>
@@ -50,11 +52,13 @@
           }
           <div class="v">{{ l.customerName }} · {{ l.state }}</div>
         </div>
-        <div>
-          <button type="button" class="btn btn--sm" [disabled]="!form.phone" (click)="dialLead()">
-            <svg lucidePhoneCall></svg> Dial lead
-          </button>
-        </div>
+        @if (!managerMode()) {
+          <div>
+            <button type="button" class="btn btn--sm" [disabled]="!form.phone" (click)="dialLead()">
+              <svg lucidePhoneCall></svg> Dial lead
+            </button>
+          </div>
+        }
       </div>
     }
 
@@ -379,19 +383,21 @@
         @if (missing().length > 0) {
           <span class="pending-note">Still needed: {{ missing().join(', ') }}</span>
         } @else {
-          <span class="pending-note ok">Ready to submit — {{ completeness() }}% of the application filled in</span>
+          <span class="pending-note ok">{{ managerMode() ? 'Application' : 'Ready to submit — ' + completeness() + '% of the application filled in' }}</span>
         }
-        <button class="btn btn--ghost" type="button" [disabled]="savingCallback() || submitting()" (click)="toggleCallback()">
-          <svg lucidePhoneForwarded></svg> {{ isCallback() ? 'Remove Callback' : 'Mark as Callback' }}
-        </button>
-        <button class="btn btn--ghost" type="button" [disabled]="savingDraft() || submitting()" (click)="openDraftModal()">
-          <svg lucideNotebookPen></svg> Save as draft
-        </button>
+        @if (!managerMode()) {
+          <button class="btn btn--ghost" type="button" [disabled]="savingCallback() || submitting()" (click)="toggleCallback()">
+            <svg lucidePhoneForwarded></svg> {{ isCallback() ? 'Remove Callback' : 'Mark as Callback' }}
+          </button>
+          <button class="btn btn--ghost" type="button" [disabled]="savingDraft() || submitting()" (click)="openDraftModal()">
+            <svg lucideNotebookPen></svg> Save as draft
+          </button>
+        }
         <button class="btn" type="submit" [disabled]="!canSubmit()">
           @if (submitting()) {
-            <span class="spinner"></span> Submitting…
+            <span class="spinner"></span> {{ managerMode() ? 'Saving…' : 'Submitting…' }}
           } @else {
-            <svg lucideSend></svg> Submit to admin
+            <svg lucideSend></svg> {{ managerMode() ? 'Save changes' : 'Submit to admin' }}
           }
         </button>
       </div>

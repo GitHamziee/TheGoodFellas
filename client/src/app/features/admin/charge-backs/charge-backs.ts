@@ -1,3 +1,4 @@
+import { Router } from '@angular/router';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
@@ -150,6 +151,7 @@ export class AdminChargeBacks implements OnInit {
   private readonly externalClientService = inject(ExternalClientService);
   private readonly analyticsService = inject(AnalyticsService);
   private readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
 
   /** PKR amounts are ADMIN-only (the server omits them for MANAGER) — charts fall back to counts. */
   /** Retention Manager works charged-back leads (edit / assign) but has no closers to show; the server limits him to charged-back Retention leads. */
@@ -560,6 +562,10 @@ export class AdminChargeBacks implements OnInit {
   // ─── Edit (charged-back leads only) ────────────────────────
   openEdit(lead: Lead, event?: Event): void {
     event?.stopPropagation();
+    if (this.auth.role() === 'RETENTION_MANAGER') {
+      void this.router.navigate(['/retention-manager/leads', lead.id]);
+      return;
+    }
     this.error.set(null);
     this.draft.set({
       customerName: lead.customerName,

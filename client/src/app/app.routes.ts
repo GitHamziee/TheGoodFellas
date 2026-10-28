@@ -556,6 +556,10 @@ export const routes: Routes = [
         path: 'leads',
         loadComponent: () => import('./features/admin/leads/leads').then((m) => m.AdminLeads),
       },
+      {
+        path: 'leads/:id',
+        loadComponent: () => import('./features/retention/lead-edit/lead-edit').then((m) => m.RetentionLeadEdit),
+      },
       { path: 'cpl-leads', redirectTo: 'charge-backs' },
       {
         path: 'retention-history',

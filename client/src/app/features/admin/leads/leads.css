@@ -219,3 +219,10 @@
 .lp-tabs button:hover { color: var(--text); }
 .lp-tabs button[aria-selected='true'] { color: var(--text); border-bottom-color: var(--ink-900); }
 .lp-tabs__n { color: var(--gray-500); font-size: 0.8rem; font-weight: 500; font-variant-numeric: tabular-nums; }
+
+.row-edit {
+  display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; padding: 0;
+  margin-left: 0.25rem; border: 0; border-radius: 50%; background: transparent; color: var(--gray-400); cursor: pointer;
+}
+.row-edit:hover { background: var(--gray-100); color: var(--gray-700); }
+.row-edit svg { width: 14px; height: 14px; }

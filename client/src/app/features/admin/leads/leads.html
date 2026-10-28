@@ -105,6 +105,11 @@
                 <td>
                   <div class="lp-name">
                     <span class="name-info"><span class="name-text">{{ lead.customerName }}</span><app-lifecycle-button [leadId]="lead.id" [name]="lead.customerName" /></span>
+                    @if (readOnly()) {
+                      <button type="button" class="row-edit" aria-label="Edit lead" title="Edit" (click)="openEdit(lead, $event)">
+                        <svg lucideSquarePen></svg>
+                      </button>
+                    }
                   </div>
                   <div class="lp-sub">
                     {{ formatPhone(lead.phone) }} · {{ lead.state }}

@@ -132,6 +132,10 @@ export class RetentionLeadEdit implements OnInit {
   readonly showDraftReasonError = signal(false);
   readonly draftModalOpen = signal(false);
   readonly lead = signal<Lead | null>(null);
+  /** The Retention Manager edits any retention lead through this same form; it saves in place
+   *  (no status change, no draft/callback) and the edit is logged for Admin. */
+  readonly managerMode = computed(() => this.auth.role() === 'RETENTION_MANAGER');
+  readonly backPath = computed(() => (this.managerMode() ? '/retention-manager/leads' : '/retention/leads'));
   /** Follow-up notes the Retention Manager left on this lead (only readable on your own leads). */
   readonly notes = signal<LeadNote[]>([]);
   readonly formatDateTime = formatDateTime;
@@ -209,7 +213,7 @@ export class RetentionLeadEdit implements OnInit {
 
   async ngOnInit(): Promise<void> {
     try {
-      this.clients.set(await this.userService.listClients());
+      if (!this.managerMode()) this.clients.set(await this.userService.listClients());
     } catch {
       // Non-fatal — the client picker is optional, the rest of the form still works.
     }
@@ -338,6 +342,11 @@ export class RetentionLeadEdit implements OnInit {
       const payload = Object.fromEntries(
         Object.entries(this.form).filter(([, v]) => v !== '' && v !== null && v !== undefined),
       ) as RetentionSubmitInput;
+      if (this.managerMode()) {
+        await this.leadService.editLead(this.leadId, payload);
+        this.router.navigateByUrl(this.backPath());
+        return;
+      }
       const lead = await this.leadService.retentionSubmit(this.leadId, payload);
       this.router.navigate(['/retention/history'], { queryParams: { highlight: lead.id } });
     } catch (err) {

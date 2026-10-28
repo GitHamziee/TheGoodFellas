@@ -1,3 +1,4 @@
+import { Router } from '@angular/router';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
@@ -104,6 +105,7 @@ export class AdminLeads implements OnInit {
   private readonly leadService = inject(LeadService);
   private readonly userService = inject(UserService);
   private readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
   /** Retention Manager browses and annotates; every pipeline action is hidden (and 403s server-side). */
   readonly readOnly = computed(() => this.auth.role() === 'RETENTION_MANAGER');
   private readonly externalClientService = inject(ExternalClientService);
@@ -688,6 +690,11 @@ export class AdminLeads implements OnInit {
   // ─── Edit (rejected leads only) ────────────────────────────
   openEdit(lead: Lead, event?: Event): void {
     event?.stopPropagation();
+    // The Retention Manager edits through the full retention form, not the quick-fix popup.
+    if (this.readOnly()) {
+      void this.router.navigate(['/retention-manager/leads', lead.id]);
+      return;
+    }
     this.error.set(null);
     this.editLead.set(lead);
   }
