@@ -1087,6 +1087,27 @@ function parseChargeMonth(value: unknown): number | null {
   return Number.isInteger(n) && n >= 1 && n <= 12 ? n : null;
 }
 
+/** A 1st-draft charge-back on a retention lead goes straight back to the retention person to
+ * fix and resubmit; a later draft stays CHARGED_BACK for the Retention Manager. */
+function chargeBackGoesToRetention(lead: { leadType: string; retentionId: string | null }, month: number): boolean {
+  return month === 1 && lead.leadType === 'RETENTION' && !!lead.retentionId;
+}
+
+const CHARGED_BACK_RESET = { clientId: null, paymentStatus: 'UNPAID', closedAt: null, adminStatus: null } as const;
+
+/** Best-effort: audit event + notice for leads a charge-back just handed back to Retention. */
+function announceChargeBackReturn(leads: { id: string; customerName: string; retentionId: string | null }[], reason: string): void {
+  for (const l of leads) {
+    void recordRetentionEvents([l.id], 'RETURNED_TO_RETENTION', { targetId: l.retentionId, note: reason });
+    void notifyUsers([l.retentionId!], {
+      kind: 'warning',
+      title: 'Lead charged back',
+      message: `${who(l.customerName)}: ${reason}`,
+      page: 'RETURNED',
+    });
+  }
+}
+
 export async function markLeadChargedBack(
   leadId: string,
   pkrAmount: unknown,
@@ -1110,12 +1131,15 @@ export async function markLeadChargedBack(
   const pkr = Math.trunc(amountNum);
 
   const clientId = lead.clientId;
+  const toRetention = chargeBackGoesToRetention(lead, month);
   // Guarded update first, ChargeBack row only if it actually moved the lead — a concurrent
   // charge-back of the same lead rolls back instead of recording the money twice.
   const applied = await runGuardedTransaction(async (tx) => {
     const updated = await tx.lead.updateMany({
       where: { id: leadId, status: lead.status, paymentStatus: 'PAID' },
-      data: { status: 'CHARGED_BACK', clientId: null, paymentStatus: 'UNPAID', closedAt: null, adminStatus: null },
+      data: toRetention
+        ? { ...CHARGED_BACK_RESET, status: 'RETURNED_TO_RETENTION', returnReason: reason.trim() }
+        : { ...CHARGED_BACK_RESET, status: 'CHARGED_BACK' },
     });
     if (updated.count !== 1) throw new StaleTransitionError();
     // Deliberately NOT mirrored into Expenses: a charge-back is made good by a replacement
@@ -1125,6 +1149,7 @@ export async function markLeadChargedBack(
     });
   });
   if (!applied) return STALE_TRANSITION_ERROR;
+  if (toRetention) announceChargeBackReturn([lead], reason.trim());
 
   const result = await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE });
   return { data: { lead: result } };
@@ -1155,7 +1180,7 @@ export async function batchChargeBack(
 
   const eligible = await prisma.lead.findMany({
     where: { id: { in: leadIds }, status: { in: [...MONEY_STATUSES] }, paymentStatus: 'PAID', clientId: { not: null } },
-    select: { id: true, clientId: true, customerName: true },
+    select: { id: true, clientId: true, customerName: true, leadType: true, retentionId: true },
   });
   if (eligible.length === 0) return { error: 'None of the selected leads can be charged back', status: 400 };
 
@@ -1163,14 +1188,29 @@ export async function batchChargeBack(
   const share = Math.floor(total / eligible.length);
   const remainder = total - share * eligible.length;
   const trimmedReason = reason.trim();
+  const toRetention = eligible.filter((l) => chargeBackGoesToRetention(l, month));
+  const toManager = eligible.filter((l) => !chargeBackGoesToRetention(l, month));
 
   // Same guard as batchMarkPaid: update first, abort the whole batch if any lead moved.
   const applied = await runGuardedTransaction(async (tx) => {
-    const updated = await tx.lead.updateMany({
-      where: { id: { in: eligible.map((l) => l.id) }, status: { in: [...MONEY_STATUSES] }, paymentStatus: 'PAID', clientId: { not: null } },
-      data: { status: 'CHARGED_BACK', clientId: null, paymentStatus: 'UNPAID', closedAt: null, adminStatus: null },
-    });
-    if (updated.count !== eligible.length) throw new StaleTransitionError();
+    const guard = { status: { in: [...MONEY_STATUSES] }, paymentStatus: 'PAID' as const, clientId: { not: null } };
+    const back = toRetention.length
+      ? (
+          await tx.lead.updateMany({
+            where: { id: { in: toRetention.map((l) => l.id) }, ...guard },
+            data: { ...CHARGED_BACK_RESET, status: 'RETURNED_TO_RETENTION', returnReason: trimmedReason },
+          })
+        ).count
+      : 0;
+    const stay = toManager.length
+      ? (
+          await tx.lead.updateMany({
+            where: { id: { in: toManager.map((l) => l.id) }, ...guard },
+            data: { ...CHARGED_BACK_RESET, status: 'CHARGED_BACK' },
+          })
+        ).count
+      : 0;
+    if (back + stay !== eligible.length) throw new StaleTransitionError();
     await tx.chargeBack.createMany({
       data: eligible.map((l, i) => ({
         leadId: l.id,
@@ -1182,6 +1222,7 @@ export async function batchChargeBack(
     });
   });
   if (!applied) return STALE_TRANSITION_ERROR;
+  announceChargeBackReturn(toRetention, trimmedReason);
 
   return { data: { count: eligible.length } };
 }

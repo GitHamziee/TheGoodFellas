@@ -254,4 +254,35 @@ describe('payment writes never record money twice', () => {
     expect(await batchChargeBack(['a', 'b'], 100, 'refund', 2)).toMatchObject({ status: 409 });
     expect(db.chargeBack.createMany).not.toHaveBeenCalled();
   });
+
+  it('a 1st-draft charge-back sends a retention lead back to its retention person', async () => {
+    db.lead.findUnique.mockResolvedValueOnce({
+      id: 'r1', customerName: 'R', status: 'ACCEPTED', paymentStatus: 'PAID', clientId: 'c', leadType: 'RETENTION', retentionId: 'ret-1',
+    });
+    db.lead.updateMany.mockResolvedValueOnce({ count: 1 });
+    db.lead.findUnique.mockResolvedValueOnce({ id: 'r1' });
+    await markLeadChargedBack('r1', 100, 'Invalid Account', 1);
+    expect(db.lead.updateMany.mock.calls[0][0].data).toMatchObject({ status: 'RETURNED_TO_RETENTION', returnReason: 'Invalid Account', clientId: null });
+  });
+
+  it('a later-draft charge-back stays CHARGED_BACK for the Retention Manager', async () => {
+    db.lead.findUnique.mockResolvedValueOnce({
+      id: 'r1', customerName: 'R', status: 'ACCEPTED', paymentStatus: 'PAID', clientId: 'c', leadType: 'RETENTION', retentionId: 'ret-1',
+    });
+    db.lead.updateMany.mockResolvedValueOnce({ count: 1 });
+    db.lead.findUnique.mockResolvedValueOnce({ id: 'r1' });
+    await markLeadChargedBack('r1', 100, 'Invalid Account', 2);
+    expect(db.lead.updateMany.mock.calls[0][0].data).toMatchObject({ status: 'CHARGED_BACK' });
+  });
+
+  it('batchChargeBack splits a 1st-draft batch between retention people and the manager', async () => {
+    db.lead.findMany.mockResolvedValueOnce([
+      { id: 'a', clientId: 'c', customerName: 'A', leadType: 'RETENTION', retentionId: 'ret-1' },
+      { id: 'b', clientId: 'c', customerName: 'B', leadType: 'RETENTION', retentionId: null },
+    ]);
+    db.lead.updateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 1 });
+    expect(await batchChargeBack(['a', 'b'], 100, 'refund', 1)).toEqual({ data: { count: 2 } });
+    expect(db.lead.updateMany.mock.calls[0][0].data.status).toBe('RETURNED_TO_RETENTION');
+    expect(db.lead.updateMany.mock.calls[1][0].data.status).toBe('CHARGED_BACK');
+  });
 });
