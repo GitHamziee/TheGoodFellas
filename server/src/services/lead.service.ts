@@ -1644,7 +1644,10 @@ export async function listRetentionHistory(requesterId: string) {
     // Charge-back charged to someone else: the tracking label was cleared, so the page needs
     // to show the restored outcome as a badge of its own.
     heldByManager: l.status === 'CHARGED_BACK',
-    chargeBacks: chargeBacks.filter((c) => c.chargeMonth === 1).map((c) => ({ createdAt: c.createdAt })),
+    // Only a lead whose latest charge-back was a 1st draft is theirs; if the latest one hit a
+    // later draft the lead now belongs to the manager, so none of its charge-backs show here
+    // (chargeBacks is newest-first).
+    chargeBacks: chargeBacks[0]?.chargeMonth === 1 ? chargeBacks.filter((c) => c.chargeMonth === 1).map((c) => ({ createdAt: c.createdAt })) : [],
   }));
 }
 
