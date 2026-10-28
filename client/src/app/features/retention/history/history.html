@@ -40,23 +40,24 @@
           <button
             type="button"
             class="pill"
-            [class.active]="view.status() === filter.value"
+            [class.active]="!chargeBacksOnly() && view.status() === filter.value"
             (click)="view.setStatus(filter.value)"
           >
             {{ filter.label }}
             <span class="n">{{ statusCounts()[filter.value] }}</span>
           </button>
         }
+        <button
+          type="button"
+          class="pill"
+          [class.active]="chargeBacksOnly()"
+          [attr.aria-pressed]="chargeBacksOnly()"
+          (click)="chargeBacksOnly.set(!chargeBacksOnly())"
+        >
+          Charge-backs
+          <span class="n">{{ chargeBackCount() }}</span>
+        </button>
       </div>
-      <button
-        type="button"
-        class="pill"
-        [class.active]="chargeBacksOnly()"
-        [attr.aria-pressed]="chargeBacksOnly()"
-        (click)="chargeBacksOnly.set(!chargeBacksOnly())"
-      >
-        Charge-backs
-      </button>
     </div>
 
     @if (loading()) {

@@ -64,6 +64,14 @@ export class RetentionHistory implements OnInit {
         )
       : inPeriod(this.allPast(), this.period(), this.anchor(), (l) => l.updatedAt ?? l.createdAt),
   );
+  readonly chargeBackCount = computed(() =>
+    inPeriod(
+      this.allPast().filter((l) => l.chargeBacks?.length),
+      this.period(),
+      this.anchor(),
+      (l) => l.chargeBacks[0].createdAt,
+    ).length,
+  );
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
 

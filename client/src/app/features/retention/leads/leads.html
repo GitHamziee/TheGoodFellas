@@ -18,13 +18,23 @@
           <button
             type="button"
             class="pill"
-            [class.active]="!chargeBacksOnly() && pendingTab() === tab.value"
+            [class.active]="!chargeBacksOnly() && !declinedOnly() && pendingTab() === tab.value"
             (click)="setPendingTab(tab.value)"
           >
             {{ tab.label }}
             <span class="n">{{ pendingSplit()[tab.value].length }}</span>
           </button>
         }
+        <button
+          type="button"
+          class="pill"
+          [class.active]="declinedOnly()"
+          [attr.aria-pressed]="declinedOnly()"
+          (click)="toggleDeclined()"
+        >
+          Declined
+          <span class="n">{{ declinedCount() }}</span>
+        </button>
         <button
           type="button"
           class="pill"
@@ -36,7 +46,7 @@
           <span class="n">{{ chargeBackCount() }}</span>
         </button>
       </div>
-      @if (pendingTab() !== 'callbacks' && !chargeBacksOnly()) {
+      @if (pendingTab() !== 'callbacks' && !chargeBacksOnly() && !declinedOnly()) {
         <app-select
           [options]="teammateOptions()"
           [ngModel]="teammateFilter()"
@@ -50,7 +60,7 @@
     @if (loading()) {
       <app-skeleton-rows [count]="4" />
     } @else if (pendingView.total() === 0) {
-      <app-empty-state [title]="chargeBacksOnly() ? 'No charge-backs' : pendingTab() === 'callbacks' ? 'No callbacks' : pendingTab() === 'drafts' ? 'No drafts' : 'Nothing pending'">
+      <app-empty-state [title]="chargeBacksOnly() ? 'No charge-backs' : declinedOnly() ? 'No declined leads' : pendingTab() === 'callbacks' ? 'No callbacks' : pendingTab() === 'drafts' ? 'No drafts' : 'Nothing pending'">
         <svg lucideSend></svg>
       </app-empty-state>
     } @else {

@@ -60,6 +60,10 @@ export class RetentionLeads implements OnInit {
   readonly chargeBacksOnly = signal(false);
   private readonly chargeBackLeads = signal<Lead[]>([]);
   readonly chargeBackCount = computed(() => this.chargeBackLeads().length);
+  /** Declined toggle: this person's leads a client turned down (also from the history feed). */
+  readonly declinedOnly = signal(false);
+  private readonly declinedLeads = signal<Lead[]>([]);
+  readonly declinedCount = computed(() => this.declinedLeads().length);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
 
@@ -110,16 +114,28 @@ export class RetentionLeads implements OnInit {
   });
 
   private readonly pendingRows = computed(() =>
-    this.chargeBacksOnly() ? this.chargeBackLeads() : this.pendingSplit()[this.pendingTab()],
+    this.chargeBacksOnly()
+      ? this.chargeBackLeads()
+      : this.declinedOnly()
+        ? this.declinedLeads()
+        : this.pendingSplit()[this.pendingTab()],
   );
 
   toggleChargeBacks(): void {
     this.chargeBacksOnly.update((v) => !v);
+    this.declinedOnly.set(false);
+    this.pendingView.page.set(1);
+  }
+
+  toggleDeclined(): void {
+    this.declinedOnly.update((v) => !v);
+    this.chargeBacksOnly.set(false);
     this.pendingView.page.set(1);
   }
 
   setPendingTab(tab: PendingTab): void {
     this.chargeBacksOnly.set(false);
+    this.declinedOnly.set(false);
     this.pendingTab.set(tab);
     this.pendingView.page.set(1);
   }
@@ -147,6 +163,7 @@ export class RetentionLeads implements OnInit {
       const [queue, history] = await Promise.all([this.leadService.retentionQueue(), this.leadService.retentionHistory()]);
       this.pending.set(queue);
       this.chargeBackLeads.set(history.filter((l) => l.chargeBacks?.length));
+      this.declinedLeads.set(history.filter((l) => l.status === 'REJECTED'));
     } catch {
       this.error.set('Could not load the leads. Refresh to try again.');
     } finally {
