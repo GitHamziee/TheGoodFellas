@@ -108,8 +108,8 @@ export class PortalShell {
     const role = this.auth.role();
     return role ? ROLE_LABEL[role] : '';
   });
-  /** Only Retention dials out — the Zoom Phone embed is mounted for them alone. */
-  readonly hasDialer = computed(() => this.auth.role() === 'RETENTION');
+  /** Only Retention and its manager dial out — the Zoom Phone embed is mounted for them alone. */
+  readonly hasDialer = computed(() => this.auth.role() === 'RETENTION' || this.auth.role() === 'RETENTION_MANAGER');
   readonly navItems = computed(() => {
     const role = this.auth.role();
     return role ? NAV_BY_ROLE[role] : [];

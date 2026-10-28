@@ -45,6 +45,7 @@ import { LeadDetail } from '../../../shared/lead-detail';
 import { RowMenu } from '../../../shared/ui/row-menu';
 import { AdminStatusControl } from '../../../shared/ui/admin-status';
 import { LifecycleButton } from '../../../shared/ui/lifecycle-button';
+import { DialButton } from '../../../shared/ui/dial-button';
 import { NotePeek } from '../../../shared/ui/lead-notes';
 import { AuthService } from '../../../core/services/auth.service';
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
@@ -81,6 +82,7 @@ interface LookupUser {
     StatusBadge,
     AdminStatusControl,
     LifecycleButton,
+    DialButton,
     NotePeek,
     SearchBox,
     Pagination,

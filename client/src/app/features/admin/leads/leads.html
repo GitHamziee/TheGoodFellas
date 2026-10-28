@@ -104,6 +104,9 @@
               <tr class="clickable" [id]="'hl-' + lead.id" [class.row-highlight]="lead.id === linkHighlightId()" (click)="selected.set(lead)">
                 <td>
                   <div class="lp-name">
+                    @if (readOnly()) {
+                      <app-dial-button [leadId]="lead.id" [name]="lead.customerName" />
+                    }
                     <span class="name-info"><span class="name-text">{{ lead.customerName }}</span><app-lifecycle-button [leadId]="lead.id" [name]="lead.customerName" /></span>
                   </div>
                   <div class="lp-sub">
@@ -264,6 +267,9 @@
                 }
                 <td>
                   <div class="lp-name">
+                    @if (readOnly()) {
+                      <app-dial-button [leadId]="lead.id" [name]="lead.customerName" />
+                    }
                     <span class="name-info"><span class="name-text">{{ lead.customerName }}</span><app-lifecycle-button [leadId]="lead.id" [name]="lead.customerName" /></span>
                     @if (readOnly()) {
                       <button type="button" class="row-edit" aria-label="Edit lead" title="Edit" (click)="openEdit(lead, $event)">

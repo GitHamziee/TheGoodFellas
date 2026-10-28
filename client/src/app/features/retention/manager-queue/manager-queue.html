@@ -64,7 +64,10 @@
                 @for (lead of view.rows(); track lead.id) {
                   <tr [id]="'hl-' + lead.id" [class.row-highlight]="lead.id === highlightId()" class="clickable" [class.row--stale]="urgency(lead) === 'stale'" (click)="detailLead.set(lead)">
                     <td>
-                      <div class="cell-main">{{ lead.customerName }}</div>
+                      <div class="cell-main name-row">
+                        <app-dial-button [leadId]="lead.id" [name]="lead.customerName" />
+                        {{ lead.customerName }}
+                      </div>
                       <div class="cell-sub">{{ formatPhone(lead.phone) }} · {{ lead.state }}</div>
                       @if (lead.chargeBacks[0]?.reason) {
                         <div class="cell-sub reason-quote">“{{ lead.chargeBacks[0].reason }}”</div>

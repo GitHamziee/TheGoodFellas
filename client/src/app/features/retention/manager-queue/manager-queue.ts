@@ -8,6 +8,7 @@ import { createListView } from '../../../core/list-view';
 import { formatPhone, getAvatarTone, getInitials, timeAgo } from '../../../core/format-utils';
 import { EmptyState, PageHero, Pagination, SearchBox, SkeletonRows, StatTile } from '../../../shared/ui/ui';
 import { NotePeek } from '../../../shared/ui/lead-notes';
+import { DialButton } from '../../../shared/ui/dial-button';
 import { LeadDetail } from '../../../shared/lead-detail';
 import { Modal } from '../../../shared/ui/modal';
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
@@ -32,6 +33,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
     EmptyState,
     SkeletonRows,
     NotePeek,
+    DialButton,
     LeadDetail,
     Modal,
     LucideBanknoteX,
@@ -42,6 +44,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
   templateUrl: './manager-queue.html',
   styles: `
     .toolbar { margin-bottom: 1.25rem; }
+    .name-row { display: flex; align-items: center; gap: 0.6rem; }
     .reason-quote { margin-top: 4px; padding-left: 8px; border-left: 3px solid var(--danger-600, #dc2626);
       font-style: italic; color: var(--gray-600); max-width: 280px; }
     .wait { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px;
