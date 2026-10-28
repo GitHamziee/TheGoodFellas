@@ -100,15 +100,23 @@ export class AdminDrafts implements OnInit {
       : DRAFT_REASON_LABEL[lead.draftReason];
   }
 
+  /** Who is sitting on the draft: the closer, or the Retention person for a Retention lead. */
+  holderOf(lead: Lead) {
+    return lead.closer ?? lead.retention;
+  }
+
   ageOf(lead: Lead): number {
     return Math.max(0, Math.floor((Date.now() - new Date(lead.updatedAt).getTime()) / 86_400_000));
   }
 
   readonly closerOptions = computed(() => {
     const seen = new Map<string, string>();
-    for (const l of this.leads()) if (l.closer) seen.set(l.closer.id, l.closer.name);
+    for (const l of this.leads()) {
+      const h = this.holderOf(l);
+      if (h) seen.set(h.id, h.name);
+    }
     return [
-      { value: '', label: 'All closers' },
+      { value: '', label: 'All holders' },
       ...[...seen].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label)),
     ];
   });
@@ -142,7 +150,7 @@ export class AdminDrafts implements OnInit {
     const junior = this.juniorFilter();
     const age = this.ageFilter();
     return this.leads().filter((l) => {
-      if (closer && l.closer?.id !== closer) return false;
+      if (closer && this.holderOf(l)?.id !== closer) return false;
       if (junior === NO_JUNIOR && l.juniorCloser) return false;
       if (junior && junior !== NO_JUNIOR && l.juniorCloser?.id !== junior) return false;
       const days = this.ageOf(l);
@@ -184,7 +192,7 @@ export class AdminDrafts implements OnInit {
       stale: ages.filter((a) => a >= STALE_DAYS).length,
       oldest: ages.length ? Math.max(...ages) : 0,
       avg: ages.length ? Math.round(ages.reduce((s, n) => s + n, 0) / ages.length) : 0,
-      closers: new Set(rows.map((l) => l.closer?.id).filter(Boolean)).size,
+      closers: new Set(rows.map((l) => this.holderOf(l)?.id).filter(Boolean)).size,
     };
   });
 
@@ -211,8 +219,8 @@ export class AdminDrafts implements OnInit {
   readonly byCloser = computed(() =>
     this.tally(
       this.filtered()
-        .filter((l) => l.closer)
-        .map((l) => ({ key: l.closer!.id, label: l.closer!.name })),
+        .filter((l) => this.holderOf(l))
+        .map((l) => ({ key: this.holderOf(l)!.id, label: this.holderOf(l)!.name })),
     ).slice(0, 8),
   );
 
@@ -224,6 +232,7 @@ export class AdminDrafts implements OnInit {
       l.state,
       this.reasonText(l),
       l.closer?.name,
+      l.retention?.name,
       l.juniorCloser?.name,
     ],
     sorters: {

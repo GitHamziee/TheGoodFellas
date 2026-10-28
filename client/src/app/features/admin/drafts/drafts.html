@@ -7,7 +7,7 @@
     <div class="card"><app-skeleton-rows [count]="6" /></div>
   } @else {
     <div class="filters">
-      <app-select [options]="closerOptions()" [searchable]="true" [ngModel]="closerFilter()" (ngModelChange)="closerFilter.set($event)" name="fCloser" ariaLabel="Closer" />
+      <app-select [options]="closerOptions()" [searchable]="true" [ngModel]="closerFilter()" (ngModelChange)="closerFilter.set($event)" name="fCloser" ariaLabel="Holder" />
       <app-select [options]="juniorOptions()" [ngModel]="juniorFilter()" (ngModelChange)="juniorFilter.set($event)" name="fJunior" ariaLabel="Junior closer" />
       <app-select [options]="reasonOptions()" [ngModel]="reasonFilter()" (ngModelChange)="reasonFilter.set($event)" name="fReason" ariaLabel="Reason" />
       <app-select [options]="ageOptions" [ngModel]="ageFilter()" (ngModelChange)="ageFilter.set($event)" name="fAge" ariaLabel="How long it's been waiting" />
@@ -32,7 +32,7 @@
       <app-stat-tile [value]="stats().avg + ' d'" label="Average wait" tone="tone-c">
         <svg lucideClock></svg>
       </app-stat-tile>
-      <app-stat-tile [value]="stats().closers" label="Closers holding drafts" tone="tone-f">
+      <app-stat-tile [value]="stats().closers" label="People holding drafts" tone="tone-f">
         <svg lucideUsers></svg>
       </app-stat-tile>
     </div>
@@ -106,7 +106,7 @@
                     Customer <span class="arrow">{{ sortArrow('customerName') }}</span>
                   </th>
                   <th class="hide-md">Junior closer</th>
-                  <th class="hide-sm">Closer</th>
+                  <th class="hide-sm">Closer / Retention</th>
                   <th class="hide-sm">Why it was saved</th>
                   <th class="sortable hide-md" (click)="view.toggleSort('createdAt')">
                     Started <span class="arrow">{{ sortArrow('createdAt') }}</span>
@@ -134,7 +134,7 @@
                       }
                     </td>
                     <td class="hide-sm">
-                      @if (lead.closer; as closer) {
+                      @if (holderOf(lead); as closer) {
                         <div class="person">
                           <span class="avatar-sm" [class]="getAvatarTone(closer.id)">{{ getInitials(closer.name) }}</span>
                           <span class="nm">{{ closer.name }}</span>
@@ -193,7 +193,7 @@
         @if (reasonText(lead)) {
           <strong>Why it was saved:</strong> {{ reasonText(lead) }} ·
         }
-        <strong>Held by:</strong> {{ lead.closer?.name ?? '—' }} ·
+        <strong>Held by:</strong> {{ holderOf(lead)?.name ?? '—' }} ·
         <strong>Started:</strong> {{ formatDate(lead.createdAt) }} ·
         <strong>Last worked on:</strong> {{ timeAgo(lead.updatedAt) }}
       </span>
