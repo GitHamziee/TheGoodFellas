@@ -183,7 +183,8 @@ export class AdminCplLeads implements OnInit {
   waitingSince(lead: Lead): string {
     if (lead.status === 'CHARGED_BACK') return lead.chargeBacks[0]?.createdAt ?? lead.updatedAt;
     if (lead.status === 'REJECTED') return lead.updatedAt ?? lead.createdAt;
-    return lead.submittedAt ?? lead.createdAt;
+    // Leads submitted before submittedAt existed: a SUBMITTED lead was last touched when it was submitted.
+    return lead.submittedAt ?? (lead.status === 'SUBMITTED' ? lead.updatedAt : lead.createdAt);
   }
 
   private readonly searchFields = (l: Lead) => [

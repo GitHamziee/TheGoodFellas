@@ -223,7 +223,8 @@ export class AdminLeads implements OnInit {
   /** When the lead started waiting on the admin — a charge-back starts the clock again. */
   waitingSince(lead: Lead): string {
     if (lead.status === 'CHARGED_BACK') return lead.chargeBacks[0]?.createdAt ?? lead.updatedAt;
-    return lead.submittedAt ?? lead.createdAt;
+    // Leads submitted before submittedAt existed: a SUBMITTED lead was last touched when it was submitted.
+    return lead.submittedAt ?? (lead.status === 'SUBMITTED' ? lead.updatedAt : lead.createdAt);
   }
 
   private readonly searchFields = (l: Lead) => [
