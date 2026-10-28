@@ -70,6 +70,8 @@ export interface ChargeBack {
   /** ADMIN reads only — the server omits it for every other role. */
   pkrAmount?: number;
   reason: string;
+  /** Which draft (1st..12th) the charge-back hit; null on rows that predate the field. */
+  chargeMonth?: number | null;
   createdAt: string;
   client: LeadParty;
 }

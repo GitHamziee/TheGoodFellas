@@ -119,7 +119,7 @@ export class RetentionHistory implements OnInit {
       accepted,
       rejected,
       acceptRate: decided ? Math.round((accepted / decided) * 100) : null,
-      chargedBack: past.filter((l) => l.status === 'CHARGED_BACK').length,
+      chargedBack: past.filter((l) => l.chargeBacks?.length).length,
     };
   });
 

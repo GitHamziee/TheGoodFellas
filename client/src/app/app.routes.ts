@@ -547,7 +547,12 @@ export const routes: Routes = [
     canMatch: [authGuard, roleGuard('RETENTION_MANAGER')],
     loadComponent: () => import('./layout/portal-shell/portal-shell').then((m) => m.PortalShell),
     children: [
-      { path: '', pathMatch: 'full', redirectTo: 'charge-backs' },
+      { path: '', pathMatch: 'full', redirectTo: 'queue' },
+      {
+        path: 'queue',
+        loadComponent: () =>
+          import('./features/retention/manager-queue/manager-queue').then((m) => m.RetentionManagerQueue),
+      },
       {
         path: 'charge-backs',
         loadComponent: () => import('./features/admin/charge-backs/charge-backs').then((m) => m.AdminChargeBacks),

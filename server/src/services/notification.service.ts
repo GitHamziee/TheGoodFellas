@@ -25,6 +25,7 @@ const PAGE_PATHS = {
     RETENTION: "/retention/chat",
     RETENTION_MANAGER: "/retention-manager/chat",
   },
+  CHARGE_BACK_QUEUE: { RETENTION_MANAGER: "/retention-manager/queue" },
   HISTORY: { JUNIOR_CLOSER: "/junior/my-leads", CLOSER: "/closer/history" },
 } as const satisfies Record<string, Partial<Record<Role, string>>>;
 

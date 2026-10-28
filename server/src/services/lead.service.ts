@@ -1134,6 +1134,20 @@ function announceChargeBackReturn(leads: { id: string; customerName: string; ret
   }
 }
 
+/** Best-effort: tell the Retention Manager a later-draft charge-back just landed in his queue. */
+function announceChargeBackToManager(leads: { customerName: string }[], month: number): void {
+  if (leads.length === 0) return;
+  void notifyRoles(['RETENTION_MANAGER'], {
+    kind: 'warning',
+    title: leads.length === 1 ? 'Lead charged back' : `${leads.length} leads charged back`,
+    message:
+      leads.length === 1
+        ? `${who(leads[0].customerName)} was charged back on draft ${month} — it's in your queue.`
+        : `Draft ${month} charge-backs are in your queue.`,
+    page: 'CHARGE_BACK_QUEUE',
+  });
+}
+
 export async function markLeadChargedBack(
   leadId: string,
   pkrAmount: unknown,
@@ -1176,6 +1190,7 @@ export async function markLeadChargedBack(
   });
   if (!applied) return STALE_TRANSITION_ERROR;
   if (toRetention) announceChargeBackReturn([lead], reason.trim());
+  else if (lead.leadType === 'RETENTION') announceChargeBackToManager([lead], month);
 
   const result = await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE });
   return { data: { lead: result } };
@@ -1249,6 +1264,7 @@ export async function batchChargeBack(
   });
   if (!applied) return STALE_TRANSITION_ERROR;
   announceChargeBackReturn(toRetention, trimmedReason);
+  announceChargeBackToManager(toManager.filter((l) => l.leadType === 'RETENTION'), month);
 
   return { data: { count: eligible.length } };
 }
@@ -1601,10 +1617,32 @@ export async function expireRetentionCallbacks(): Promise<number> {
 export async function listRetentionHistory(requesterId: string) {
   const leads = await prisma.lead.findMany({
     where: { leadType: 'RETENTION', retentionId: requesterId, status: { notIn: ['NEW', 'DRAFT'] } },
-    select: RETENTION_HISTORY_SELECT,
+    select: { ...RETENTION_HISTORY_SELECT, chargeBacks: { select: { createdAt: true, chargeMonth: true }, orderBy: { createdAt: 'desc' } } },
     orderBy: { updatedAt: 'desc' },
   });
-  return leads;
+
+  // A Retention person answers only for the 1st draft (those come straight back to them as
+  // RETURNED_TO_RETENTION). A later-draft charge-back belongs to the Retention Manager, so it
+  // must not show on their history: drop those rows and, while the lead sits CHARGED_BACK for
+  // the manager, show the outcome it had before the charge-back instead.
+  const chargedBack = leads.filter((l) => l.status === 'CHARGED_BACK').map((l) => l.id);
+  const priorStatus = new Map<string, LeadStatus>();
+  if (chargedBack.length > 0) {
+    const events = await prisma.leadEvent.findMany({
+      where: { leadId: { in: chargedBack }, type: { in: ['ASSIGNED_TO_CLIENT', 'ASSIGNED_EXTERNAL', 'ACCEPTED', 'REJECTED'] } },
+      select: { leadId: true, type: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    const statusOfEvent = { ASSIGNED_TO_CLIENT: 'ASSIGNED', ASSIGNED_EXTERNAL: 'ASSIGNED_EXTERNAL', ACCEPTED: 'ACCEPTED', REJECTED: 'REJECTED' } as const;
+    for (const e of events) priorStatus.set(e.leadId, statusOfEvent[e.type as keyof typeof statusOfEvent]);
+  }
+
+  return leads.map(({ chargeBacks, ...l }) => ({
+    ...l,
+    // A charged-back lead was PAID, so ACCEPTED is the fallback for leads that predate LeadEvent.
+    status: l.status === 'CHARGED_BACK' ? (priorStatus.get(l.id) ?? 'ACCEPTED') : l.status,
+    chargeBacks: chargeBacks.filter((c) => c.chargeMonth === 1).map((c) => ({ createdAt: c.createdAt })),
+  }));
 }
 
 // ─── QA ─────────────────────────────────────────────────────────

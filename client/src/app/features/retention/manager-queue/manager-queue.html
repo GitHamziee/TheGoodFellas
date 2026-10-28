@@ -1,0 +1,130 @@
+<div class="page">
+  <app-page-hero
+    eyebrow="Retention"
+    title="My Queue"
+    tone="red"
+    [count]="loading() ? '–' : stats().total"
+    countLabel="to work"
+  >
+    <svg lucideBanknoteX></svg>
+  </app-page-hero>
+
+  @if (error()) {
+    <div class="error">{{ error() }}</div>
+  }
+
+  @if (loading()) {
+    <div class="card"><app-skeleton-rows [count]="4" /></div>
+  } @else {
+    <div class="stats-row">
+      <app-stat-tile [value]="stats().total" label="Waiting on you" [tone]="stats().total ? 'tone-danger' : 'tone-gold'">
+        <svg lucideBanknoteX></svg>
+      </app-stat-tile>
+      <app-stat-tile [value]="stats().untouched" label="No notes yet" tone="tone-warning">
+        <svg lucideSquarePen></svg>
+      </app-stat-tile>
+      <app-stat-tile [value]="stats().oldest + ' d'" label="Longest wait" tone="tone-warning">
+        <svg lucideClock></svg>
+      </app-stat-tile>
+    </div>
+
+    @if (stats().total === 0) {
+      <div class="card">
+        <app-empty-state title="Nothing to work">
+          <svg lucideBanknoteX></svg>
+        </app-empty-state>
+      </div>
+    } @else {
+      <div class="toolbar">
+        <app-search-box [value]="view.search()" placeholder="Search customer, client, or reason…" (valueChange)="view.setSearch($event)" />
+      </div>
+
+      <div class="card card--flush">
+        @if (view.total() === 0) {
+          <app-empty-state title="No leads match that search">
+            <svg lucideBanknoteX></svg>
+          </app-empty-state>
+        } @else {
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th class="sortable" (click)="view.toggleSort('customerName')">
+                    Customer <span class="arrow">{{ sortArrow('customerName') }}</span>
+                  </th>
+                  <th class="hide-sm">Charged back by</th>
+                  <th class="hide-sm">Draft</th>
+                  <th class="sortable hide-md" (click)="view.toggleSort('chargedAt')">
+                    Waiting <span class="arrow">{{ sortArrow('chargedAt') }}</span>
+                  </th>
+                  <th class="right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (lead of view.rows(); track lead.id) {
+                  <tr class="clickable" [class.row--stale]="urgency(lead) === 'stale'" (click)="detailLead.set(lead)">
+                    <td>
+                      <div class="cell-main">{{ lead.customerName }}</div>
+                      <div class="cell-sub">{{ formatPhone(lead.phone) }} · {{ lead.state }}</div>
+                      @if (lead.chargeBacks[0]?.reason) {
+                        <div class="cell-sub reason-quote">“{{ lead.chargeBacks[0].reason }}”</div>
+                      }
+                      <app-note-peek [leadId]="lead.id" [name]="lead.customerName" [notes]="lead.notes" [count]="lead._count?.notes" />
+                    </td>
+                    <td class="hide-sm">
+                      @if (lead.chargeBacks[0]?.client; as client) {
+                        <div class="person">
+                          <span class="avatar-sm" [class]="getAvatarTone(client.id)">{{ getInitials(client.name) }}</span>
+                          <span class="nm">{{ client.name }}</span>
+                        </div>
+                      } @else {
+                        <span class="empty">—</span>
+                      }
+                    </td>
+                    <td class="hide-sm">{{ draftLabel(lead) }}</td>
+                    <td class="hide-md">
+                      <span class="wait wait--{{ urgency(lead) }}">
+                        <svg lucideClock></svg>{{ waitingDays(lead) }} {{ waitingDays(lead) === 1 ? 'day' : 'days' }}
+                      </span>
+                    </td>
+                    <td>
+                      <div class="row-actions">
+                        <button type="button" class="btn btn--sm btn--ghost" (click)="edit(lead, $event)">
+                          <svg lucideSquarePen></svg> Work lead
+                        </button>
+                        <button type="button" class="btn btn--sm" [disabled]="busyId() === lead.id" (click)="submitToAdmin(lead, $event)">
+                          <svg lucideSend></svg> Submit to admin
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          <app-pagination
+            [page]="view.page()"
+            [totalPages]="view.totalPages()"
+            [total]="view.total()"
+            (pageChange)="view.page.set($event)"
+          />
+        }
+      </div>
+    }
+  }
+</div>
+
+@if (detailLead(); as lead) {
+  <app-modal title="Lead details" [subtitle]="lead.customerName" [wide]="true" (close)="detailLead.set(null)">
+    <app-lead-detail [lead]="lead" [unmasked]="true" />
+    <div footer>
+      <button type="button" class="btn btn--ghost" (click)="detailLead.set(null); edit(lead)">
+        <svg lucideSquarePen></svg> Work lead
+      </button>
+      <button type="button" class="btn" [disabled]="busyId() === lead.id" (click)="submitToAdmin(lead)">
+        <svg lucideSend></svg> Submit to admin
+      </button>
+    </div>
+  </app-modal>
+}

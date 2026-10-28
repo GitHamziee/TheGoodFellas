@@ -80,7 +80,7 @@ export class AuthService {
       case 'MANAGER':
         return '/manager/dashboard';
       case 'RETENTION_MANAGER':
-        return '/retention-manager/charge-backs';
+        return '/retention-manager/queue';
     }
   }
 }
