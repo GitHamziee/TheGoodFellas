@@ -205,7 +205,7 @@ export async function submitChargedBackToAdmin(leadId: string, actorId: string):
 
   const updated = await prisma.lead.updateMany({
     where: { id: leadId, status: 'CHARGED_BACK' },
-    data: { status: 'SUBMITTED', adminStatus: null },
+    data: { status: 'SUBMITTED', adminStatus: null, submittedAt: new Date() },
   });
   if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
 
@@ -323,7 +323,7 @@ export async function submitCplLead(
   if (!isNonEmptyString(data.state)) return { error: 'State is required', status: 400 };
 
   const lead = await prisma.lead.create({
-    data: { juniorCloserId, leadType: 'CPL', status: 'SUBMITTED', ...data } as Prisma.LeadUncheckedCreateInput,
+    data: { juniorCloserId, leadType: 'CPL', status: 'SUBMITTED', submittedAt: new Date(), ...data } as Prisma.LeadUncheckedCreateInput,
     include: FULL_INCLUDE,
   });
 
@@ -377,7 +377,7 @@ export async function resubmitByJuniorCloser(
 
   const updated = await prisma.lead.updateMany({
     where: { id: leadId, status: 'RETURNED_TO_JUNIOR', juniorCloserId },
-    data: { ...data, status: 'SUBMITTED', returnReason: null },
+    data: { ...data, status: 'SUBMITTED', submittedAt: new Date(), returnReason: null },
   });
   if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
 
@@ -502,7 +502,7 @@ export async function enrichAndSubmitLead(
 
   const updated = await prisma.lead.updateMany({
     where: { id: leadId, status: lead.status, closerId },
-    data: { ...sanitized.data, ...suggested, status: 'SUBMITTED', draftReason: null, draftReasonNote: null },
+    data: { ...sanitized.data, ...suggested, status: 'SUBMITTED', submittedAt: new Date(), draftReason: null, draftReasonNote: null },
   });
   if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
 
@@ -548,7 +548,7 @@ export async function resubmitByCloser(
 
   const updated = await prisma.lead.updateMany({
     where: { id: leadId, status: 'RETURNED_TO_CLOSER', closerId },
-    data: { ...sanitized.data, ...suggested, status: 'SUBMITTED', returnReason: null },
+    data: { ...sanitized.data, ...suggested, status: 'SUBMITTED', submittedAt: new Date(), returnReason: null },
   });
   if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
 
@@ -586,7 +586,7 @@ export async function createLeadByCloser(
   if ('error' in suggested) return { error: suggested.error, status: 400 };
 
   const lead = await prisma.lead.create({
-    data: { closerId, status: 'SUBMITTED', ...data, ...suggested } as Prisma.LeadUncheckedCreateInput,
+    data: { closerId, status: 'SUBMITTED', submittedAt: new Date(), ...data, ...suggested } as Prisma.LeadUncheckedCreateInput,
     include: FULL_INCLUDE,
   });
 
@@ -1376,7 +1376,7 @@ export async function createLeadByRetention(
   if ('error' in suggested) return { error: suggested.error, status: 400 };
 
   const lead = await prisma.lead.create({
-    data: { retentionId, leadType: 'RETENTION', status: 'SUBMITTED', ...data, ...suggested } as Prisma.LeadUncheckedCreateInput,
+    data: { retentionId, leadType: 'RETENTION', status: 'SUBMITTED', submittedAt: new Date(), ...data, ...suggested } as Prisma.LeadUncheckedCreateInput,
     include: FULL_INCLUDE,
   });
   void recordRetentionEvents([lead.id], 'CREATED', { actorId: retentionId });
@@ -1480,7 +1480,7 @@ export async function enrichAndSubmitRetentionLead(
 
   const updated = await prisma.lead.updateMany({
     where: { id: leadId, status: lead.status },
-    data: { ...sanitized.data, ...suggested, retentionId: submitterId, status: 'SUBMITTED', draftReason: null, draftReasonNote: null, returnReason: null, callbackById: null, callbackAt: null },
+    data: { ...sanitized.data, ...suggested, retentionId: submitterId, status: 'SUBMITTED', submittedAt: new Date(), draftReason: null, draftReasonNote: null, returnReason: null, callbackById: null, callbackAt: null },
   });
   if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
 

@@ -183,7 +183,7 @@ export class AdminCplLeads implements OnInit {
   waitingSince(lead: Lead): string {
     if (lead.status === 'CHARGED_BACK') return lead.chargeBacks[0]?.createdAt ?? lead.updatedAt;
     if (lead.status === 'REJECTED') return lead.updatedAt ?? lead.createdAt;
-    return lead.createdAt;
+    return lead.submittedAt ?? lead.createdAt;
   }
 
   private readonly searchFields = (l: Lead) => [
@@ -236,7 +236,7 @@ export class AdminCplLeads implements OnInit {
           const cb = Number(b.status === 'CHARGED_BACK') - Number(a.status === 'CHARGED_BACK');
           if (cb) return cb;
         }
-        return sort === 'newest' ? since(b) - since(a) : since(a) - since(b);
+        return sort === 'oldest' ? since(a) - since(b) : since(b) - since(a);
       });
   });
 

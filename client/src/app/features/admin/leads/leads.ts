@@ -223,7 +223,7 @@ export class AdminLeads implements OnInit {
   /** When the lead started waiting on the admin — a charge-back starts the clock again. */
   waitingSince(lead: Lead): string {
     if (lead.status === 'CHARGED_BACK') return lead.chargeBacks[0]?.createdAt ?? lead.updatedAt;
-    return lead.createdAt;
+    return lead.submittedAt ?? lead.createdAt;
   }
 
   private readonly searchFields = (l: Lead) => [
@@ -280,7 +280,7 @@ export class AdminLeads implements OnInit {
           const cb = Number(b.status === 'CHARGED_BACK') - Number(a.status === 'CHARGED_BACK');
           if (cb) return cb;
         }
-        return sort === 'newest' ? since(b) - since(a) : since(a) - since(b);
+        return sort === 'oldest' ? since(a) - since(b) : since(b) - since(a);
       });
   });
 

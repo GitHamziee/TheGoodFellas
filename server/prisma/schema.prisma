@@ -398,8 +398,11 @@ model Lead {
   status    LeadStatus @default(NEW)
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
+  // When the lead last reached the admin (any transition into SUBMITTED). Starts the admin's
+  // waiting-age clock; null on leads that predate it, which fall back to createdAt.
+  submittedAt DateTime?
 
-  juniorCloser    User?           @relation("JuniorCloserLeads", fields: [juniorCloserId], references: [id], onDelete: Cascade)
+  juniorCloser    User?        @relation("JuniorCloserLeads", fields: [juniorCloserId], references: [id], onDelete: Cascade)
   closer          User?           @relation("CloserLeads", fields: [closerId], references: [id], onDelete: Cascade)
   client          User?           @relation("ClientLeads", fields: [clientId], references: [id], onDelete: SetNull)
   externalClient  ExternalClient? @relation("ExternalClientLeads", fields: [externalClientId], references: [id], onDelete: SetNull)

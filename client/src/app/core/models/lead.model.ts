@@ -188,6 +188,7 @@ export interface Lead {
   status: LeadStatus;
   createdAt: string;
   updatedAt: string;
+  submittedAt?: string | null;
 
   /** Null when a Closer created the lead from scratch (self- or AI-sourced calls). */
   juniorCloser: LeadParty | null;
