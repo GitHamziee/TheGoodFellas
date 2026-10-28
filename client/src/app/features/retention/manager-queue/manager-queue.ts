@@ -142,7 +142,7 @@ export class RetentionManagerQueue implements OnInit {
     try {
       await this.leadService.submitToAdmin(lead.id);
       this.detailLead.set(null);
-      void this.router.navigate(['/retention-manager/retention-history'], { queryParams: { highlight: lead.id } });
+      void this.router.navigate(['/retention-manager/history'], { queryParams: { highlight: lead.id } });
     } catch (err) {
       this.error.set(apiErrorMessage(err, 'Could not send the lead to admin.'));
     } finally {

@@ -184,6 +184,7 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
   // Read-only view of every lead plus per-lead follow-up notes — no pipeline actions.
   RETENTION_MANAGER: [
     { label: 'My Queue', path: '/retention-manager/queue', icon: 'queue' },
+    { label: 'My History', path: '/retention-manager/history', icon: 'history' },
     { label: 'Charge Backs', path: '/retention-manager/charge-backs', icon: 'chargeback' },
     group('Leads', 'leads', [
       { label: 'Retention Leads', path: '/retention-manager/leads' },

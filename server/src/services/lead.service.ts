@@ -1667,6 +1667,54 @@ export async function listRetentionHistory(requesterId: string) {
   }));
 }
 
+export type ManagerAction = 'SUBMITTED' | 'EDITED' | 'NOTED';
+
+/**
+ * The Retention Manager's own history: every Retention lead he has worked — submitted to the
+ * admin, edited, or left a note on. A lead has no "retention manager" column (there is one
+ * shared role), so ownership comes from the audit trail: his LeadEvents and LeadNotes. Each row
+ * carries the actions he took and when he last acted; the lead's current status shows what
+ * became of it afterwards. List-row fields only, and no PKR (chargeBacks selects dates/months).
+ */
+export async function listRetentionManagerHistory(managerId: string) {
+  const [events, notes] = await Promise.all([
+    prisma.leadEvent.findMany({
+      where: { actorId: managerId, type: { in: ['SUBMITTED', 'EDITED'] } },
+      select: { leadId: true, type: true, createdAt: true },
+    }),
+    prisma.leadNote.findMany({
+      where: { authorId: managerId },
+      select: { leadId: true, createdAt: true },
+    }),
+  ]);
+
+  const worked = new Map<string, { actions: Set<ManagerAction>; workedAt: Date }>();
+  const touch = (leadId: string, action: ManagerAction, at: Date) => {
+    const entry = worked.get(leadId) ?? { actions: new Set<ManagerAction>(), workedAt: at };
+    entry.actions.add(action);
+    if (at > entry.workedAt) entry.workedAt = at;
+    worked.set(leadId, entry);
+  };
+  for (const e of events) touch(e.leadId, e.type === 'SUBMITTED' ? 'SUBMITTED' : 'EDITED', e.createdAt);
+  for (const n of notes) touch(n.leadId, 'NOTED', n.createdAt);
+  if (worked.size === 0) return [];
+
+  const leads = await prisma.lead.findMany({
+    where: { id: { in: [...worked.keys()] }, leadType: 'RETENTION' },
+    select: {
+      ...RETENTION_HISTORY_SELECT,
+      chargeBacks: { select: { createdAt: true, chargeMonth: true }, orderBy: { createdAt: 'desc' } },
+    },
+  });
+
+  return leads
+    .map((l) => {
+      const w = worked.get(l.id)!;
+      return { ...l, managerActions: [...w.actions], workedAt: w.workedAt };
+    })
+    .sort((a, b) => b.workedAt.getTime() - a.workedAt.getTime());
+}
+
 // ─── QA ─────────────────────────────────────────────────────────
 // Neither queue/history function below touches Lead.status or any transition — QA is
 // purely an internal metrics side-channel (see LeadReview in schema.prisma). A lead

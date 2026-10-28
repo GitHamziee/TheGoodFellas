@@ -9,6 +9,7 @@ import {
   LeadInboxPreview,
   LeadIntakeEdit,
   LeadNote,
+  ManagerHistoryRow,
   TeamLeadLeadRow,
 } from '../models/lead.model';
 import { LeadReviewRow, QaCloserLeadRow, QaJuniorLeadRow, ReviewOutcome } from '../models/review.model';
@@ -475,6 +476,14 @@ export class LeadService {
    *  premium come back null; Retention doesn't see money figures. */
   async retentionHistory(): Promise<Lead[]> {
     const res = await firstValueFrom(this.http.get<ApiSuccess<{ leads: Lead[] }>>(`${BASE}/retention/history`));
+    return res.data.leads;
+  }
+
+  /** Retention Manager's own history — leads he submitted, edited or left a note on. */
+  async retentionManagerHistory(): Promise<ManagerHistoryRow[]> {
+    const res = await firstValueFrom(
+      this.http.get<ApiSuccess<{ leads: ManagerHistoryRow[] }>>(`${BASE}/retention-manager/history`)
+    );
     return res.data.leads;
   }
 

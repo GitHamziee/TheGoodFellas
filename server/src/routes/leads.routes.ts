@@ -384,6 +384,16 @@ router.get(
   })
 );
 
+// The Retention Manager's own history — leads he has submitted, edited or noted.
+router.get(
+  '/retention-manager/history',
+  requireRole('RETENTION_MANAGER'),
+  asyncHandler(async (req, res) => {
+    const leads = await leadService.listRetentionManagerHistory(req.user!.id);
+    return apiSuccess(res, { leads });
+  })
+);
+
 // Retention History — full lifecycle of every retention lead. ADMIN/MANAGER only; carries no
 // PKR figures. (Not '/retention/history': that path is the Retention role's own history page.)
 router.get(

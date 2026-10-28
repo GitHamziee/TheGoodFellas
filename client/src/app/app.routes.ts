@@ -567,6 +567,11 @@ export const routes: Routes = [
       },
       { path: 'cpl-leads', redirectTo: 'charge-backs' },
       {
+        path: 'history',
+        loadComponent: () =>
+          import('./features/retention/manager-history/manager-history').then((m) => m.RetentionManagerHistory),
+      },
+      {
         path: 'retention-history',
         loadComponent: () =>
           import('./features/admin/retention-history/retention-history').then((m) => m.RetentionHistory),

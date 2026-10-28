@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // exercise only the service's own access-control and transaction logic.
 const db = vi.hoisted(() => ({
   lead: { findUnique: vi.fn(), findMany: vi.fn(), updateMany: vi.fn() },
+  leadEvent: { findMany: vi.fn() },
+  leadNote: { findMany: vi.fn() },
   incomePayment: { create: vi.fn() },
   chargeBack: { create: vi.fn(), createMany: vi.fn() },
   $transaction: vi.fn(),
@@ -19,6 +21,7 @@ import {
   batchMarkPaid,
   enrichAndSubmitRetentionLead,
   getLeadById,
+  listRetentionManagerHistory,
   listRetentionQueue,
   editLead,
   markLeadChargedBack,
@@ -298,5 +301,32 @@ describe('payment writes never record money twice', () => {
   it('an Admin still cannot edit a lead that is out with a client', async () => {
     db.lead.findUnique.mockResolvedValueOnce({ id: 'r1', status: 'ACCEPTED', leadType: 'RETENTION' });
     expect(await editLead('r1', { state: 'Texas' }, { id: 'a-1', role: 'ADMIN' })).toMatchObject({ status: 400 });
+  });
+});
+
+describe('listRetentionManagerHistory', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('merges his events and notes per lead, newest action first', async () => {
+    db.leadEvent.findMany.mockResolvedValue([
+      { leadId: 'a', type: 'SUBMITTED', createdAt: new Date('2026-01-02') },
+      { leadId: 'b', type: 'EDITED', createdAt: new Date('2026-01-05') },
+    ]);
+    db.leadNote.findMany.mockResolvedValue([{ leadId: 'a', createdAt: new Date('2026-01-03') }]);
+    db.lead.findMany.mockResolvedValue([{ id: 'a' }, { id: 'b' }]);
+
+    const rows = await listRetentionManagerHistory('mgr-1');
+
+    expect(db.leadEvent.findMany.mock.calls[0][0].where.actorId).toBe('mgr-1');
+    expect(db.leadNote.findMany.mock.calls[0][0].where.authorId).toBe('mgr-1');
+    expect(rows.map((r) => r.id)).toEqual(['b', 'a']);
+    expect(rows[1].managerActions.sort()).toEqual(['NOTED', 'SUBMITTED']);
+  });
+
+  it('returns nothing, without querying leads, when he has done nothing', async () => {
+    db.leadEvent.findMany.mockResolvedValue([]);
+    db.leadNote.findMany.mockResolvedValue([]);
+    expect(await listRetentionManagerHistory('mgr-1')).toEqual([]);
+    expect(db.lead.findMany).not.toHaveBeenCalled();
   });
 });

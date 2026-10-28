@@ -1,0 +1,111 @@
+<div class="page">
+  <div class="period-bar">
+    <app-period-filter [(period)]="period" [(anchor)]="anchor" />
+  </div>
+
+  @if (error()) {
+    <div class="error">{{ error() }}</div>
+  }
+
+  <div class="stats-row">
+    <app-stat-tile [value]="stats().worked" label="Worked" tone="tone-d">
+      <svg lucideSquarePen></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().sent" label="Sent to admin" tone="tone-a">
+      <svg lucideSend></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().accepted" label="Approved" tone="tone-success">
+      <svg lucideCircleCheck></svg>
+    </app-stat-tile>
+    <app-stat-tile [value]="stats().chargedBack" label="Charged back" tone="tone-warning">
+      <svg lucideBanknoteX></svg>
+    </app-stat-tile>
+  </div>
+
+  <div class="toolbar">
+    <app-search-box [value]="view.search()" placeholder="Search history…" (valueChange)="view.setSearch($event)" />
+  </div>
+
+  <div class="card card--flush">
+    <div class="section-head">
+      <div class="pills">
+        @for (filter of statusFilters; track filter.value) {
+          <button
+            type="button"
+            class="pill"
+            [class.active]="view.status() === filter.value"
+            (click)="view.setStatus(filter.value)"
+          >
+            {{ filter.label }}
+            <span class="n">{{ statusCounts()[filter.value] }}</span>
+          </button>
+        }
+      </div>
+    </div>
+
+    @if (loading()) {
+      <app-skeleton-rows [count]="4" />
+    } @else if (view.total() === 0) {
+      <app-empty-state title="Nothing in this period">
+        <svg lucideSquarePen></svg>
+      </app-empty-state>
+    } @else {
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="sortable" (click)="view.toggleSort('customerName')">
+                Customer <span class="arrow">{{ sortArrow('customerName') }}</span>
+              </th>
+              <th class="hide-md">Retention</th>
+              <th class="hide-md">Client</th>
+              <th>Your action</th>
+              <th class="sortable" (click)="view.toggleSort('status')">
+                Outcome <span class="arrow">{{ sortArrow('status') }}</span>
+              </th>
+              <th class="sortable right hide-sm" (click)="view.toggleSort('workedAt')">
+                Last action <span class="arrow">{{ sortArrow('workedAt') }}</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (lead of view.rows(); track lead.id) {
+              <tr [id]="'hl-' + lead.id" [class.row-highlight]="lead.id === highlightId()">
+                <td><div class="cell-main">{{ lead.customerName }}</div></td>
+                <td class="hide-md">
+                  @if (lead.retention) {
+                    <div class="person">
+                      <span class="avatar-sm" [class]="getAvatarTone(lead.retention.id)">
+                        {{ getInitials(lead.retention.name) }}
+                      </span>
+                      <span class="nm">{{ lead.retention.name }}</span>
+                    </div>
+                  } @else {
+                    <span class="empty">—</span>
+                  }
+                </td>
+                <td class="hide-md">{{ lead.client?.name || '—' }}</td>
+                <td>
+                  @for (action of lead.managerActions; track action) {
+                    <span class="chip">{{ actionLabel(action) }}</span>
+                  }
+                </td>
+                <td><app-status-badge [status]="lead.status" /><app-admin-status-badge [status]="lead.adminStatus" /></td>
+                <td class="right hide-sm">
+                  <span class="chip"><svg lucideClock></svg>{{ timeAgo(lead.workedAt) }}</span>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <app-pagination
+        [page]="view.page()"
+        [totalPages]="view.totalPages()"
+        [total]="view.total()"
+        (pageChange)="view.page.set($event)"
+      />
+    }
+  </div>
+</div>

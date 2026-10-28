@@ -207,6 +207,16 @@ export interface Lead {
   _count?: { notes: number };
 }
 
+export type ManagerAction = 'SUBMITTED' | 'EDITED' | 'NOTED';
+
+/** One row of the Retention Manager's own history — a lead he worked, and what he did to it. */
+export interface ManagerHistoryRow
+  extends Pick<Lead, 'id' | 'customerName' | 'status' | 'adminStatus' | 'createdAt' | 'updatedAt' | 'retention' | 'client'> {
+  chargeBacks: Pick<ChargeBack, 'createdAt' | 'chargeMonth'>[];
+  managerActions: ManagerAction[];
+  workedAt: string;
+}
+
 /** Masked row for Junior Closer / Closer history views — Name + status + date only, per
  * access-control requirement. Phone is deliberately excluded here (data-theft risk) even
  * though the full Lead carries it. */
