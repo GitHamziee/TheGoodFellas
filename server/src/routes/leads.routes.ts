@@ -434,10 +434,10 @@ router.get(
   })
 );
 
-// Admin-only: the manager scope middleware above would 403 this path for a MANAGER anyway.
+// No :id and no leadIds, so the manager scope middleware above lets it through.
 router.post(
   '/retention/sync',
-  requireRole('ADMIN'),
+  requireRole('ADMIN', 'MANAGER'),
   asyncHandler(async (req, res) => {
     if (!sheetSync.isSheetSyncConfigured()) return apiError(res, 'Google Sheet sync is not configured', 400);
     try {
