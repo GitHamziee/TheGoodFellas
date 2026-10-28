@@ -1546,6 +1546,52 @@ export async function removeRetentionCallback(
   return { data: { lead: result } };
 }
 
+/** A Callback is held for this long, then lapses back into its owner's drafts. */
+export const RETENTION_CALLBACK_HOURS = 48;
+
+/** Lapses every Callback older than RETENTION_CALLBACK_HOURS: the lead becomes a DRAFT (reason
+ * CALLBACK) assigned to the person who held it, with a fresh exclusive window, and the callback
+ * flag is cleared. Run on a timer; each lead is guarded on the same callback it read, so a
+ * person removing or re-marking it mid-sweep wins and nothing is double-moved. Returns the
+ * number of leads lapsed. */
+export async function expireRetentionCallbacks(): Promise<number> {
+  const cutoff = new Date(Date.now() - RETENTION_CALLBACK_HOURS * 60 * 60 * 1000);
+  const due = await prisma.lead.findMany({
+    where: {
+      leadType: 'RETENTION',
+      status: { in: RETENTION_QUEUE_STATUSES },
+      callbackById: { not: null },
+      callbackAt: { lte: cutoff },
+    },
+    select: { id: true, customerName: true, callbackById: true, callbackAt: true },
+  });
+
+  let lapsed = 0;
+  for (const lead of due) {
+    const updated = await prisma.lead.updateMany({
+      where: { id: lead.id, callbackById: lead.callbackById, callbackAt: lead.callbackAt },
+      data: {
+        status: 'DRAFT',
+        draftReason: 'CALLBACK',
+        draftReasonNote: null,
+        retentionId: lead.callbackById,
+        retentionAssignedAt: new Date(),
+        callbackById: null,
+        callbackAt: null,
+      },
+    });
+    if (updated.count === 0) continue;
+    lapsed += 1;
+    void notifyUsers([lead.callbackById!], {
+      kind: 'warning',
+      title: 'Callback expired',
+      message: `${who(lead.customerName)} was moved back to your drafts.`,
+      page: 'INBOX',
+    });
+  }
+  return lapsed;
+}
+
 /**
  * Leads this Retention person has worked past the queue (submitted, assigned, accepted,
  * rejected, etc.) — scoped to the caller: whoever submits a lead becomes its retentionId,
