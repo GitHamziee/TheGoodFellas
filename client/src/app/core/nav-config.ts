@@ -132,8 +132,7 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
       { label: 'IP Whitelist', path: '/admin/ip-whitelist' },
     ]),
   ],
-  // Everything ADMIN has except Clients, Team, External Clients, Expenses, and IP
-  // Whitelist — full run of the pipeline/reporting pages, none of the account-management ones.
+  // Everything ADMIN has except Expenses and IP Whitelist.
   MANAGER: [
     { label: 'Dashboard', path: '/manager/dashboard', icon: 'dashboard' },
     group('Leads', 'leads', [
@@ -143,6 +142,11 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
       { label: 'Retention Imports', path: '/manager/retention' },
       { label: 'Retention History', path: '/manager/retention-history' },
       { label: 'Charge Backs', path: '/manager/charge-backs' },
+    ]),
+    group('People', 'users', [
+      { label: 'Team', path: '/manager/team' },
+      { label: 'Clients', path: '/manager/clients' },
+      { label: 'External Clients', path: '/manager/external-clients' },
     ]),
     analyticsTabs('/manager'),
     qaTabs('/manager'),

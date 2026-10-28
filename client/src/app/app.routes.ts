@@ -244,8 +244,8 @@ export const routes: Routes = [
     ],
   },
 
-  // Reuses the same admin-page components as /admin above, minus Clients, Team, External
-  // Clients, and Expenses — see nav-config.ts's MANAGER entry for the exact list this mirrors.
+  // Reuses the same admin-page components as /admin above, minus Expenses and IP Whitelist —
+  // see nav-config.ts's MANAGER entry for the exact list this mirrors.
   {
     path: 'manager',
     canMatch: [authGuard, roleGuard('MANAGER')],
@@ -278,6 +278,19 @@ export const routes: Routes = [
       {
         path: 'cpl-leads',
         loadComponent: () => import('./features/admin/cpl-leads/cpl-leads').then((m) => m.AdminCplLeads),
+      },
+      {
+        path: 'clients',
+        loadComponent: () => import('./features/admin/clients/clients').then((m) => m.AdminClients),
+      },
+      {
+        path: 'team',
+        loadComponent: () => import('./features/admin/team/team').then((m) => m.AdminTeam),
+      },
+      {
+        path: 'external-clients',
+        loadComponent: () =>
+          import('./features/admin/external-clients/external-clients').then((m) => m.AdminExternalClients),
       },
       {
         path: 'drafts',
@@ -348,9 +361,6 @@ export const routes: Routes = [
         loadComponent: () => import('./features/settings/settings').then((m) => m.Settings),
       },
       // Excluded from this role — redirect stray bookmarks/links rather than 404ing.
-      { path: 'clients', redirectTo: 'dashboard' },
-      { path: 'team', redirectTo: 'dashboard' },
-      { path: 'external-clients', redirectTo: 'dashboard' },
       { path: 'expenses', redirectTo: 'dashboard' },
       { path: 'ip-whitelist', redirectTo: 'dashboard' },
     ],

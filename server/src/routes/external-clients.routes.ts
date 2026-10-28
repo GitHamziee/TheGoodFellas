@@ -7,9 +7,6 @@ import * as externalClientService from '../services/external-client.service';
 const router = Router();
 router.use(authenticate);
 
-// List is also how Manager's "Assign External" dropdown (on Queue/CPA/CPL Leads) is
-// populated — Manager can hand a lead to an external client without being able to manage
-// the roster itself, so only this one is opened up beyond ADMIN.
 router.get(
   '/',
   requireRole('ADMIN', 'MANAGER'),
@@ -19,7 +16,7 @@ router.get(
   })
 );
 
-router.use(requireRole('ADMIN'));
+router.use(requireRole('ADMIN', 'MANAGER'));
 
 router.post(
   '/',
