@@ -106,7 +106,16 @@ function summarize(r: LeadRecord, names: Map<string, string>, now: Date): Retent
   const paidAt = r.events.find((e) => e.type === 'PAID')?.createdAt ?? r.incomePayment?.createdAt ?? null;
   const chargedBackAt = r.chargeBacks[0]?.createdAt ?? null;
   const wasChargedBack = r.chargeBacks.length > 0;
-  const closedAgain = r.status === 'ACCEPTED' || r.status === 'ASSIGNED_EXTERNAL';
+  // A charge-back resets paymentStatus to UNPAID, so PAID again means the admin re-collected and
+  // the charge-back is settled, even while the client hasn't re-decided yet (status ASSIGNED).
+  const closedAgain = r.status === 'ACCEPTED' || r.status === 'ASSIGNED_EXTERNAL' || r.paymentStatus === 'PAID';
+
+  // Once settled again, the book clock restarts from the payment that followed the charge-back.
+  const repaidAt =
+    wasChargedBack && r.paymentStatus === 'PAID'
+      ? [...r.events].reverse().find((e) => e.type === 'PAID' && e.createdAt >= chargedBackAt!)?.createdAt ?? null
+      : null;
+  const bookStart = repaidAt ?? paidAt;
 
   const state: RetentionHistoryState = wasChargedBack
     ? closedAgain
@@ -140,7 +149,7 @@ function summarize(r: LeadRecord, names: Map<string, string>, now: Date): Retent
     chargedBackAt,
     chargeBackCount: r.chargeBacks.length,
     chargeBackDates: r.chargeBacks.map((c) => c.createdAt),
-    monthsOnBook: paidAt ? wholeMonthsBetween(paidAt, chargedBackAt ?? now) : null,
+    monthsOnBook: bookStart ? wholeMonthsBetween(bookStart, repaidAt ? now : chargedBackAt ?? now) : null,
     workedBy: unique(submits.map((e) => nameOf(e.actorId))).concat(
       submits.length === 0 && r.retention ? [r.retention.name] : []
     ),
