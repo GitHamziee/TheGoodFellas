@@ -1,5 +1,6 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { LucideFileText } from '@lucide/angular';
 import { LeadService } from '../../../core/services/lead.service';
 import { apiErrorMessage } from '../../../core/api';
@@ -120,6 +121,10 @@ function stageOf(l: RetentionHistoryRow): string {
 export class RetentionHistory implements OnInit {
   private readonly liveReload = reloadOnChange(() => this.refresh());
   private readonly leadService = inject(LeadService);
+
+  /** Lead to land on after a submit (?highlight=<id>) — paged to and flashed once, on first load. */
+  readonly highlightId = signal<string | null>(inject(ActivatedRoute).snapshot.queryParamMap.get('highlight'));
+  private highlightHandled = false;
 
   readonly leads = signal<RetentionHistoryRow[]>([]);
   readonly loading = signal(true);
@@ -265,11 +270,23 @@ export class RetentionHistory implements OnInit {
     }
   }
 
+  private revealHighlight(): void {
+    const id = this.highlightId();
+    if (!id || this.highlightHandled) return;
+    this.highlightHandled = true;
+    this.view.clearFilters();
+    const at = this.view.filtered().findIndex((l) => l.id === id);
+    if (at >= 0) this.view.page.set(Math.floor(at / this.view.pageSize) + 1);
+    setTimeout(() => document.getElementById('hl-' + id)?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+    setTimeout(() => this.highlightId.set(null), 6000);
+  }
+
   async ngOnInit(): Promise<void> {
     if (!isSilentReload()) this.loading.set(true);
     try {
       this.leads.set(await this.leadService.retentionLifecycle());
       this.error.set(null);
+      this.revealHighlight();
     } catch (err) {
       this.error.set(apiErrorMessage(err, 'Could not load retention history. Refresh to try again.'));
     } finally {

@@ -451,6 +451,23 @@ export class AdminLeads implements OnInit {
   /** Set after a successful assignment so the admin sees the assigned lead (with its copy action). */
   readonly assignedLead = signal<{ lead: Lead; to: string } | null>(null);
 
+  /** Row briefly highlighted in History after an assignment. */
+  readonly highlightId = signal<string | null>(null);
+
+  /** Closing the "Lead assigned" popup takes the admin to the History tab, on the lead. */
+  closeAssigned(): void {
+    const done = this.assignedLead();
+    this.assignedLead.set(null);
+    if (!done) return;
+    this.clearFilters();
+    this.day.set(pacificIsoDate());
+    this.dayTo.set('');
+    this.tab.set('history');
+    this.highlightId.set(done.lead.id);
+    setTimeout(() => document.getElementById('hl-' + done.lead.id)?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+    setTimeout(() => this.highlightId.set(null), 6000);
+  }
+
 
   readonly statusCounts = computed(() => {
     const rows = this.byDay();

@@ -521,8 +521,7 @@ export class AdminChargeBacks implements OnInit {
     this.busyId.set(lead.id);
     try {
       await this.leadService.submitToAdmin(lead.id);
-      this.leads.update((rows) => rows.filter((l) => l.id !== lead.id));
-      this.notice.set(`${lead.customerName} sent to admin.`);
+      void this.router.navigate(['/retention-manager/retention-history'], { queryParams: { highlight: lead.id } });
     } catch (err) {
       this.error.set(apiErrorMessage(err, 'Could not send the lead to admin.'));
     } finally {

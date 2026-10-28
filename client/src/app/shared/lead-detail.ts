@@ -280,14 +280,16 @@ export class LeadDetail {
     };
 
     /** The routing/admin tail shared by every lead type; CPL drops the Closer rows
-     * because CPL never has a Closer step. */
+     * because CPL never has a Closer step. A Retention lead has neither a Junior Closer nor a
+     * Closer — its one notes field (stored in closerNotes) is just "Notes". */
+    const retention = l.leadType === 'RETENTION';
     const routingRows = (cpl: boolean): Row[] =>
       keep([
-        row(cpl ? 'Notes' : 'Junior closer notes', l.juniorNotes),
-        cpl ? null : row('Closer notes', l.closerNotes),
+        retention ? null : row(cpl ? 'Notes' : 'Junior closer notes', l.juniorNotes),
+        cpl ? null : row(retention ? 'Notes' : 'Closer notes', l.closerNotes),
         row('Decline reason', l.rejectionReason),
-        row('Junior closer', l.juniorCloser?.name),
-        cpl ? null : row('Closer', l.closer?.name),
+        retention ? null : row('Junior closer', l.juniorCloser?.name),
+        cpl || retention ? null : row('Closer', l.closer?.name),
         row('Client', l.client?.name),
         row(
           'External client',

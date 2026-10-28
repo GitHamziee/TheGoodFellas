@@ -226,3 +226,12 @@
 }
 .row-edit:hover { background: var(--gray-100); color: var(--gray-700); }
 .row-edit svg { width: 14px; height: 14px; }
+
+tr.row-highlight td {
+  background: rgba(212, 175, 55, 0.18);
+  animation: row-highlight-fade 6s ease-out forwards;
+}
+@keyframes row-highlight-fade {
+  0%, 70% { background: rgba(212, 175, 55, 0.18); }
+  100% { background: transparent; }
+}

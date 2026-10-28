@@ -102,7 +102,7 @@
             </thead>
             <tbody>
               @for (lead of view.rows(); track lead.id) {
-                <tr class="clickable" (click)="open(lead)">
+                <tr class="clickable" [id]="'hl-' + lead.id" [class.row-highlight]="lead.id === highlightId()" (click)="open(lead)">
                   <td>
                     <div class="lp-name"><span class="name-text">{{ lead.customerName }}</span></div>
                     <div class="lp-sub">Created {{ formatDate(lead.createdAt) }}</div>

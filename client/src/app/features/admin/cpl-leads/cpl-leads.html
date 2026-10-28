@@ -242,7 +242,7 @@
           </thead>
           <tbody>
             @for (lead of view.rows(); track lead.id) {
-              <tr class="clickable" (click)="detailLead.set(lead)">
+              <tr class="clickable" [id]="'hl-' + lead.id" [class.row-highlight]="lead.id === highlightId()" (click)="detailLead.set(lead)">
                 @if (!readOnly()) {
                   <td class="checkbox-col" (click)="$event.stopPropagation()">
                     <input
@@ -579,7 +579,7 @@
     [wide]="true"
     title="Lead assigned"
     [subtitle]="done.lead.customerName + ' was assigned to ' + done.to"
-    (close)="assignedLead.set(null)"
+    (close)="closeAssigned()"
   >
     <app-lead-detail [lead]="done.lead" />
   </app-modal>
