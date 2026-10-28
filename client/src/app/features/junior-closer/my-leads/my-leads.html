@@ -102,7 +102,7 @@
           </thead>
           <tbody>
             @for (lead of view.rows(); track lead.id) {
-              <tr class="clickable" (click)="selected.set(lead)">
+              <tr [id]="'hl-' + lead.id" [class.row-highlight]="lead.id === highlightId()" class="clickable" (click)="selected.set(lead)">
                 <td><span class="cell-main">{{ lead.customerName }}</span></td>
                 <td class="hide-md">
                   @if (lead.closer) {

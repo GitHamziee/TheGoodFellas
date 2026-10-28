@@ -12,6 +12,7 @@ import { LeadService } from '../../../core/services/lead.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { ZoomPhoneService } from '../../../core/services/zoom-phone.service';
 import { Lead } from '../../../core/models/lead.model';
+import { highlightFromQuery } from '../../../core/highlight';
 import { ListView, createListView } from '../../../core/list-view';
 import { getAvatarTone, getInitials, timeAgo } from '../../../core/format-utils';
 import { DRAFT_REASON_LABEL } from '../../../core/lead-options';
@@ -149,6 +150,14 @@ export class RetentionLeads implements OnInit {
       updatedAt: (l) => new Date(l.updatedAt ?? l.createdAt).getTime(),
     },
     initialSort: { key: 'updatedAt', dir: 'desc' },
+  });
+
+  readonly highlightId = highlightFromQuery(() => this.pending(), (lead) => {
+    this.chargeBacksOnly.set(false);
+    this.declinedOnly.set(false);
+    this.teammateFilter.set('');
+    this.pendingTab.set(lead.callbackById ? 'callbacks' : lead.status === 'DRAFT' ? 'drafts' : 'new');
+    this.pendingView.reveal((l) => l.id === lead.id);
   });
 
   async ngOnInit(): Promise<void> {

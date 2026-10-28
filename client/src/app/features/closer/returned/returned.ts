@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 import { LucideCircleCheck, LucideClock, LucideSquarePen, LucideUndo2 } from '@lucide/angular';
 import { Lead } from '../../../core/models/lead.model';
 import { LeadService } from '../../../core/services/lead.service';
+import { highlightFromQuery } from '../../../core/highlight';
 import { createListView } from '../../../core/list-view';
 import { formatPhone, timeAgo } from '../../../core/format-utils';
 import { EmptyState, Pagination, SearchBox, SkeletonRows } from '../../../shared/ui/ui';
@@ -52,6 +53,8 @@ export class CloserReturned implements OnInit {
     initialSort: { key: 'updatedAt', dir: 'desc' },
     pageSize: 10,
   });
+
+  readonly highlightId = highlightFromQuery(() => this.leads(), (lead) => this.view.reveal((l) => l.id === lead.id));
 
   async ngOnInit(): Promise<void> {
     try {

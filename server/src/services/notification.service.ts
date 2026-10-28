@@ -36,6 +36,8 @@ export interface NotificationInput {
   title: string;
   message: string;
   page?: NotificationPage;
+  /** Lead the notification is about; the page opened on click highlights it. */
+  leadId?: string;
 }
 
 export interface PublicNotification {
@@ -75,7 +77,7 @@ export async function notifyUsers(
     for (const user of users) {
       const paths = input.page ? (PAGE_PATHS[input.page] as Partial<Record<Role, string>>) : undefined;
       const row = await prisma.notification.create({
-        data: { userId: user.id, kind: input.kind, title: input.title, message: input.message, link: paths?.[user.role] ?? null },
+        data: { userId: user.id, kind: input.kind, title: input.title, message: input.message, link: linkFor(paths?.[user.role], input.leadId) },
       });
       emitNotification(user.id, toPublic(row));
     }
@@ -84,6 +86,10 @@ export async function notifyUsers(
     reportError(err);
   }
 }
+
+/** Page path, plus `?highlight=<leadId>` so the page can scroll to and flash that lead. */
+const linkFor = (path: string | undefined, leadId: string | undefined): string | null =>
+  path ? (leadId ? `${path}?highlight=${leadId}` : path) : null;
 
 /** Notifies every account holding one of the given roles (e.g. the admin team). */
 export async function notifyRoles(roles: Role[], input: NotificationInput, exceptUserId?: string): Promise<void> {

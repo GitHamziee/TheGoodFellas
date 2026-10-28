@@ -17,6 +17,7 @@ import { UserService } from '../../../core/services/user.service';
 import { ExternalClientService } from '../../../core/services/external-client.service';
 import { ExternalClient } from '../../../core/models/external-client.model';
 import { Lead, LeadStatus } from '../../../core/models/lead.model';
+import { highlightFromQuery } from '../../../core/highlight';
 import { createListView } from '../../../core/list-view';
 import {
   APP_TIME_ZONE,
@@ -453,6 +454,19 @@ export class AdminLeads implements OnInit {
 
   /** Row briefly highlighted in History after an assignment. */
   readonly highlightId = signal<string | null>(null);
+
+  /** Lead a notification link points at (`?highlight=`): switch to the tab holding it, then flash it. */
+  readonly linkHighlightId = highlightFromQuery(() => this.leads(), (lead) => {
+    if (this.pendingLeads().some((l) => l.id === lead.id)) {
+      this.tab.set('todo');
+      return;
+    }
+    this.clearFilters();
+    this.day.set('');
+    this.dayTo.set('');
+    this.tab.set('history');
+    this.view.reveal((l) => l.id === lead.id);
+  });
 
   /** Closing the "Lead assigned" popup takes the admin to the History tab, on the lead. */
   closeAssigned(): void {

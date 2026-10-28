@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { LucideBanknoteX, LucideClock, LucideSend, LucideSquarePen } from '@lucide/angular';
 import { LeadService } from '../../../core/services/lead.service';
 import { Lead } from '../../../core/models/lead.model';
+import { highlightFromQuery } from '../../../core/highlight';
 import { createListView } from '../../../core/list-view';
 import { formatPhone, getAvatarTone, getInitials, timeAgo } from '../../../core/format-utils';
 import { EmptyState, PageHero, Pagination, SearchBox, SkeletonRows, StatTile } from '../../../shared/ui/ui';
@@ -78,6 +79,8 @@ export class RetentionManagerQueue implements OnInit {
     initialSort: { key: 'chargedAt', dir: 'asc' },
     pageSize: 10,
   });
+
+  readonly highlightId = highlightFromQuery(() => this.leads(), (lead) => this.view.reveal((l) => l.id === lead.id));
 
   readonly stats = computed(() => {
     const rows = this.leads();

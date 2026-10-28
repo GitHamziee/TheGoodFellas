@@ -81,7 +81,7 @@
           </thead>
           <tbody>
             @for (lead of pendingView.filtered(); track lead.id) {
-              <tr>
+              <tr [id]="'hl-' + lead.id" [class.row-highlight]="lead.id === highlightId()">
                 <td>
                   <div class="cell-main name-row">
                     @if (!chargeBacksOnly()) {

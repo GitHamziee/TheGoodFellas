@@ -3282,3 +3282,13 @@ a.feed-row--link:hover { background: var(--gold-50); }
 .ledger-act .btn { opacity: 0.45; }
 .ledger-row:hover .ledger-act .btn, .ledger-act .btn:focus-visible { opacity: 1; }
 .ledger > :last-child { padding-bottom: 0.4rem; }
+
+/* Row flashed after a notification link (see core/highlight.ts) */
+tr.row-highlight td {
+  background: rgba(212, 175, 55, 0.18);
+  animation: row-highlight-fade 6s ease-out forwards;
+}
+@keyframes row-highlight-fade {
+  0%, 70% { background: rgba(212, 175, 55, 0.18); }
+  100% { background: transparent; }
+}

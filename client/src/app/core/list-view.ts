@@ -35,6 +35,8 @@ export interface ListView<T> {
   setStatus(value: string): void;
   toggleSort(key: string): void;
   clearFilters(): void;
+  /** Clears filters and moves to the page holding the first row that matches. */
+  reveal(match: (item: T) => boolean): void;
 }
 
 /**
@@ -131,6 +133,12 @@ export function createListView<T>(opts: ListViewOptions<T>): ListView<T> {
       search.set('');
       status.set('');
       page.set(1);
+    },
+    reveal(match: (item: T) => boolean) {
+      search.set('');
+      status.set('');
+      const index = filtered().findIndex(match);
+      page.set(index < 0 ? 1 : Math.floor(index / pageSize) + 1);
     },
   };
 }

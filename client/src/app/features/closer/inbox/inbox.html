@@ -63,7 +63,7 @@
           </thead>
           <tbody>
             @for (lead of view.rows(); track lead.id) {
-              <tr class="clickable" (click)="selected.set(lead)">
+              <tr [id]="'hl-' + lead.id" [class.row-highlight]="lead.id === highlightId()" class="clickable" (click)="selected.set(lead)">
                 <td>
                   <div class="cell-main">{{ lead.customerName }}</div>
                   <div class="cell-sub">{{ lead.state }}</div>

@@ -16,6 +16,7 @@ import {
 } from '@lucide/angular';
 import { LeadService } from '../../../core/services/lead.service';
 import { Lead } from '../../../core/models/lead.model';
+import { highlightFromQuery } from '../../../core/highlight';
 import { createListView } from '../../../core/list-view';
 import { formatMoney, formatPhone, getAvatarTone, getInitials, humanizeEnum, pacificIsoDate, pacificToday, timeAgo } from '../../../core/format-utils';
 import { Modal } from '../../../shared/ui/modal';
@@ -115,6 +116,11 @@ export class ClientLeadHistory implements OnInit {
     },
     initialSort: { key: 'updatedAt', dir: 'desc' },
     pageSize: 12,
+  });
+
+  readonly highlightId = highlightFromQuery(() => [...this.newLeads(), ...this.allLeads()], (lead) => {
+    if (this.allLeads().some((l) => l.id === lead.id)) this.period.set('all');
+    this.view.reveal((l) => l.id === lead.id);
   });
 
   readonly stats = computed(() => {

@@ -11,6 +11,7 @@ import {
 } from '@lucide/angular';
 import { LeadService } from '../../../core/services/lead.service';
 import { LeadInboxPreview } from '../../../core/models/lead.model';
+import { highlightFromQuery } from '../../../core/highlight';
 import { createListView } from '../../../core/list-view';
 import { getAvatarTone, getInitials, humanizeEnum, isToday, timeAgo } from '../../../core/format-utils';
 import { Modal } from '../../../shared/ui/modal';
@@ -66,6 +67,8 @@ export class CloserInbox implements OnInit {
     initialSort: { key: 'updatedAt', dir: 'desc' },
     pageSize: 10,
   });
+
+  readonly highlightId = highlightFromQuery(() => this.leads(), (lead) => this.view.reveal((l) => l.id === lead.id));
 
   readonly stats = computed(() => {
     const rows = this.leads();

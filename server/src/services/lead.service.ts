@@ -215,6 +215,7 @@ export async function submitChargedBackToAdmin(leadId: string, actorId: string):
     title: 'Charged-back lead worked',
     message: `${who(lead.customerName)} was worked by the Retention Manager and is ready for you to assign.`,
     page: 'ADMIN_LEADS',
+    leadId: lead.id,
   });
 
   const result = await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE });
@@ -298,6 +299,7 @@ export async function submitLead(
     title: 'New lead assigned to you',
     message: `${who(lead.customerName)} was sent to you by ${lead.juniorCloser?.name ?? 'a junior closer'}.`,
     page: 'INBOX',
+    leadId: lead.id,
   });
 
   return { data: { lead } };
@@ -330,6 +332,7 @@ export async function submitCplLead(
     title: 'New CPL lead submitted',
     message: `${who(lead.customerName)} is waiting in the CPL queue.`,
     page: 'ADMIN_CPL',
+    leadId: lead.id,
   });
 
   return { data: { lead } };
@@ -383,6 +386,7 @@ export async function resubmitByJuniorCloser(
     title: 'Lead corrected and resubmitted',
     message: `${who(data.customerName as string)} was fixed by the junior closer and is back in your queue.`,
     page: 'ADMIN_LEADS',
+    leadId,
   });
 
   // Deliberately the masked view — correcting a lead doesn't earn ongoing visibility.
@@ -507,6 +511,7 @@ export async function enrichAndSubmitLead(
     title: 'Lead submitted by a closer',
     message: `${who(lead.customerName)} is ready for you to assign.`,
     page: 'ADMIN_LEADS',
+    leadId: lead.id,
   });
 
   const result = await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE });
@@ -552,6 +557,7 @@ export async function resubmitByCloser(
     title: 'Lead corrected and resubmitted',
     message: `${who(lead.customerName)} was re-written by the closer and is back in your queue.`,
     page: 'ADMIN_LEADS',
+    leadId: lead.id,
   });
 
   const result = await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE });
@@ -589,6 +595,7 @@ export async function createLeadByCloser(
     title: 'Lead submitted by a closer',
     message: `${who(lead.customerName)} is ready for you to assign.`,
     page: 'ADMIN_LEADS',
+    leadId: lead.id,
   });
 
   return { data: { lead } };
@@ -666,6 +673,7 @@ export async function assignLeadToClient(leadId: string, clientId: string, actor
     title: 'New lead for you',
     message: `${who(lead.customerName)} has been assigned to you — review and accept or reject.`,
     page: lead.leadType === 'CPL' ? 'CLIENT_CPL' : 'CLIENT_CPA',
+    leadId: lead.id,
   });
 
   const result = await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE });
@@ -773,6 +781,7 @@ export async function assignLeadToRetention(leadId: string, retentionId: string,
     title: 'New retention lead',
     message: `${who(lead.customerName)} was assigned to the retention team.`,
     page: 'INBOX',
+    leadId: lead.id,
   });
 
   const result = await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE });
@@ -931,6 +940,7 @@ export async function returnLeadForEdit(
     title: 'Lead sent back for correction',
     message: `${who(lead.customerName)}: ${reason.trim()}`,
     page: 'RETURNED',
+    leadId: lead.id,
   });
 
   const result = await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE });
@@ -1130,12 +1140,13 @@ function announceChargeBackReturn(leads: { id: string; customerName: string; ret
       title: 'Lead charged back',
       message: `${who(l.customerName)}: ${reason}`,
       page: 'RETURNED',
+      leadId: l.id,
     });
   }
 }
 
 /** Best-effort: tell the Retention Manager a later-draft charge-back just landed in his queue. */
-function announceChargeBackToManager(leads: { customerName: string }[], month: number): void {
+function announceChargeBackToManager(leads: { id: string; customerName: string }[], month: number): void {
   if (leads.length === 0) return;
   void notifyRoles(['RETENTION_MANAGER'], {
     kind: 'warning',
@@ -1145,6 +1156,7 @@ function announceChargeBackToManager(leads: { customerName: string }[], month: n
         ? `${who(leads[0].customerName)} was charged back on draft ${month} — it's in your queue.`
         : `Draft ${month} charge-backs are in your queue.`,
     page: 'CHARGE_BACK_QUEUE',
+    leadId: leads.length === 1 ? leads[0].id : undefined,
   });
 }
 
@@ -1375,6 +1387,7 @@ export async function createLeadByRetention(
     title: 'Retention lead submitted',
     message: `${who(lead.customerName)} is ready for you to assign.`,
     page: 'ADMIN_LEADS',
+    leadId: lead.id,
   });
 
   return { data: { lead } };
@@ -1477,6 +1490,7 @@ export async function enrichAndSubmitRetentionLead(
     title: 'Retention lead submitted',
     message: `${who(lead.customerName)} is ready for you to assign.`,
     page: 'ADMIN_LEADS',
+    leadId: lead.id,
   });
 
   const result = await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE });
@@ -1603,6 +1617,7 @@ export async function expireRetentionCallbacks(): Promise<number> {
       title: 'Callback expired',
       message: `${who(lead.customerName)} was moved back to your drafts.`,
       page: 'INBOX',
+      leadId: lead.id,
     });
   }
   return lapsed;
@@ -1847,12 +1862,14 @@ export async function acceptLead(leadId: string, clientId: string): Promise<Serv
     title: 'Lead accepted',
     message: `A client accepted ${who(lead.customerName)}.`,
     page: 'ADMIN_LEADS',
+    leadId: lead.id,
   });
   void notifyUsers([lead.closerId, lead.juniorCloserId], {
     kind: 'success',
     title: 'Your lead was accepted',
     message: `${who(lead.customerName)} was accepted by the client.`,
     page: 'HISTORY',
+    leadId: lead.id,
   });
 
   const result = await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE });
@@ -1893,6 +1910,7 @@ export async function rejectLead(leadId: string, clientId: string, reason?: stri
       title: 'Client rejected your lead',
       message: `${who(lead.customerName)} needs a re-write.${why}`,
       page: 'RETURNED',
+      leadId: lead.id,
     });
   }
   if (toJunior) {
@@ -1901,6 +1919,7 @@ export async function rejectLead(leadId: string, clientId: string, reason?: stri
       title: 'Client rejected your lead',
       message: `${who(lead.customerName)} needs a re-write.${why}`,
       page: 'RETURNED',
+      leadId: lead.id,
     });
   }
   if (toRetention) {
@@ -1909,6 +1928,7 @@ export async function rejectLead(leadId: string, clientId: string, reason?: stri
       title: 'Client rejected your lead',
       message: `${who(lead.customerName)} needs a re-write.${why}`,
       page: 'RETURNED',
+      leadId: lead.id,
     });
   }
   void notifyRoles(ADMIN_TEAM, {
@@ -1916,6 +1936,7 @@ export async function rejectLead(leadId: string, clientId: string, reason?: stri
     title: 'Lead rejected by client',
     message: `${who(lead.customerName)} was rejected.${why}`,
     page: 'ADMIN_LEADS',
+    leadId: lead.id,
   });
 
   const result = await prisma.lead.findUnique({ where: { id: leadId }, include: FULL_INCLUDE });
@@ -1979,6 +2000,7 @@ export async function batchDecideAsAdmin(
         title: 'Your lead was accepted',
         message: `${who(l.customerName)} was accepted.`,
         page: 'HISTORY',
+        leadId: l.id,
       });
     }
     return { data: { count: updated.count } };
@@ -2027,6 +2049,7 @@ export async function batchDecideAsAdmin(
       title: 'Lead rejected — needs a re-write',
       message: `${who(l.customerName)}: ${trimmed ?? 'Rejected by admin'}`,
       page: 'RETURNED',
+      leadId: l.id,
     });
   }
 
@@ -2036,6 +2059,7 @@ export async function batchDecideAsAdmin(
       title: 'Lead rejected — needs a re-write',
       message: `${who(l.customerName)}: ${trimmed ?? 'Rejected by admin'}`,
       page: 'RETURNED',
+      leadId: l.id,
     });
   }
 
@@ -2045,6 +2069,7 @@ export async function batchDecideAsAdmin(
       title: 'Lead rejected — needs a re-write',
       message: `${who(l.customerName)}: ${trimmed ?? 'Rejected by admin'}`,
       page: 'RETURNED',
+      leadId: l.id,
     });
   }
 

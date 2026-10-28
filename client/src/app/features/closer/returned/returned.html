@@ -47,7 +47,7 @@
           </thead>
           <tbody>
             @for (lead of view.rows(); track lead.id) {
-              <tr>
+              <tr [id]="'hl-' + lead.id" [class.row-highlight]="lead.id === highlightId()">
                 <td>
                   <div class="cell-main">{{ lead.customerName }}</div>
                   <div class="cell-sub"><app-copy-phone [phone]="lead.phone" /> · {{ lead.state }}</div>

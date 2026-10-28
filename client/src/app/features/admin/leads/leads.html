@@ -101,7 +101,7 @@
           </thead>
           <tbody>
             @for (lead of pendingLeads(); track lead.id) {
-              <tr class="clickable" (click)="selected.set(lead)">
+              <tr class="clickable" [id]="'hl-' + lead.id" [class.row-highlight]="lead.id === linkHighlightId()" (click)="selected.set(lead)">
                 <td>
                   <div class="lp-name">
                     <span class="name-info"><span class="name-text">{{ lead.customerName }}</span><app-lifecycle-button [leadId]="lead.id" [name]="lead.customerName" /></span>
@@ -250,7 +250,7 @@
           </thead>
           <tbody>
             @for (lead of view.rows(); track lead.id) {
-              <tr class="clickable" [id]="'hl-' + lead.id" [class.row-highlight]="lead.id === highlightId()" (click)="selected.set(lead)">
+              <tr class="clickable" [id]="'hl-' + lead.id" [class.row-highlight]="lead.id === highlightId() || lead.id === linkHighlightId()" (click)="selected.set(lead)">
                 @if (!readOnly()) {
                   <td class="checkbox-col" (click)="$event.stopPropagation()">
                     <input

@@ -10,6 +10,7 @@ import {
 } from '@lucide/angular';
 import { LeadService } from '../../../core/services/lead.service';
 import { LeadHistoryRow, LeadStatus } from '../../../core/models/lead.model';
+import { highlightFromQuery } from '../../../core/highlight';
 import { createListView } from '../../../core/list-view';
 import {
   formatDateTime,
@@ -95,6 +96,8 @@ export class MyLeads implements OnInit {
     initialSort: { key: 'updatedAt', dir: 'desc' },
     pageSize: 12,
   });
+
+  readonly highlightId = highlightFromQuery(() => this.leads(), (lead) => this.view.reveal((l) => l.id === lead.id));
 
   readonly stats = computed(() => {
     const rows = this.leads();
