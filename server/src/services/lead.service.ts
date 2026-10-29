@@ -205,7 +205,7 @@ export async function submitChargedBackToAdmin(leadId: string, actorId: string):
 
   const updated = await prisma.lead.updateMany({
     where: { id: leadId, status: 'CHARGED_BACK' },
-    data: { status: 'SUBMITTED', adminStatus: null, submittedAt: new Date() },
+    data: { status: 'SUBMITTED', submittedAt: new Date() },
   });
   if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
 
@@ -1130,6 +1130,13 @@ function chargeBackGoesToRetention(lead: { leadType: string; retentionId: string
 }
 
 const CHARGED_BACK_RESET = { clientId: null, paymentStatus: 'UNPAID', closedAt: null, adminStatus: null } as const;
+// A later-draft charge-back belongs to the Retention Manager, who keeps seeing the tracking
+// labels the lead already carries (Approval confirmed etc.) — only a 1st draft (back to
+// Retention) clears them.
+const { adminStatus: _clearAdminStatus, ...CHARGED_BACK_KEEP_APPROVAL } = CHARGED_BACK_RESET;
+// The payment labels no longer describe a charged-back lead (it is back to UNPAID).
+const clearStaleAdminStatus = (tx: Prisma.TransactionClient, ids: string[]) =>
+  tx.lead.updateMany({ where: { id: { in: ids }, adminStatus: { in: ['CLIENT_PAID', 'CLIENT_UNPAID'] } }, data: { adminStatus: null } });
 
 /** Best-effort: audit event + notice for leads a charge-back just handed back to Retention. */
 function announceChargeBackReturn(leads: { id: string; customerName: string; retentionId: string | null }[], reason: string): void {
@@ -1191,9 +1198,10 @@ export async function markLeadChargedBack(
       where: { id: leadId, status: lead.status, paymentStatus: 'PAID' },
       data: toRetention
         ? { ...CHARGED_BACK_RESET, status: 'RETURNED_TO_RETENTION', returnReason: reason.trim() }
-        : { ...CHARGED_BACK_RESET, status: 'CHARGED_BACK' },
+        : { ...CHARGED_BACK_KEEP_APPROVAL, status: 'CHARGED_BACK' },
     });
     if (updated.count !== 1) throw new StaleTransitionError();
+    if (!toRetention) await clearStaleAdminStatus(tx, [leadId]);
     // Deliberately NOT mirrored into Expenses: a charge-back is made good by a replacement
     // lead, so it doesn't count as money lost.
     await tx.chargeBack.create({
@@ -1259,11 +1267,12 @@ export async function batchChargeBack(
       ? (
           await tx.lead.updateMany({
             where: { id: { in: toManager.map((l) => l.id) }, ...guard },
-            data: { ...CHARGED_BACK_RESET, status: 'CHARGED_BACK' },
+            data: { ...CHARGED_BACK_KEEP_APPROVAL, status: 'CHARGED_BACK' },
           })
         ).count
       : 0;
     if (back + stay !== eligible.length) throw new StaleTransitionError();
+    if (toManager.length) await clearStaleAdminStatus(tx, toManager.map((l) => l.id));
     await tx.chargeBack.createMany({
       data: eligible.map((l, i) => ({
         leadId: l.id,
@@ -1666,34 +1675,28 @@ export async function listRetentionHistory(requesterId: string) {
   });
 
   // A Retention person answers only for the 1st draft (those come straight back to them as
-  // RETURNED_TO_RETENTION). A later-draft charge-back belongs to the Retention Manager, so it
-  // must not show on their history: drop those rows and, while the lead sits CHARGED_BACK for
-  // the manager, show the outcome it had before the charge-back instead.
-  const chargedBack = leads.filter((l) => l.status === 'CHARGED_BACK').map((l) => l.id);
-  const priorStatus = new Map<string, LeadStatus>();
-  if (chargedBack.length > 0) {
-    const events = await prisma.leadEvent.findMany({
-      where: { leadId: { in: chargedBack }, type: { in: ['ASSIGNED_TO_CLIENT', 'ASSIGNED_EXTERNAL', 'ACCEPTED', 'REJECTED'] } },
-      select: { leadId: true, type: true },
-      orderBy: { createdAt: 'asc' },
-    });
-    const statusOfEvent = { ASSIGNED_TO_CLIENT: 'ASSIGNED', ASSIGNED_EXTERNAL: 'ASSIGNED_EXTERNAL', ACCEPTED: 'ACCEPTED', REJECTED: 'REJECTED' } as const;
-    for (const e of events) priorStatus.set(e.leadId, statusOfEvent[e.type as keyof typeof statusOfEvent]);
-  }
+  // RETURNED_TO_RETENTION). A later-draft charge-back belongs to the Retention Manager and the
+  // admin, so whatever they do with it (charged back, submitted, re-assigned) must not show here:
+  // keep showing it as Approved / Approval confirmed until it is paid again. The Retention
+  // Manager and Admin still see the real status.
+  const withManager = (l: (typeof leads)[number]) =>
+    l.paymentStatus !== 'PAID' &&
+    ['CHARGED_BACK', 'SUBMITTED', 'ASSIGNED', 'ASSIGNED_EXTERNAL', 'ACCEPTED'].includes(l.status) &&
+    (l.status === 'CHARGED_BACK' || (l.chargeBacks[0]?.chargeMonth ?? 0) > 1);
 
-  return leads.map(({ chargeBacks, paymentStatus, ...l }) => ({
+  return leads.map(({ chargeBacks, paymentStatus, ...l }) => {
+    const held = withManager({ ...l, paymentStatus, chargeBacks });
+    return {
     ...l,
-    // A charged-back lead was PAID, so ACCEPTED is the fallback for leads that predate LeadEvent.
-    status: l.status === 'CHARGED_BACK' ? (priorStatus.get(l.id) ?? 'ACCEPTED') : l.status,
-    // Charge-back charged to someone else: the tracking label was cleared, so the page needs
-    // to show the restored outcome as a badge of its own.
-    heldByManager: l.status === 'CHARGED_BACK',
+    status: held ? ('ACCEPTED' as LeadStatus) : l.status,
+    adminStatus: held ? ('APPROVAL_CONFIRMED' as const) : l.adminStatus,
     // Only a lead whose latest charge-back was a 1st draft is theirs; if the latest one hit a
     // later draft the lead now belongs to the manager, so none of its charge-backs show here
     // (chargeBacks is newest-first). A charge-back resets paymentStatus to UNPAID, so PAID again
     // means the admin re-approved and re-collected: the charge-back is settled and drops off.
     chargeBacks: paymentStatus !== 'PAID' && chargeBacks[0]?.chargeMonth === 1 ? chargeBacks.filter((c) => c.chargeMonth === 1).map((c) => ({ createdAt: c.createdAt })) : [],
-  }));
+    };
+  });
 }
 
 export type ManagerAction = 'SUBMITTED' | 'EDITED' | 'NOTED';

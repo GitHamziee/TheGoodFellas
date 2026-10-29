@@ -71,7 +71,11 @@
           <tbody>
             @for (lead of view.rows(); track lead.id) {
               <tr [id]="'hl-' + lead.id" [class.row-highlight]="lead.id === highlightId()">
-                <td><div class="cell-main">{{ lead.customerName }}</div></td>
+                <td>
+                  <div class="cell-main">
+                    <span class="name-info"><span class="name-text">{{ lead.customerName }}</span><app-lifecycle-button [leadId]="lead.id" [name]="lead.customerName" /></span>
+                  </div>
+                </td>
                 <td class="hide-md">
                   @if (lead.retention) {
                     <div class="person">

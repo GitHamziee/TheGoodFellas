@@ -7,6 +7,7 @@ import { createListView } from '../../../core/list-view';
 import { getAvatarTone, getInitials, pacificIsoDate, pacificToday, timeAgo } from '../../../core/format-utils';
 import { EmptyState, Pagination, SearchBox, SkeletonRows, StatTile, StatusBadge } from '../../../shared/ui/ui';
 import { AdminStatusBadge } from '../../../shared/ui/admin-status';
+import { LifecycleButton } from '../../../shared/ui/lifecycle-button';
 import { Period, PeriodFilter, inPeriod } from '../../../shared/ui/period-filter';
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 
@@ -25,6 +26,7 @@ const ACTION_LABEL: Record<ManagerAction, string> = {
   selector: 'app-retention-manager-history',
   imports: [
     AdminStatusBadge,
+    LifecycleButton,
     PeriodFilter,
     StatTile,
     StatusBadge,
