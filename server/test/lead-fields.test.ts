@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeSSN, sanitizeLeadFields } from '../src/lib/lead-fields';
+import { draftScheduleDate, normalizeSSN, sanitizeLeadFields } from '../src/lib/lead-fields';
 
 describe('sanitizeLeadFields', () => {
   it('keeps only allowed keys', () => {
@@ -54,5 +54,33 @@ describe('normalizeSSN', () => {
   it('formats as xxx-xx-xxxx', () => {
     expect(normalizeSSN('123456789')).toBe('123-45-6789');
     expect(normalizeSSN('123-45-6789')).toBe('123-45-6789');
+  });
+});
+
+describe('draft schedules', () => {
+  const keys = ['initialDraftDate', 'initialDraftSchedule'];
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+
+  it('lands on the fixed day or the nth Wednesday of the month', () => {
+    expect(iso(draftScheduleDate('THIRD_OF_MONTH', 2026, 11))).toBe('2026-12-03');
+    // December 2026 starts on a Tuesday: Wednesdays are the 2nd, 9th, 16th, 23rd.
+    expect(iso(draftScheduleDate('SECOND_WEDNESDAY', 2026, 11))).toBe('2026-12-09');
+    expect(iso(draftScheduleDate('FOURTH_WEDNESDAY', 2026, 11))).toBe('2026-12-23');
+    // April 2026 starts on a Wednesday.
+    expect(iso(draftScheduleDate('SECOND_WEDNESDAY', 2026, 3))).toBe('2026-04-08');
+  });
+
+  it('pins a scheduled date to the exact day in its month', () => {
+    const result = sanitizeLeadFields({ initialDraftDate: '2026-12-01', initialDraftSchedule: 'THIRD_WEDNESDAY' }, keys);
+    if ('error' in result) throw new Error(result.error);
+    expect(iso(result.data.initialDraftDate as Date)).toBe('2026-12-16');
+    expect(result.data.initialDraftSchedule).toBe('THIRD_WEDNESDAY');
+  });
+
+  it('clears the schedule when a specific date is sent alone', () => {
+    const result = sanitizeLeadFields({ initialDraftDate: '2026-12-05' }, keys);
+    if ('error' in result) throw new Error(result.error);
+    expect(iso(result.data.initialDraftDate as Date)).toBe('2026-12-05');
+    expect(result.data.initialDraftSchedule).toBeNull();
   });
 });

@@ -53,6 +53,14 @@ export type AccountType = 'CHECKING' | 'SAVINGS';
 export type PayerType = 'SELF' | 'SOMEONE_ELSE';
 export type PlanType = 'LEVEL' | 'GRADED' | 'MODIFIED' | 'GI';
 export type PaymentMethod = 'BANK_ACCOUNT' | 'CARD';
+/** A recurring draft day, picked instead of a calendar draft date. */
+export type DraftSchedule =
+  | 'FIRST_OF_MONTH'
+  | 'SECOND_OF_MONTH'
+  | 'THIRD_OF_MONTH'
+  | 'SECOND_WEDNESDAY'
+  | 'THIRD_WEDNESDAY'
+  | 'FOURTH_WEDNESDAY';
 export type CardType = 'CREDIT' | 'DEBIT' | 'DIRECT_EXPRESS';
 export type AccountOwnership = 'SINGLE' | 'JOINT';
 
@@ -157,8 +165,11 @@ export interface Lead {
   planType?: PlanType | null;
   coverageAmount?: number | null;
   monthlyPremiums?: number | null;
+  /** Each draft is a calendar date or a schedule, never both. */
   initialDraftDate?: string | null;
+  initialDraftSchedule?: DraftSchedule | null;
   futureDraftDate?: string | null;
+  futureDraftSchedule?: DraftSchedule | null;
   payer?: PayerType | null;
   paymentMethod?: PaymentMethod | null;
   bankName?: string | null;

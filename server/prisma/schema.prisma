@@ -354,8 +354,12 @@ model Lead {
   monthlyPremiums Int?
 
   // ─── Closer enrichment — billing ───
-  initialDraftDate    DateTime?
-  futureDraftDate     DateTime?
+  // Each draft is either a calendar date or a recurring day of the month (DraftSchedule
+  // value, e.g. SECOND_WEDNESDAY) — never both; setting one clears the other.
+  initialDraftDate     DateTime?
+  initialDraftSchedule String?
+  futureDraftDate      DateTime?
+  futureDraftSchedule  String?
   payer               PayerType?
   // Bank account vs card — gates which of the two field groups below applies.
   paymentMethod       PaymentMethod?

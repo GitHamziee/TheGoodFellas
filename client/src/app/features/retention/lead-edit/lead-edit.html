@@ -133,40 +133,6 @@
         </div>
       </div>
 
-      <!-- Need & income -->
-      <div class="section">
-        <h2 class="section-title"><svg lucideUsers></svg> Need & income</h2>
-        <div class="form-grid">
-          <label>
-            Need
-            <app-select [options]="needOptions" [ngModel]="form.need" name="need" [invalid]="err('need')"
-              (ngModelChange)="form.need = $event; touch()" />
-          </label>
-          <label>
-            Source of income
-            <app-select [options]="incomeSourceOptions" [ngModel]="form.incomeSource" name="incomeSource" [invalid]="err('incomeSource')"
-              (ngModelChange)="form.incomeSource = $event; touch()" />
-          </label>
-          @if (form.incomeSource === 'RETIRED') {
-            <label>
-              Retired income type
-              <app-select [options]="retiredIncomeOptions" [ngModel]="form.retiredIncomeType" name="retiredIncomeType" [invalid]="err('retiredIncomeType')"
-                (ngModelChange)="form.retiredIncomeType = $event; touch()" />
-            </label>
-          }
-          @if (form.retiredIncomeType === 'SSDI') {
-            <label>
-              Nature of disability
-              <input type="text" name="natureOfDisability" [class.invalid]="err('natureOfDisability')" [(ngModel)]="form.natureOfDisability" />
-            </label>
-          }
-          <label>
-            <span>Annual income <span class="hint">Whole dollars</span></span>
-            <input type="number" name="annualIncome" [class.invalid]="err('annualIncome')" min="0" [(ngModel)]="form.annualIncome" />
-          </label>
-        </div>
-      </div>
-
       <!-- Health -->
       <div class="section">
         <h2 class="section-title"><svg lucideHeartPulse></svg> Physical & health</h2>
@@ -281,17 +247,53 @@
         </div>
       </div>
 
+      <!-- Need & income -->
+      <div class="section">
+        <h2 class="section-title"><svg lucideUsers></svg> Need & income</h2>
+        <div class="form-grid">
+          <label>
+            Need
+            <app-select [options]="needOptions" [ngModel]="form.need" name="need" [invalid]="err('need')"
+              (ngModelChange)="form.need = $event; touch()" />
+          </label>
+          <label>
+            Source of income
+            <app-select [options]="incomeSourceOptions" [ngModel]="form.incomeSource" name="incomeSource" [invalid]="err('incomeSource')"
+              (ngModelChange)="form.incomeSource = $event; touch()" />
+          </label>
+          @if (form.incomeSource === 'RETIRED') {
+            <label>
+              Retired income type
+              <app-select [options]="retiredIncomeOptions" [ngModel]="form.retiredIncomeType" name="retiredIncomeType" [invalid]="err('retiredIncomeType')"
+                (ngModelChange)="form.retiredIncomeType = $event; touch()" />
+            </label>
+          }
+          @if (form.retiredIncomeType === 'SSDI') {
+            <label>
+              Nature of disability
+              <input type="text" name="natureOfDisability" [class.invalid]="err('natureOfDisability')" [(ngModel)]="form.natureOfDisability" />
+            </label>
+          }
+          <label>
+            <span>Annual income <span class="hint">Whole dollars</span></span>
+            <input type="number" name="annualIncome" [class.invalid]="err('annualIncome')" min="0" [(ngModel)]="form.annualIncome" />
+          </label>
+        </div>
+      </div>
+
       <!-- Billing -->
       <div class="section">
         <h2 class="section-title"><svg lucideBanknote></svg> Billing</h2>
         <div class="form-grid">
           <label>
             Initial draft date
-            <app-date-input name="initialDraftDate" [invalid]="err('initialDraftDate')" min="2000-01-01" max="2100-12-31" [(ngModel)]="form.initialDraftDate"></app-date-input>
+            <app-draft-date [invalid]="err('initialDraftDate')" [date]="form.initialDraftDate" [schedule]="form.initialDraftSchedule"
+              (dateChange)="form.initialDraftDate = $event ?? undefined; touch()" (scheduleChange)="form.initialDraftSchedule = $event ?? undefined; touch()"></app-draft-date>
           </label>
           <label>
             Future draft date
-            <app-date-input name="futureDraftDate" [invalid]="err('futureDraftDate')" min="2000-01-01" max="2100-12-31" [(ngModel)]="form.futureDraftDate"></app-date-input>
+            <app-draft-date [invalid]="err('futureDraftDate')" [date]="form.futureDraftDate" [schedule]="form.futureDraftSchedule"
+              (dateChange)="form.futureDraftDate = $event ?? undefined; touch()" (scheduleChange)="form.futureDraftSchedule = $event ?? undefined; touch()"></app-draft-date>
           </label>
           <label class="full">
             Who is paying?

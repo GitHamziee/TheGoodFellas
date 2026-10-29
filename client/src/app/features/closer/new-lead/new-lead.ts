@@ -39,6 +39,7 @@ import { NoCopy } from '../../../shared/no-copy.directive';
 import { PhoneInput } from '../../../shared/ui/phone-input';
 import { ZipInput } from '../../../shared/ui/zip-input';
 import { DateInput } from '../../../shared/ui/date-input';
+import { DraftDate } from '../../../shared/ui/draft-date';
 import { apiErrorMessage } from '../../../core/api';
 
 interface LookupUser {
@@ -88,7 +89,7 @@ const TRACKED: (keyof CloserCreateLeadInput)[] = [
  */
 @Component({
   selector: 'app-new-lead',
-  imports: [DateInput, PhoneInput, ZipInput, 
+  imports: [DateInput, DraftDate, PhoneInput, ZipInput, 
     FormsModule,
     RouterLink,
     Select,

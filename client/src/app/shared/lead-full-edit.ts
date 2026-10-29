@@ -34,6 +34,7 @@ import { Select } from './ui/select';
 import { PhoneInput } from './ui/phone-input';
 import { ZipInput } from './ui/zip-input';
 import { DateInput } from './ui/date-input';
+import { DraftDate } from './ui/draft-date';
 import { apiErrorMessage } from '../core/api';
 
 const CPL_KEYS = [
@@ -49,7 +50,7 @@ const FORM_KEYS = [
   'dCode', 'incomeSource', 'retiredIncomeType', 'natureOfDisability', 'annualIncome', 'height', 'weight',
   'doctorName', 'healthConditions', 'medications', 'beneficiaryName', 'beneficiaryRelation', 'beneficiaryDob',
   'carrierName', 'clientLeadId', 'planType', 'coverageAmount', 'monthlyPremiums', 'initialDraftDate', 'futureDraftDate',
-  'payer', 'paymentMethod', 'payerSocial', 'bankName', 'accountTitle', 'accountType', 'accountOwnership',
+  'initialDraftSchedule', 'futureDraftSchedule', 'payer', 'paymentMethod', 'payerSocial', 'bankName', 'accountTitle', 'accountType', 'accountOwnership',
   'accountOpeningState', 'routingNumber', 'accountNumber', 'cardType', 'cardNumber', 'cardExpiry',
   'juniorNotes', 'closerNotes',
 ];
@@ -62,7 +63,7 @@ const FORM_KEYS = [
 @Component({
   selector: 'app-lead-full-edit',
   imports: [
-    FormsModule, Modal, Select, PhoneInput, ZipInput, DateInput,
+    FormsModule, Modal, Select, PhoneInput, ZipInput, DateInput, DraftDate,
     LucideUser, LucideWallet, LucideHeartPulse, LucideUsers, LucideShieldCheck,
     LucideBanknote, LucideCreditCard, LucideNotebookPen,
   ],
@@ -267,11 +268,13 @@ const FORM_KEYS = [
             <div class="form-grid">
               <label>
                 Initial draft date
-                <app-date-input name="initialDraftDate" min="2000-01-01" max="2100-12-31" [(ngModel)]="form['initialDraftDate']"></app-date-input>
+                <app-draft-date [date]="$any(form['initialDraftDate'])" [schedule]="$any(form['initialDraftSchedule'])"
+                  (dateChange)="form['initialDraftDate'] = $event ?? ''" (scheduleChange)="form['initialDraftSchedule'] = $event ?? ''"></app-draft-date>
               </label>
               <label>
                 Future draft date
-                <app-date-input name="futureDraftDate" min="2000-01-01" max="2100-12-31" [(ngModel)]="form['futureDraftDate']"></app-date-input>
+                <app-draft-date [date]="$any(form['futureDraftDate'])" [schedule]="$any(form['futureDraftSchedule'])"
+                  (dateChange)="form['futureDraftDate'] = $event ?? ''" (scheduleChange)="form['futureDraftSchedule'] = $event ?? ''"></app-draft-date>
               </label>
               <label>
                 Who is paying?

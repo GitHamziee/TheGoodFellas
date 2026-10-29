@@ -41,6 +41,7 @@ import { NoCopy } from '../../../shared/no-copy.directive';
 import { PhoneInput } from '../../../shared/ui/phone-input';
 import { ZipInput } from '../../../shared/ui/zip-input';
 import { DateInput } from '../../../shared/ui/date-input';
+import { DraftDate } from '../../../shared/ui/draft-date';
 import { apiErrorMessage } from '../../../core/api';
 import { clientNeedsLeadId, retentionMissing, scrollToFirstInvalid } from '../retention-required';
 import { ClientCoverage } from '../../../core/models/user.model';
@@ -86,7 +87,7 @@ const TRACKED: (keyof RetentionSubmitInput)[] = [
  */
 @Component({
   selector: 'app-retention-new-lead',
-  imports: [DateInput, PhoneInput, ZipInput, 
+  imports: [DateInput, DraftDate, PhoneInput, ZipInput, 
     FormsModule,
     RouterLink,
     Select,

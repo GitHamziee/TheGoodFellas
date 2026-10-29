@@ -62,6 +62,44 @@ export const DRAFT_REASON_VALUES = [
 
 export const D_CODE_VALUES = ['D1', 'D2', 'D3', 'D4'] as const;
 
+/** A recurring draft day, picked instead of a calendar date. */
+export const DRAFT_SCHEDULE_VALUES = [
+  'FIRST_OF_MONTH',
+  'SECOND_OF_MONTH',
+  'THIRD_OF_MONTH',
+  'SECOND_WEDNESDAY',
+  'THIRD_WEDNESDAY',
+  'FOURTH_WEDNESDAY',
+] as const;
+
+type DraftSchedule = (typeof DRAFT_SCHEDULE_VALUES)[number];
+
+/** Which day of the month each schedule lands on: a fixed day, or the nth Wednesday. */
+const DRAFT_SCHEDULE_DAY: Record<DraftSchedule, { day: number } | { wednesday: number }> = {
+  FIRST_OF_MONTH: { day: 1 },
+  SECOND_OF_MONTH: { day: 2 },
+  THIRD_OF_MONTH: { day: 3 },
+  SECOND_WEDNESDAY: { wednesday: 2 },
+  THIRD_WEDNESDAY: { wednesday: 3 },
+  FOURTH_WEDNESDAY: { wednesday: 4 },
+};
+
+/** The exact (UTC-midnight) date a schedule falls on in the given month (0-based).
+ * Mirrors `draftScheduleDate` in client/src/app/core/lead-options.ts. */
+export function draftScheduleDate(schedule: DraftSchedule, year: number, month: number): Date {
+  const rule = DRAFT_SCHEDULE_DAY[schedule];
+  if ('day' in rule) return new Date(Date.UTC(year, month, rule.day));
+  const firstWeekday = new Date(Date.UTC(year, month, 1)).getUTCDay();
+  return new Date(Date.UTC(year, month, 1 + ((3 - firstWeekday + 7) % 7) + (rule.wednesday - 1) * 7));
+}
+
+/** Date field → its schedule. A draft is a specific date (no schedule) or a schedule in a
+ * month — the date then always holds the exact day the schedule lands on. */
+const DRAFT_DATE_PAIRS = [
+  ['initialDraftDate', 'initialDraftSchedule'],
+  ['futureDraftDate', 'futureDraftSchedule'],
+] as const;
+
 export function normalizeSSN(value: string): string {
   const digits = value.replace(/\D/g, '');
   return `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5, 9)}`;
@@ -110,6 +148,8 @@ const FIELD_SCHEMA: Record<string, FieldSpec> = {
   monthlyPremiums: { type: 'int' },
   initialDraftDate: { type: 'date' },
   futureDraftDate: { type: 'date' },
+  initialDraftSchedule: { type: 'string', enumValues: DRAFT_SCHEDULE_VALUES },
+  futureDraftSchedule: { type: 'string', enumValues: DRAFT_SCHEDULE_VALUES },
   payer: { type: 'string', enumValues: ['SELF', 'SOMEONE_ELSE'] },
   paymentMethod: { type: 'string', enumValues: ['BANK_ACCOUNT', 'CARD'] },
   bankName: { type: 'string' },
@@ -158,7 +198,7 @@ export const CLOSER_ONLY_FIELDS = [
   'beneficiaryRelation', 'beneficiaryName', 'beneficiaryDob', 'extraBeneficiaries',
   'medications',
   'carrierName', 'clientLeadId', 'planType', 'coverageAmount', 'monthlyPremiums',
-  'initialDraftDate', 'futureDraftDate', 'payer', 'paymentMethod',
+  'initialDraftDate', 'initialDraftSchedule', 'futureDraftDate', 'futureDraftSchedule', 'payer', 'paymentMethod',
   'bankName', 'accountTitle', 'payerSocial', 'accountType', 'accountOwnership', 'accountOpeningState',
   'routingNumber', 'accountNumber', 'cardType', 'cardNumber', 'cardExpiry',
   'closerNotes',
@@ -292,5 +332,16 @@ export function sanitizeLeadFields(
     }
   }
 
-  return { data: data as SanitizedLeadFields };
+  // A schedule pins the date to its exact day in the chosen month; a date sent without a
+  // schedule is a specific date, so any stored schedule is cleared (null is otherwise never written).
+  const cleared: Record<string, null> = {};
+  for (const [date, schedule] of DRAFT_DATE_PAIRS) {
+    const d = data[date];
+    if (!(d instanceof Date)) continue;
+    const s = data[schedule] as DraftSchedule | undefined;
+    if (s) data[date] = draftScheduleDate(s, d.getUTCFullYear(), d.getUTCMonth());
+    else if (allowedKeys.includes(schedule)) cleared[schedule] = null;
+  }
+
+  return { data: { ...data, ...cleared } as SanitizedLeadFields };
 }

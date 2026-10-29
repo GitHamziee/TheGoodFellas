@@ -252,11 +252,11 @@
         <div class="form-grid">
           <label>
             Initial draft date
-            <app-date-input name="initialDraftDate" min="2000-01-01" max="2100-12-31" [(ngModel)]="form.initialDraftDate"></app-date-input>
+            <app-draft-date [(date)]="form.initialDraftDate" [(schedule)]="form.initialDraftSchedule"></app-draft-date>
           </label>
           <label>
             Future draft date
-            <app-date-input name="futureDraftDate" min="2000-01-01" max="2100-12-31" [(ngModel)]="form.futureDraftDate"></app-date-input>
+            <app-draft-date [(date)]="form.futureDraftDate" [(schedule)]="form.futureDraftSchedule"></app-draft-date>
           </label>
           <label class="full">
             Who is paying?

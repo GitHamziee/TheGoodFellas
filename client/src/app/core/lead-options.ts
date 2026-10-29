@@ -1,6 +1,7 @@
-import { AccountOwnership, AccountType, CardType, DCode, DraftReason, IncomeSource, LeadAdminStatus, LeadNeed, LeadStatus, PayerType, PaymentMethod, PlanType, RetiredIncomeType } from './models/lead.model';
+import { AccountOwnership, AccountType, CardType, DCode, DraftReason, DraftSchedule, IncomeSource, LeadAdminStatus, LeadNeed, LeadStatus, PayerType, PaymentMethod, PlanType, RetiredIncomeType } from './models/lead.model';
 
 import { US_STATES } from './us-states';
+import { formatDate } from './format-utils';
 
 /** Leads handed to a client can be marked paid / charged back whatever their decision status. */
 export const MONEY_STATUSES: LeadStatus[] = ['ASSIGNED', 'ACCEPTED', 'ASSIGNED_EXTERNAL', 'REJECTED'];
@@ -61,13 +62,53 @@ export const NEED_OPTIONS: { value: LeadNeed; label: string }[] = [
 export const INCOME_SOURCE_OPTIONS: { value: IncomeSource; label: string }[] = [
   { value: 'EMPLOYED', label: 'Employed' },
   { value: 'SELF_EMPLOYED', label: 'Self employed' },
-  { value: 'RETIRED', label: 'Retired' },
+  { value: 'RETIRED', label: 'Retired / SSI / Disability' },
 ];
 
 export const RETIRED_INCOME_OPTIONS: { value: RetiredIncomeType; label: string }[] = [
   { value: 'SSI', label: 'SSI' },
   { value: 'SSDI', label: 'SSDI' },
 ];
+
+export const DRAFT_SCHEDULE_OPTIONS: { value: DraftSchedule; label: string }[] = [
+  { value: 'FIRST_OF_MONTH', label: '1st of month' },
+  { value: 'SECOND_OF_MONTH', label: '2nd of month' },
+  { value: 'THIRD_OF_MONTH', label: '3rd of month' },
+  { value: 'SECOND_WEDNESDAY', label: '2nd Wednesday' },
+  { value: 'THIRD_WEDNESDAY', label: '3rd Wednesday' },
+  { value: 'FOURTH_WEDNESDAY', label: '4th Wednesday' },
+];
+
+/** Which day of the month each schedule lands on: a fixed day, or the nth Wednesday. */
+const DRAFT_SCHEDULE_DAY: Record<DraftSchedule, { day: number } | { wednesday: number }> = {
+  FIRST_OF_MONTH: { day: 1 },
+  SECOND_OF_MONTH: { day: 2 },
+  THIRD_OF_MONTH: { day: 3 },
+  SECOND_WEDNESDAY: { wednesday: 2 },
+  THIRD_WEDNESDAY: { wednesday: 3 },
+  FOURTH_WEDNESDAY: { wednesday: 4 },
+};
+
+/** The exact date a schedule falls on in a month — `month` is "yyyy-MM", result "yyyy-MM-dd".
+ * Mirrors `draftScheduleDate` in server/src/lib/lead-fields.ts. */
+export function draftScheduleDate(schedule: DraftSchedule, month: string): string {
+  const [year, mon] = month.split('-').map(Number);
+  const rule = DRAFT_SCHEDULE_DAY[schedule];
+  let day: number;
+  if ('day' in rule) day = rule.day;
+  else {
+    const firstWeekday = new Date(Date.UTC(year, mon - 1, 1)).getUTCDay();
+    day = 1 + ((3 - firstWeekday + 7) % 7) + (rule.wednesday - 1) * 7;
+  }
+  return `${month}-${String(day).padStart(2, '0')}`;
+}
+
+/** A draft's display text: "2nd Wednesday · 12/09/2026" for a schedule, else the date. */
+export function draftLabel(date: string | null | undefined, schedule: DraftSchedule | null | undefined): string {
+  const label = DRAFT_SCHEDULE_OPTIONS.find((o) => o.value === schedule)?.label;
+  if (!label) return formatDate(date);
+  return date ? `${label} · ${formatDate(date)}` : label;
+}
 
 export const ACCOUNT_TYPE_OPTIONS: { value: AccountType; label: string }[] = [
   { value: 'CHECKING', label: 'Checking' },

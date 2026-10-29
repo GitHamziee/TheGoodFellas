@@ -49,6 +49,7 @@ import { NoCopy } from '../../../shared/no-copy.directive';
 import { PhoneInput } from '../../../shared/ui/phone-input';
 import { ZipInput } from '../../../shared/ui/zip-input';
 import { DateInput } from '../../../shared/ui/date-input';
+import { DraftDate } from '../../../shared/ui/draft-date';
 import { apiErrorMessage } from '../../../core/api';
 
 interface LookupUser {
@@ -89,7 +90,7 @@ const TRACKED: (keyof CloserCreateLeadInput)[] = [
 
 @Component({
   selector: 'app-enrich-lead',
-  imports: [DateInput, PhoneInput, ZipInput, 
+  imports: [DateInput, DraftDate, PhoneInput, ZipInput, 
     FormsModule,
     RouterLink,
     SkeletonRows,
@@ -253,7 +254,9 @@ export class EnrichLead implements OnInit {
         coverageAmount: lead.coverageAmount ?? undefined,
         monthlyPremiums: lead.monthlyPremiums ?? undefined,
         initialDraftDate: toDateInput(lead.initialDraftDate) || undefined,
+        initialDraftSchedule: lead.initialDraftSchedule ?? undefined,
         futureDraftDate: toDateInput(lead.futureDraftDate) || undefined,
+        futureDraftSchedule: lead.futureDraftSchedule ?? undefined,
         payer: lead.payer ?? undefined,
         // Older leads predate this field — infer it from whichever group they already have
         // data in, so an existing enrichment doesn't suddenly show neither section.

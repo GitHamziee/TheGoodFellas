@@ -24,7 +24,7 @@ import {
   maskSsn,
   timeAgo,
 } from '../core/format-utils';
-import { PLAN_TYPE_LABEL } from '../core/lead-options';
+import { INCOME_SOURCE_OPTIONS, PLAN_TYPE_LABEL, draftLabel } from '../core/lead-options';
 import { Detail, PaymentBadge, StatusBadge } from './ui/ui';
 
 interface Row {
@@ -85,8 +85,8 @@ export function leadCopyText(l: Lead, show: boolean): string {
       `Coverage Amount :${money(l.coverageAmount)}`,
       `Monthly Premiums :${money(l.monthlyPremiums)}`,
       '____________',
-      `Initial Draft Date :${date(l.initialDraftDate)}`,
-      `Future Draft Date :${date(l.futureDraftDate)}`,
+      `Initial Draft Date :${l.initialDraftSchedule ? draftLabel(l.initialDraftDate, l.initialDraftSchedule) : date(l.initialDraftDate)}`,
+      `Future Draft Date :${l.futureDraftSchedule ? draftLabel(l.futureDraftDate, l.futureDraftSchedule) : date(l.futureDraftDate)}`,
       `Bank Name:${s(l.bankName)}`,
       `Account Type:${s(l.accountType) ? humanizeEnum(l.accountType) : ''}`,
       `Routing Number:${s(l.routingNumber) ? (show ? l.routingNumber! : maskAccount(l.routingNumber)) : ''}`,
@@ -371,7 +371,7 @@ export class LeadDetail {
         title: 'Income',
         icon: 'user',
         rows: keep([
-          row('Source of income', l.incomeSource, humanizeEnum(l.incomeSource)),
+          row('Source of income', l.incomeSource, INCOME_SOURCE_OPTIONS.find((o) => o.value === l.incomeSource)?.label),
           row('Retired income type', l.retiredIncomeType, humanizeEnum(l.retiredIncomeType)),
           row('Nature of disability', l.natureOfDisability),
           row('Annual income', l.annualIncome, formatMoney(l.annualIncome)),
@@ -417,8 +417,8 @@ export class LeadDetail {
         rows: keep([
           row('Payer', l.payer, humanizeEnum(l.payer)),
           row('Payment method', l.paymentMethod, humanizeEnum(l.paymentMethod)),
-          row('Initial draft date', l.initialDraftDate, formatDate(l.initialDraftDate)),
-          row('Future draft date', l.futureDraftDate, formatDate(l.futureDraftDate)),
+          row('Initial draft date', l.initialDraftDate ?? l.initialDraftSchedule, draftLabel(l.initialDraftDate, l.initialDraftSchedule)),
+          row('Future draft date', l.futureDraftDate ?? l.futureDraftSchedule, draftLabel(l.futureDraftDate, l.futureDraftSchedule)),
           row('Bank name', l.bankName),
           row('Account title', l.accountTitle),
           row('Account type', l.accountType, humanizeEnum(l.accountType)),

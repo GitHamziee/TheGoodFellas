@@ -46,6 +46,7 @@ import { FormSections } from '../../../shared/ui/form-sections';
 import { PhoneInput } from '../../../shared/ui/phone-input';
 import { ZipInput } from '../../../shared/ui/zip-input';
 import { DateInput } from '../../../shared/ui/date-input';
+import { DraftDate } from '../../../shared/ui/draft-date';
 import { apiErrorMessage } from '../../../core/api';
 import { clientNeedsLeadId, retentionMissing, scrollToFirstInvalid } from '../retention-required';
 
@@ -93,7 +94,7 @@ const TRACKED: (keyof RetentionSubmitInput)[] = [
  */
 @Component({
   selector: 'app-retention-lead-edit',
-  imports: [DateInput, PhoneInput, ZipInput, 
+  imports: [DateInput, DraftDate, PhoneInput, ZipInput, 
     FormsModule,
     RouterLink,
     SkeletonRows,
@@ -154,9 +155,12 @@ export class RetentionLeadEdit implements OnInit {
   readonly clientOptions = computed(() => {
     this.revision();
     const state = this.form.state;
-    return this.coverage()
+    const options = this.coverage()
       .filter((c) => !state || c.states.includes(state))
       .map((c) => ({ value: c.id, label: c.name }));
+    // The Retention Manager has no coverage list — still show the lead's saved client.
+    const saved = this.lead()?.suggestedClient;
+    return saved && !options.some((o) => o.value === saved.id) ? [...options, { value: saved.id, label: saved.name }] : options;
   });
   /** Plans the suggested client doesn't take are shown crossed out and can't be picked. */
   readonly planOptions = computed(() => {
@@ -170,7 +174,10 @@ export class RetentionLeadEdit implements OnInit {
     return this.coverage().find((c) => c.id === this.form.suggestedClientId) ?? null;
   });
   /** AG / FCF leads carry the client's own lead ID; hidden for every other client. */
-  readonly needsLeadId = computed(() => clientNeedsLeadId(this.suggestedClient()?.name));
+  readonly needsLeadId = computed(() => {
+    this.revision();
+    return clientNeedsLeadId(this.clientName(this.form.suggestedClientId));
+  });
   readonly suggestedMinimumPremium = computed(() => this.suggestedClient()?.minimumPremium ?? null);
   /** Carriers of the suggested client in the chosen state. */
   readonly carrierOptions = computed(() => {
@@ -295,7 +302,9 @@ export class RetentionLeadEdit implements OnInit {
         coverageAmount: lead.coverageAmount ?? undefined,
         monthlyPremiums: lead.monthlyPremiums ?? undefined,
         initialDraftDate: toDateInput(lead.initialDraftDate) || undefined,
+        initialDraftSchedule: lead.initialDraftSchedule ?? undefined,
         futureDraftDate: toDateInput(lead.futureDraftDate) || undefined,
+        futureDraftSchedule: lead.futureDraftSchedule ?? undefined,
         payer: lead.payer ?? undefined,
         // Older leads predate this field — infer it from whichever group they already have
         // data in, so an existing record doesn't suddenly show neither section.
@@ -340,10 +349,16 @@ export class RetentionLeadEdit implements OnInit {
     else this.touch();
   }
 
+  /** From the coverage list, or the lead's saved client when that list isn't loaded (RM). */
+  private clientName(clientId: string | null | undefined): string | undefined {
+    const saved = this.lead()?.suggestedClient;
+    return this.coverage().find((c) => c.id === clientId)?.name ?? (saved && saved.id === clientId ? saved.name : undefined);
+  }
+
   onClientChange(clientId: string | undefined): void {
     this.form.suggestedClientId = clientId;
     this.form.carrierName = undefined;
-    if (!clientNeedsLeadId(this.coverage().find((c) => c.id === clientId)?.name)) this.form.clientLeadId = undefined;
+    if (!clientNeedsLeadId(this.clientName(clientId))) this.form.clientLeadId = undefined;
     const accepted = this.coverage().find((c) => c.id === clientId)?.acceptedPlans;
     if (accepted && this.form.planType && !accepted.includes(this.form.planType)) this.form.planType = undefined;
     this.touch();
