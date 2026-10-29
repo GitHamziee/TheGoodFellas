@@ -18,7 +18,6 @@ import { getAvatarTone, getInitials, timeAgo } from '../../../core/format-utils'
 import { DRAFT_REASON_LABEL } from '../../../core/lead-options';
 import { EmptyState, SearchBox, SkeletonRows, StatusBadge } from '../../../shared/ui/ui';
 import { Select } from '../../../shared/ui/select';
-import { NoCopy } from '../../../shared/no-copy.directive';
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 import { apiErrorMessage } from '../../../core/api';
 
@@ -36,7 +35,6 @@ type PendingTab = 'new' | 'drafts' | 'callbacks';
     FormsModule,
     RouterLink,
     Select,
-    NoCopy,
     StatusBadge,
     SearchBox,
     EmptyState,
