@@ -405,6 +405,7 @@ export class LeadDetail {
         icon: 'policy',
         rows: keep([
           row('Carrier', l.carrierName),
+          row('Client lead ID', l.clientLeadId),
           row('Plan type', l.planType, l.planType ? PLAN_TYPE_LABEL[l.planType] : undefined),
           row('Coverage amount', l.coverageAmount, formatMoney(l.coverageAmount)),
           row('Monthly premium', l.monthlyPremiums, formatMoney(l.monthlyPremiums)),

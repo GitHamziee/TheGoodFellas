@@ -48,7 +48,7 @@ const FORM_KEYS = [
   'gender', 'dob', 'age', 'ssn', 'dlStateId', 'yearlyIncome', 'smoker', 'need', 'decisionMaker', 'bankAccount',
   'dCode', 'incomeSource', 'retiredIncomeType', 'natureOfDisability', 'annualIncome', 'height', 'weight',
   'doctorName', 'healthConditions', 'medications', 'beneficiaryName', 'beneficiaryRelation', 'beneficiaryDob',
-  'carrierName', 'planType', 'coverageAmount', 'monthlyPremiums', 'initialDraftDate', 'futureDraftDate',
+  'carrierName', 'clientLeadId', 'planType', 'coverageAmount', 'monthlyPremiums', 'initialDraftDate', 'futureDraftDate',
   'payer', 'paymentMethod', 'payerSocial', 'bankName', 'accountTitle', 'accountType', 'accountOwnership',
   'accountOpeningState', 'routingNumber', 'accountNumber', 'cardType', 'cardNumber', 'cardExpiry',
   'juniorNotes', 'closerNotes',
@@ -242,6 +242,10 @@ const FORM_KEYS = [
               <label>
                 Carrier name
                 <input type="text" name="carrierName" [(ngModel)]="form['carrierName']" />
+              </label>
+              <label>
+                Client lead ID
+                <input type="text" name="clientLeadId" [(ngModel)]="form['clientLeadId']" />
               </label>
               <label>
                 Plan type

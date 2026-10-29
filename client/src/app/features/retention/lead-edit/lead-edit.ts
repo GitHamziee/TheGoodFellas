@@ -47,9 +47,12 @@ import { PhoneInput } from '../../../shared/ui/phone-input';
 import { ZipInput } from '../../../shared/ui/zip-input';
 import { DateInput } from '../../../shared/ui/date-input';
 import { apiErrorMessage } from '../../../core/api';
+import { clientNeedsLeadId, retentionMissing, scrollToFirstInvalid } from '../retention-required';
 
 /** Fields tracked for the completeness meter — same set the sheet import can fill plus
  * everything a Retention person can add on top of it. */
+const MANAGER_REQUIRED = ['customerName', 'phone', 'state'];
+
 const TRACKED: (keyof RetentionSubmitInput)[] = [
   'mailingAddress',
   'email',
@@ -166,6 +169,8 @@ export class RetentionLeadEdit implements OnInit {
     this.revision();
     return this.coverage().find((c) => c.id === this.form.suggestedClientId) ?? null;
   });
+  /** AG / FCF leads carry the client's own lead ID; hidden for every other client. */
+  readonly needsLeadId = computed(() => clientNeedsLeadId(this.suggestedClient()?.name));
   readonly suggestedMinimumPremium = computed(() => this.suggestedClient()?.minimumPremium ?? null);
   /** Carriers of the suggested client in the chosen state. */
   readonly carrierOptions = computed(() => {
@@ -210,16 +215,19 @@ export class RetentionLeadEdit implements OnInit {
     return !!r && r.length !== 9;
   });
 
-  readonly missing = computed(() => {
+  /** Required fields still empty. The Retention Manager edits leads in place (often older,
+   *  incomplete ones), so only the original name/phone/state minimum applies to him. */
+  readonly missingFields = computed(() => {
     this.revision();
-    const f = this.form;
-    const missing: string[] = [];
-    if (!f.customerName?.trim()) missing.push("Customer's name");
-    if (!f.phone?.trim()) missing.push('Phone');
-    if (!f.state?.trim()) missing.push('State');
-    if (this.routingInvalid()) missing.push('Routing number (must be exactly 9 digits)');
-    return missing;
+    const all = retentionMissing(this.form, this.needsLeadId());
+    return this.managerMode() ? all.filter((m) => MANAGER_REQUIRED.includes(m.key)) : all;
   });
+  private readonly missingKeys = computed(() => new Set(this.missingFields().map((m) => m.key)));
+
+  /** Highlight a field only after a submit attempt, and only while it's still empty. */
+  err(key: string): boolean {
+    return this.showErrors() && this.missingKeys().has(key);
+  }
 
   readonly completeness = computed(() => {
     this.revision();
@@ -230,7 +238,7 @@ export class RetentionLeadEdit implements OnInit {
     return Math.round((filled / TRACKED.length) * 100);
   });
 
-  readonly canSubmit = computed(() => this.missing().length === 0 && !this.submitting());
+  readonly canSubmit = computed(() => !this.submitting());
 
   /** Display-only — derived from monthly premium, not a stored field. */
   readonly annualPremium = computed(() => {
@@ -281,6 +289,7 @@ export class RetentionLeadEdit implements OnInit {
         extraBeneficiaries: (lead.extraBeneficiaries ?? []).map((b) => ({ ...b, dob: toDateInput(b.dob) })),
         medications: lead.medications ?? undefined,
         carrierName: lead.carrierName ?? undefined,
+        clientLeadId: lead.clientLeadId ?? undefined,
         planType: lead.planType ?? undefined,
         suggestedClientId: lead.suggestedClientId ?? undefined,
         coverageAmount: lead.coverageAmount ?? undefined,
@@ -334,6 +343,7 @@ export class RetentionLeadEdit implements OnInit {
   onClientChange(clientId: string | undefined): void {
     this.form.suggestedClientId = clientId;
     this.form.carrierName = undefined;
+    if (!clientNeedsLeadId(this.coverage().find((c) => c.id === clientId)?.name)) this.form.clientLeadId = undefined;
     const accepted = this.coverage().find((c) => c.id === clientId)?.acceptedPlans;
     if (accepted && this.form.planType && !accepted.includes(this.form.planType)) this.form.planType = undefined;
     this.touch();
@@ -385,8 +395,10 @@ export class RetentionLeadEdit implements OnInit {
 
   async submit(): Promise<void> {
     this.showErrors.set(true);
-    if (this.missing().length > 0) {
-      this.error.set(`Still needed: ${this.missing().join(', ')}.`);
+    const missing = this.missingFields().length;
+    if (missing > 0) {
+      this.error.set(`Fill in the ${missing} highlighted field${missing === 1 ? '' : 's'} before submitting.`);
+      scrollToFirstInvalid();
       return;
     }
 

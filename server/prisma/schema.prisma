@@ -347,6 +347,8 @@ model Lead {
 
   // ─── Closer enrichment — policy ───
   carrierName     String?
+  // The client's own lead reference — only collected for clients that require one (AG, FCF).
+  clientLeadId    String?
   planType        PlanType?
   coverageAmount  Int?
   monthlyPremiums Int?

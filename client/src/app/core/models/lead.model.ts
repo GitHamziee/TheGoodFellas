@@ -153,6 +153,7 @@ export interface Lead {
   extraBeneficiaries?: ExtraBeneficiary[] | null;
   medications?: string | null;
   carrierName?: string | null;
+  clientLeadId?: string | null;
   planType?: PlanType | null;
   coverageAmount?: number | null;
   monthlyPremiums?: number | null;

@@ -49,7 +49,7 @@ function usToIso(us: string): string {
       autocomplete="off"
       maxlength="10"
       placeholder="MM/DD/YYYY"
-      [class.invalid]="invalid()"
+      [class.invalid]="invalid() || flagged()"
       [attr.aria-label]="ariaLabel() || null"
       [disabled]="disabled()"
       (input)="onInput($event)"
@@ -86,6 +86,8 @@ export class DateInput implements ControlValueAccessor, Validator {
   readonly min = input<string>('');
   readonly max = input<string>('');
   readonly ariaLabel = input<string>('', { alias: 'aria-label' });
+  /** Lets the parent form highlight it, e.g. a required date left empty. */
+  readonly flagged = input(false, { alias: 'invalid' });
 
   @ViewChild('text', { static: true }) private text!: ElementRef<HTMLInputElement>;
   @ViewChild('picker', { static: true }) private picker!: ElementRef<HTMLInputElement>;

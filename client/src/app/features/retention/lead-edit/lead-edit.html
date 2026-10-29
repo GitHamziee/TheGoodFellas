@@ -70,75 +70,64 @@
         <h2 class="section-title"><svg lucideUser></svg> Personal & contact</h2>
         <div class="form-grid">
           <label>
-            <span>Customer's name <span class="req" title="Required">*</span></span>
-            <input type="text" name="customerName" [(ngModel)]="form.customerName"
-              [class.invalid]="showErrors() && !form.customerName" />
-            @if (showErrors() && !form.customerName) {
-              <span class="field-error">Enter the customer's name.</span>
-            }
+            <span>Customer's name</span>
+            <input type="text" name="customerName" [class.invalid]="err('customerName')" [(ngModel)]="form.customerName" />
           </label>
           <label>
-            <span>Phone number <span class="req" title="Required">*</span></span>
-            <input appPhone [maxDigits]="10" name="phone" [(ngModel)]="form.phone"
-              [class.invalid]="showErrors() && !form.phone" />
-            @if (showErrors() && !form.phone) {
-              <span class="field-error">Enter a contact number.</span>
-            }
+            <span>Phone number</span>
+            <input appPhone [maxDigits]="10" name="phone" [class.invalid]="err('phone')" [(ngModel)]="form.phone" />
           </label>
           <label>
-            <span>State <span class="req" title="Required">*</span></span>
-            <app-select [options]="stateOptions" [searchable]="true" name="state" [ngModel]="form.state"
-              (ngModelChange)="onStateChange($event)" [invalid]="showErrors() && !form.state" />
-            @if (showErrors() && !form.state) {
-              <span class="field-error">Enter the customer's state.</span>
-            }
+            <span>State</span>
+            <app-select [options]="stateOptions" [searchable]="true" name="state" [invalid]="err('state')" [ngModel]="form.state"
+              (ngModelChange)="onStateChange($event)" />
           </label>
           <label>
             Zipcode
-            <input appZip name="zipcode" [(ngModel)]="form.zipcode" />
+            <input appZip name="zipcode" [class.invalid]="err('zipcode')" [(ngModel)]="form.zipcode" />
           </label>
           <label class="full wide">
             Mailing address
-            <input type="text" name="mailingAddress" [(ngModel)]="form.mailingAddress" />
+            <input type="text" name="mailingAddress" [class.invalid]="err('mailingAddress')" [(ngModel)]="form.mailingAddress" />
           </label>
           <label>
-            Email
+            <span>Email <span class="hint">Optional</span></span>
             <input type="email" name="email" [(ngModel)]="form.email" />
           </label>
           <label>
             Marital status
-            <app-select [options]="maritalStatusOptions" [ngModel]="form.maritalStatus" name="maritalStatus"
+            <app-select [options]="maritalStatusOptions" [ngModel]="form.maritalStatus" name="maritalStatus" [invalid]="err('maritalStatus')"
               (ngModelChange)="form.maritalStatus = $event; touch()" />
           </label>
           <label>
             Birth state
-            <app-select [options]="stateOptions" [searchable]="true" name="birthState" [(ngModel)]="form.birthState" />
+            <app-select [options]="stateOptions" [searchable]="true" name="birthState" [invalid]="err('birthState')" [(ngModel)]="form.birthState" />
           </label>
           <label>
             Gender
-            <app-select [options]="genderOptions" [ngModel]="form.gender" name="gender"
+            <app-select [options]="genderOptions" [ngModel]="form.gender" name="gender" [invalid]="err('gender')"
               (ngModelChange)="form.gender = $event; touch()" />
           </label>
           <label>
             Date of birth
-            <app-date-input name="dob" [min]="minDob" [max]="todayIso" [(ngModel)]="form.dob"></app-date-input>
+            <app-date-input name="dob" [invalid]="err('dob')" [min]="minDob" [max]="todayIso" [(ngModel)]="form.dob"></app-date-input>
           </label>
           <label>
             Age
-            <input type="number" name="age" min="0" max="130" [(ngModel)]="form.age" />
+            <input type="number" name="age" [class.invalid]="err('age')" min="0" max="130" [(ngModel)]="form.age" />
           </label>
           <label>
             Social Security Number
-            <input type="text" name="ssn" inputmode="numeric" maxlength="9" placeholder="123456789"
+            <input type="text" name="ssn" [class.invalid]="err('ssn')" inputmode="numeric" maxlength="9" placeholder="123456789"
               [ngModel]="form.ssn" (ngModelChange)="onSsnChange($event)" />
             <span class="hint">Exactly 9 digits.</span>
           </label>
           <label>
-            DL / State ID #
+            <span>DL / State ID # <span class="hint">Optional</span></span>
             <input type="text" name="dlStateId" [(ngModel)]="form.dlStateId" />
           </label>
           <label>
-            <span>Yearly income <span class="hint">Whole dollars</span></span>
+            <span>Yearly income <span class="hint">Whole dollars, optional</span></span>
             <input type="number" name="yearlyIncome" min="0" [(ngModel)]="form.yearlyIncome" />
           </label>
         </div>
@@ -150,30 +139,30 @@
         <div class="form-grid">
           <label>
             Need
-            <app-select [options]="needOptions" [ngModel]="form.need" name="need"
+            <app-select [options]="needOptions" [ngModel]="form.need" name="need" [invalid]="err('need')"
               (ngModelChange)="form.need = $event; touch()" />
           </label>
           <label>
             Source of income
-            <app-select [options]="incomeSourceOptions" [ngModel]="form.incomeSource" name="incomeSource"
+            <app-select [options]="incomeSourceOptions" [ngModel]="form.incomeSource" name="incomeSource" [invalid]="err('incomeSource')"
               (ngModelChange)="form.incomeSource = $event; touch()" />
           </label>
           @if (form.incomeSource === 'RETIRED') {
             <label>
               Retired income type
-              <app-select [options]="retiredIncomeOptions" [ngModel]="form.retiredIncomeType" name="retiredIncomeType"
+              <app-select [options]="retiredIncomeOptions" [ngModel]="form.retiredIncomeType" name="retiredIncomeType" [invalid]="err('retiredIncomeType')"
                 (ngModelChange)="form.retiredIncomeType = $event; touch()" />
             </label>
           }
           @if (form.retiredIncomeType === 'SSDI') {
             <label>
               Nature of disability
-              <input type="text" name="natureOfDisability" [(ngModel)]="form.natureOfDisability" />
+              <input type="text" name="natureOfDisability" [class.invalid]="err('natureOfDisability')" [(ngModel)]="form.natureOfDisability" />
             </label>
           }
           <label>
             <span>Annual income <span class="hint">Whole dollars</span></span>
-            <input type="number" name="annualIncome" min="0" [(ngModel)]="form.annualIncome" />
+            <input type="number" name="annualIncome" [class.invalid]="err('annualIncome')" min="0" [(ngModel)]="form.annualIncome" />
           </label>
         </div>
       </div>
@@ -184,27 +173,27 @@
         <div class="form-grid">
           <label>
             Height
-            <input type="text" name="height" placeholder="e.g. 5'10&quot;" [(ngModel)]="form.height" />
+            <input type="text" name="height" [class.invalid]="err('height')" placeholder="e.g. 5'10&quot;" [(ngModel)]="form.height" />
           </label>
           <label>
             <span>Weight <span class="hint">Pounds</span></span>
-            <input type="number" name="weight" min="0" [(ngModel)]="form.weight" />
+            <input type="number" name="weight" [class.invalid]="err('weight')" min="0" [(ngModel)]="form.weight" />
           </label>
           <label>
             Smoker
-            <app-select [options]="smokerOptions" [ngModel]="form.smoker" name="smoker"
+            <app-select [options]="smokerOptions" [ngModel]="form.smoker" name="smoker" [invalid]="err('smoker')"
               (ngModelChange)="form.smoker = $event; touch()" />
           </label>
           <label>
-            Doctor's name
+            <span>Doctor's name <span class="hint">Optional</span></span>
             <input type="text" name="doctorName" [(ngModel)]="form.doctorName" />
           </label>
           <label class="full">
-            Health conditions
+            <span>Health conditions <span class="hint">Optional</span></span>
             <textarea name="healthConditions" rows="2" [(ngModel)]="form.healthConditions"></textarea>
           </label>
           <label class="full">
-            Medications
+            <span>Medications <span class="hint">Optional</span></span>
             <textarea name="medications" rows="2" [(ngModel)]="form.medications"></textarea>
           </label>
         </div>
@@ -216,27 +205,27 @@
         <div class="form-grid">
           <label>
             Beneficiary name
-            <input type="text" name="beneficiaryName" [(ngModel)]="form.beneficiaryName" />
+            <input type="text" name="beneficiaryName" [class.invalid]="err('beneficiaryName')" [(ngModel)]="form.beneficiaryName" />
           </label>
           <label>
             Relation
-            <input type="text" name="beneficiaryRelation" placeholder="e.g. Daughter" [(ngModel)]="form.beneficiaryRelation" />
+            <input type="text" name="beneficiaryRelation" [class.invalid]="err('beneficiaryRelation')" placeholder="e.g. Daughter" [(ngModel)]="form.beneficiaryRelation" />
           </label>
           <label>
-            Beneficiary date of birth
+            <span>Beneficiary date of birth <span class="hint">Optional</span></span>
             <app-date-input name="beneficiaryDob" [min]="minDob" [max]="todayIso" [(ngModel)]="form.beneficiaryDob"></app-date-input>
           </label>
           @for (b of form.extraBeneficiaries ?? []; track $index; let n = $index) {
             <label>
               Beneficiary {{ n + 2 }} name
-              <input type="text" [name]="'extraBeneficiaryName' + n" [(ngModel)]="b.name" />
+              <input type="text" [name]="'extraBeneficiaryName' + n" [class.invalid]="err('extraBeneficiaryName' + n)" [(ngModel)]="b.name" />
             </label>
             <label>
               Relation
-              <input type="text" [name]="'extraBeneficiaryRelation' + n" placeholder="e.g. Son" [(ngModel)]="b.relation" />
+              <input type="text" [name]="'extraBeneficiaryRelation' + n" [class.invalid]="err('extraBeneficiaryRelation' + n)" placeholder="e.g. Son" [(ngModel)]="b.relation" />
             </label>
             <label>
-              Beneficiary {{ n + 2 }} date of birth
+              <span>Beneficiary {{ n + 2 }} date of birth <span class="hint">Optional</span></span>
               <app-date-input [name]="'extraBeneficiaryDob' + n" [min]="minDob" [max]="todayIso" [(ngModel)]="b.dob"></app-date-input>
             </label>
             <div class="full">
@@ -255,39 +244,35 @@
         <div class="form-grid">
           <label>
             Suggested client
-            <app-select [options]="clientOptions()" [ngModel]="form.suggestedClientId" name="suggestedClientId"
+            <app-select [options]="clientOptions()" [ngModel]="form.suggestedClientId" name="suggestedClientId" [invalid]="err('suggestedClientId')"
               (ngModelChange)="onClientChange($event)" placeholder="No suggestion…" />
           </label>
-          @if (suggestedClient(); as client) {
-            <div class="plan-badges full">
-              @for (plan of planTypeOptions; track plan.value) {
-                <span class="plan-badge" [class.plan-badge--accepted]="client.acceptedPlans.includes(plan.value)">
-                  @if (client.acceptedPlans.includes(plan.value)) { <svg lucideCircleCheck></svg> } @else { <svg lucideCircleX></svg> }
-                  {{ plan.label }}
-                </span>
-              }
-            </div>
+          @if (needsLeadId()) {
+            <label>
+              Lead ID
+              <input type="text" name="clientLeadId" [class.invalid]="err('clientLeadId')" [(ngModel)]="form.clientLeadId" />
+            </label>
           }
           <label>
             Carrier name
-            <app-select [options]="carrierOptions()" [ngModel]="form.carrierName" name="carrierName"
+            <app-select [options]="carrierOptions()" [ngModel]="form.carrierName" name="carrierName" [invalid]="err('carrierName')"
               (ngModelChange)="form.carrierName = $event; touch()" placeholder="Select a carrier…" />
           </label>
           <label>
             Plan type
-            <app-select [options]="planOptions()" [ngModel]="form.planType" name="planType"
+            <app-select [options]="planOptions()" [ngModel]="form.planType" name="planType" [invalid]="err('planType')"
               (ngModelChange)="form.planType = $event; touch()" placeholder="Select a plan type…" />
           </label>
           <label>
             <span>Coverage amount <span class="hint">Whole dollars</span></span>
-            <input type="number" name="coverageAmount" min="0" [(ngModel)]="form.coverageAmount" />
+            <input type="number" name="coverageAmount" [class.invalid]="err('coverageAmount')" min="0" [(ngModel)]="form.coverageAmount" />
           </label>
           <label>
             <span>Monthly premium <span class="hint">Whole dollars</span></span>
-            @if (suggestedMinimumPremium() !== null) {
+            <input type="number" name="monthlyPremiums" [class.invalid]="err('monthlyPremiums')" min="0" [(ngModel)]="form.monthlyPremiums" />
+            @if (suggestedClient()?.minimumPremium != null) {
               <span class="chip"><svg lucideBanknote></svg>Min premium: {{ formatMoney(suggestedMinimumPremium()) }}</span>
             }
-            <input type="number" name="monthlyPremiums" min="0" [(ngModel)]="form.monthlyPremiums" />
           </label>
           <label>
             <span>Annual premium <span class="hint">Monthly × 12, calculated</span></span>
@@ -302,20 +287,20 @@
         <div class="form-grid">
           <label>
             Initial draft date
-            <app-date-input name="initialDraftDate" min="2000-01-01" max="2100-12-31" [(ngModel)]="form.initialDraftDate"></app-date-input>
+            <app-date-input name="initialDraftDate" [invalid]="err('initialDraftDate')" min="2000-01-01" max="2100-12-31" [(ngModel)]="form.initialDraftDate"></app-date-input>
           </label>
           <label>
             Future draft date
-            <app-date-input name="futureDraftDate" min="2000-01-01" max="2100-12-31" [(ngModel)]="form.futureDraftDate"></app-date-input>
+            <app-date-input name="futureDraftDate" [invalid]="err('futureDraftDate')" min="2000-01-01" max="2100-12-31" [(ngModel)]="form.futureDraftDate"></app-date-input>
           </label>
           <label class="full">
             Who is paying?
-            <app-select [options]="payerOptions" [ngModel]="form.payer" name="payer"
+            <app-select [options]="payerOptions" [ngModel]="form.payer" name="payer" [invalid]="err('payer')"
               (ngModelChange)="form.payer = $event; touch()" />
           </label>
           <label class="full">
             Payment method
-            <app-select [options]="paymentMethodOptions" [ngModel]="form.paymentMethod" name="paymentMethod"
+            <app-select [options]="paymentMethodOptions" [ngModel]="form.paymentMethod" name="paymentMethod" [invalid]="err('paymentMethod')"
               (ngModelChange)="form.paymentMethod = $event; touch()" placeholder="Select a payment method…" />
           </label>
         </div>
@@ -329,39 +314,39 @@
               @if (form.payer === 'SELF') {
                 <label>
                   Bank name
-                  <input type="text" name="bankName" [(ngModel)]="form.bankName" />
+                  <input type="text" name="bankName" [class.invalid]="err('bankName')" [(ngModel)]="form.bankName" />
                 </label>
               } @else {
                 <label>
                   Payer's Social Security Number
-                  <input type="text" name="payerSocial" inputmode="numeric" maxlength="9" placeholder="123456789"
+                  <input type="text" name="payerSocial" [class.invalid]="err('payerSocial')" inputmode="numeric" maxlength="9" placeholder="123456789"
                     [ngModel]="form.payerSocial" (ngModelChange)="onPayerSocialChange($event)" />
                   <span class="hint">Exactly 9 digits.</span>
                 </label>
               }
               <label>
                 Account title
-                <input type="text" name="accountTitle" [(ngModel)]="form.accountTitle" />
+                <input type="text" name="accountTitle" [class.invalid]="err('accountTitle')" [(ngModel)]="form.accountTitle" />
               </label>
               <label>
                 Account type
-                <app-select [options]="accountTypeOptions" [ngModel]="form.accountType" name="accountType"
+                <app-select [options]="accountTypeOptions" [ngModel]="form.accountType" name="accountType" [invalid]="err('accountType')"
                   (ngModelChange)="form.accountType = $event; touch()" />
               </label>
               <label>
                 Joint or single account
-                <app-select [options]="accountOwnershipOptions" [ngModel]="form.accountOwnership" name="accountOwnership"
+                <app-select [options]="accountOwnershipOptions" [ngModel]="form.accountOwnership" name="accountOwnership" [invalid]="err('accountOwnership')"
                   (ngModelChange)="form.accountOwnership = $event; touch()" placeholder="Select…" />
               </label>
               <label>
                 Account opening state
-                <app-select [options]="stateOptions" [searchable]="true" name="accountOpeningState" [(ngModel)]="form.accountOpeningState" />
+                <app-select [options]="stateOptions" [searchable]="true" name="accountOpeningState" [invalid]="err('accountOpeningState')" [(ngModel)]="form.accountOpeningState" />
               </label>
               <label>
                 Routing number
                 <input type="text" name="routingNumber" inputmode="numeric" maxlength="9" placeholder="123456789"
                   [ngModel]="form.routingNumber" (ngModelChange)="onRoutingNumberChange($event)"
-                [class.invalid]="routingInvalid()" />
+                [class.invalid]="routingInvalid() || err('routingNumber')" />
                 @if (routingInvalid()) {
                   <span class="field-error">Routing number must be exactly 9 digits.</span>
                 }
@@ -369,7 +354,7 @@
               </label>
               <label>
                 Account number
-                <input type="text" name="accountNumber" inputmode="numeric" maxlength="17"
+                <input type="text" name="accountNumber" [class.invalid]="err('accountNumber')" inputmode="numeric" maxlength="17"
                   [ngModel]="form.accountNumber" (ngModelChange)="onAccountNumberChange($event)" />
                 <span class="hint">3 to 17 digits.</span>
               </label>
@@ -385,18 +370,18 @@
             <div class="form-grid">
               <label>
                 Card type
-                <app-select [options]="cardTypeOptions" [ngModel]="form.cardType" name="cardType"
+                <app-select [options]="cardTypeOptions" [ngModel]="form.cardType" name="cardType" [invalid]="err('cardType')"
                   (ngModelChange)="form.cardType = $event; touch()" placeholder="Select a card type…" />
               </label>
               <label>
                 Card number
-                <input type="text" name="cardNumber" inputmode="numeric" maxlength="19"
+                <input type="text" name="cardNumber" [class.invalid]="err('cardNumber')" inputmode="numeric" maxlength="19"
                   [ngModel]="form.cardNumber" (ngModelChange)="onCardNumberChange($event)" />
                 <span class="hint">13 to 19 digits.</span>
               </label>
               <label>
                 Expiry
-                <input type="text" name="cardExpiry" inputmode="numeric" maxlength="5" placeholder="MM/YY"
+                <input type="text" name="cardExpiry" [class.invalid]="err('cardExpiry')" inputmode="numeric" maxlength="5" placeholder="MM/YY"
                   [ngModel]="form.cardExpiry" (ngModelChange)="onCardExpiryChange($event)" />
               </label>
             </div>
@@ -408,15 +393,15 @@
       <div class="section">
         <h2 class="section-title"><svg lucideNotebookPen></svg> Notes for the admin team</h2>
         <label>
-          Anything worth flagging
+          <span>Anything worth flagging <span class="hint">Optional</span></span>
           <textarea name="closerNotes" rows="4" [(ngModel)]="form.closerNotes"></textarea>
         </label>
       </div>
       </div>
 
       <div class="form-actions">
-        @if (missing().length > 0) {
-          <span class="pending-note">Still needed: {{ missing().join(', ') }}</span>
+        @if (missingFields().length > 0) {
+          <span class="pending-note">{{ missingFields().length }} required field{{ missingFields().length === 1 ? '' : 's' }} left</span>
         } @else {
           <span class="pending-note ok">{{ managerMode() ? 'Application' : 'Ready to submit — ' + completeness() + '% of the application filled in' }}</span>
         }
