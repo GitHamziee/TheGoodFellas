@@ -21,6 +21,7 @@ import { Select } from '../../../shared/ui/select';
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 import { apiErrorMessage } from '../../../core/api';
 import { toastNotice } from '../../../core/toast-notice';
+import { TeamBonuses } from './team-bonuses';
 
 const ROLE_TONE: Record<Role, string> = {
   ADMIN: 'tone-b',
@@ -49,6 +50,7 @@ const ROLE_TONE: Record<Role, string> = {
     Pagination,
     EmptyState,
     SkeletonRows,
+    TeamBonuses,
     LucideUsers,
     LucideUserPlus,
     LucideShieldCheck,
@@ -63,6 +65,10 @@ export class AdminTeam implements OnInit {
   private readonly liveReload = reloadOnChange(() => this.refresh());
   private readonly userService = inject(UserService);
   private readonly auth = inject(AuthService);
+
+  /** Bonuses carry PKR figures, so the tab is ADMIN-only (this page is also mounted for Managers). */
+  readonly canSeeBonuses = computed(() => this.auth.role() === 'ADMIN');
+  readonly tab = signal<'accounts' | 'bonuses'>('accounts');
 
   readonly team = signal<AppUser[]>([]);
   readonly loading = signal(true);

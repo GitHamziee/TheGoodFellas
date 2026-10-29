@@ -544,6 +544,10 @@ export const routes: Routes = [
         loadComponent: () => import('./features/retention/history/history').then((m) => m.RetentionHistory),
       },
       {
+        path: 'bonus',
+        loadComponent: () => import('./features/retention/bonus/bonus').then((m) => m.RetentionBonus),
+      },
+      {
         path: 'state-sheet',
         loadComponent: () => import('./features/admin/state-sheet/state-sheet').then((m) => m.StateSheet),
       },

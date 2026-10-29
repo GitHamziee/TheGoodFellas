@@ -9,6 +9,7 @@ import analyticsRoutes from "./routes/analytics.routes";
 import chatRoutes from "./routes/chat.routes";
 import externalClientRoutes from "./routes/external-clients.routes";
 import expenseRoutes from "./routes/expenses.routes";
+import bonusRoutes from "./routes/bonuses.routes";
 import callReviewRoutes from "./routes/call-reviews.routes";
 import ipWhitelistRoutes from "./routes/ip-whitelist.routes";
 import notificationRoutes from "./routes/notifications.routes";
@@ -49,6 +50,7 @@ app.use("/api/chat", chatRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/external-clients", externalClientRoutes);
 app.use("/api/expenses", expenseRoutes);
+app.use("/api/bonuses", bonusRoutes);
 app.use("/api/call-reviews", callReviewRoutes);
 app.use("/api/admin/whitelisted-ips", ipWhitelistRoutes);
 

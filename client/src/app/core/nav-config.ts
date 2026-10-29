@@ -203,6 +203,7 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
     { label: 'New Lead', path: '/retention/new-lead', icon: 'send' },
     { label: 'Leads', path: '/retention/leads', icon: 'queue' },
     { label: 'History', path: '/retention/history', icon: 'analytics' },
+    { label: 'My Bonus', path: '/retention/bonus', icon: 'expenses' },
     { label: 'State Sheet', path: '/retention/state-sheet', icon: 'states' },
     { label: 'Team Chat', path: '/retention/chat', icon: 'chat', badge: 'chat' },
   ],

@@ -584,6 +584,26 @@ model Expense {
   @@index([date])
 }
 
+// Admin-set bonus rules for one role (PKR). Daily bonus: a tier per approved-lead count for
+// a single submission day (below `daily2` approvals pays nothing, above `daily6` pays the
+// top tier). Monthly bonus: `monthlyBase` once the month reaches `monthlyThreshold`
+// approvals, then a flat per-lead rate by plan for every approval past the threshold.
+// Keyed by role so other roles can get their own rules later; only RETENTION is wired up.
+model BonusConfig {
+  role             Role @id
+  monthlyThreshold Int  @default(15)
+  monthlyBase      Int  @default(0)
+  daily2           Int  @default(1000)
+  daily3           Int  @default(4000)
+  daily4           Int  @default(6000)
+  daily5           Int  @default(10000)
+  daily6           Int  @default(12000)
+  levelRate        Int  @default(10000)
+  gradedRate       Int  @default(5000)
+  giRate           Int  @default(2000)
+  updatedAt        DateTime @updatedAt
+}
+
 // Admin-managed roster of office IPs allowed to use the app. ADMIN and CLIENT accounts
 // bypass this check entirely (see IP_EXEMPT_ROLES in lib/ip-whitelist.ts); every other
 // role is rejected — at login and on every subsequent request — from an IP not listed here.

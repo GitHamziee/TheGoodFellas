@@ -13,6 +13,16 @@
       </button>
   </app-page-hero>
 
+  @if (canSeeBonuses()) {
+    <div class="pills">
+      <button type="button" class="pill" [class.active]="tab() === 'accounts'" (click)="tab.set('accounts')">Accounts</button>
+      <button type="button" class="pill" [class.active]="tab() === 'bonuses'" (click)="tab.set('bonuses')">Bonuses</button>
+    </div>
+  }
+
+  @if (tab() === 'bonuses' && canSeeBonuses()) {
+    <app-team-bonuses />
+  } @else {
   <div class="stats-row">
     <app-stat-tile [value]="stats().closers" label="Closers" tone="tone-c">
       <svg lucideUsers></svg>
@@ -117,6 +127,7 @@
       />
     }
   </div>
+  }
 </div>
 
 <!-- Create account -->
