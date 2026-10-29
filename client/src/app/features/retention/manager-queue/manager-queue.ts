@@ -79,7 +79,7 @@ export class RetentionManagerQueue implements OnInit {
       customerName: (l) => l.customerName,
       chargedAt: (l) => new Date(l.chargeBacks[0]?.createdAt ?? l.updatedAt ?? l.createdAt).getTime(),
     },
-    initialSort: { key: 'chargedAt', dir: 'asc' },
+    initialSort: { key: 'chargedAt', dir: 'desc' },
     pageSize: 10,
   });
 

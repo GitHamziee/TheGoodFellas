@@ -411,7 +411,7 @@ export class QaTransferReport implements OnInit {
       person: (l) => this.personOf(l)?.name,
       age: (l) => l.ageDays,
     },
-    initialSort: { key: 'age', dir: 'desc' },
+    initialSort: { key: 'age', dir: 'asc' },
     pageSize: 10,
   });
 

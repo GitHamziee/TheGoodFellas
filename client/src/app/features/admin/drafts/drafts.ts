@@ -240,7 +240,7 @@ export class AdminDrafts implements OnInit {
       createdAt: (l) => new Date(l.createdAt).getTime(),
       updatedAt: (l) => new Date(l.updatedAt).getTime(),
     },
-    initialSort: { key: 'updatedAt', dir: 'asc' },
+    initialSort: { key: 'updatedAt', dir: 'desc' },
     pageSize: 10,
   });
 
