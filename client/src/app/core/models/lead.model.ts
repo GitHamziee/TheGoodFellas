@@ -86,6 +86,12 @@ export interface LeadNote {
   author: { id: string; name: string };
 }
 
+export interface ExtraBeneficiary {
+  name: string;
+  relation: string;
+  dob: string;
+}
+
 export interface Lead {
   id: string;
   /** Null when a Closer created the lead from scratch (self- or AI-sourced calls). */
@@ -143,6 +149,8 @@ export interface Lead {
   beneficiaryRelation?: string | null;
   beneficiaryName?: string | null;
   beneficiaryDob?: string | null;
+  /** Beneficiaries beyond the first (the three fields above). */
+  extraBeneficiaries?: ExtraBeneficiary[] | null;
   medications?: string | null;
   carrierName?: string | null;
   planType?: PlanType | null;

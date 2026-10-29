@@ -826,7 +826,7 @@ export async function batchAssignToRetention(
 const EDITABLE_STATUSES = ['REJECTED', 'CHARGED_BACK'] as const;
 
 const fieldLabel = (key: string) => key.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
-const logValue = (v: unknown) => (v === null || v === undefined || v === '' ? '—' : v instanceof Date ? v.toISOString().slice(0, 10) : String(v));
+const logValue = (v: unknown) => (v === null || v === undefined || v === '' ? '—' : v instanceof Date ? v.toISOString().slice(0, 10) : typeof v === 'object' ? JSON.stringify(v) : String(v));
 
 /** "Phone: 555 → 556; SSN changed" for every field the edit actually moved. */
 function describeEdit(before: Record<string, unknown>, data: Record<string, unknown>): string {

@@ -5,11 +5,37 @@
 import type { Prisma } from '@prisma/client';
 import { normalizeUsPhone, INVALID_PHONE_MESSAGE, INVALID_RETENTION_PHONE_MESSAGE, isValidZip, INVALID_ZIP_MESSAGE } from './validation';
 
-type FieldType = 'string' | 'int' | 'boolean' | 'date' | 'ssn' | 'phone' | 'zip' | 'routing' | 'accountNumber' | 'cardNumber' | 'cardExpiry';
+type FieldType = 'string' | 'int' | 'boolean' | 'date' | 'ssn' | 'phone' | 'zip' | 'routing' | 'accountNumber' | 'cardNumber' | 'cardExpiry' | 'beneficiaries';
 
 interface FieldSpec {
   type: FieldType;
   enumValues?: readonly string[];
+}
+
+export interface ExtraBeneficiary {
+  name: string;
+  relation: string;
+  dob: string;
+}
+
+const MAX_EXTRA_BENEFICIARIES = 10;
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}/;
+
+/** Extra beneficiaries arrive as a list; rows with no name are dropped. `[]` is a real value
+ * (it clears the list), unlike the other fields where empty means "not sent". */
+function parseBeneficiaries(raw: unknown): ExtraBeneficiary[] | null {
+  if (!Array.isArray(raw) || raw.length > MAX_EXTRA_BENEFICIARIES) return null;
+  const out: ExtraBeneficiary[] = [];
+  for (const item of raw) {
+    if (typeof item !== 'object' || item === null) return null;
+    const { name, relation, dob } = item as Record<string, unknown>;
+    for (const v of [name, relation, dob]) if (v !== undefined && v !== null && typeof v !== 'string') return null;
+    const n = typeof name === 'string' ? name.trim().slice(0, 120) : '';
+    if (!n) continue;
+    const d = typeof dob === 'string' && DATE_ONLY_PATTERN.test(dob) ? dob.slice(0, 10) : '';
+    out.push({ name: n, relation: typeof relation === 'string' ? relation.trim().slice(0, 60) : '', dob: d });
+  }
+  return out;
 }
 
 const SSN_PATTERN = /^\d{3}-?\d{2}-?\d{4}$/;
@@ -75,6 +101,7 @@ const FIELD_SCHEMA: Record<string, FieldSpec> = {
   beneficiaryRelation: { type: 'string' },
   beneficiaryName: { type: 'string' },
   beneficiaryDob: { type: 'date' },
+  extraBeneficiaries: { type: 'beneficiaries' },
   medications: { type: 'string' },
   carrierName: { type: 'string' },
   planType: { type: 'string', enumValues: ['LEVEL', 'GRADED', 'MODIFIED', 'GI'] },
@@ -127,7 +154,7 @@ export const JUNIOR_ONLY_FIELDS = [
 
 export const CLOSER_ONLY_FIELDS = [
   'mailingAddress', 'email', 'yearlyIncome', 'ssn', 'dlStateId', 'doctorName',
-  'beneficiaryRelation', 'beneficiaryName', 'beneficiaryDob',
+  'beneficiaryRelation', 'beneficiaryName', 'beneficiaryDob', 'extraBeneficiaries',
   'medications',
   'carrierName', 'planType', 'coverageAmount', 'monthlyPremiums',
   'initialDraftDate', 'futureDraftDate', 'payer', 'paymentMethod',
@@ -181,10 +208,17 @@ export function sanitizeLeadFields(
 ): { data: SanitizedLeadFields } | { error: string } {
   if (typeof body !== 'object' || body === null) return { error: 'Invalid request body' };
   const input = body as Record<string, unknown>;
-  const data: Record<string, string | number | boolean | Date> = {};
+  const data: Record<string, string | number | boolean | Date | ExtraBeneficiary[]> = {};
 
   for (const key of allowedKeys) {
     const raw = input[key];
+    if (FIELD_SCHEMA[key]?.type === 'beneficiaries') {
+      if (raw === undefined || raw === null) continue;
+      const list = parseBeneficiaries(raw);
+      if (!list) return { error: `Invalid ${key}` };
+      data[key] = list;
+      continue;
+    }
     if (raw === undefined || raw === null || raw === '') continue;
 
     const spec = FIELD_SCHEMA[key];

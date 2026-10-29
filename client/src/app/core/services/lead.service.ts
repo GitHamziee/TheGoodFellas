@@ -47,6 +47,7 @@ export type CloserLeadInput = Partial<Pick<Lead, (typeof SHARED_KEYS)[number]>> 
       | 'beneficiaryRelation'
       | 'beneficiaryName'
       | 'beneficiaryDob'
+      | 'extraBeneficiaries'
       | 'medications'
       | 'carrierName'
       | 'planType'

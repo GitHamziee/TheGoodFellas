@@ -34,7 +34,8 @@
         </label>
         <label>
           <span>State <span class="req" title="Required">*</span></span>
-          <app-select [options]="stateOptions" [searchable]="true" name="state" [(ngModel)]="form.state" [invalid]="showErrors() && !form.state" />
+          <app-select [options]="stateOptions" [searchable]="true" name="state" [ngModel]="form.state"
+            (ngModelChange)="onStateChange($event)" [invalid]="showErrors() && !form.state" />
           @if (showErrors() && !form.state) {
             <span class="field-error">Enter the customer's state.</span>
           }
@@ -172,6 +173,26 @@
           Beneficiary date of birth
           <app-date-input name="beneficiaryDob" [min]="minDob" [max]="todayIso" [(ngModel)]="form.beneficiaryDob"></app-date-input>
         </label>
+        @for (b of form.extraBeneficiaries ?? []; track $index; let n = $index) {
+          <label>
+            Beneficiary {{ n + 2 }} name
+            <input type="text" [name]="'extraBeneficiaryName' + n" [(ngModel)]="b.name" />
+          </label>
+          <label>
+            Relation
+            <input type="text" [name]="'extraBeneficiaryRelation' + n" placeholder="e.g. Son" [(ngModel)]="b.relation" />
+          </label>
+          <label>
+            Beneficiary {{ n + 2 }} date of birth
+            <app-date-input [name]="'extraBeneficiaryDob' + n" [min]="minDob" [max]="todayIso" [(ngModel)]="b.dob"></app-date-input>
+          </label>
+          <div class="full">
+            <button class="btn btn--ghost" type="button" (click)="removeBeneficiary(n)">Remove beneficiary {{ n + 2 }}</button>
+          </div>
+        }
+        <div class="full">
+          <button class="btn btn--ghost" type="button" (click)="addBeneficiary()">Add beneficiary</button>
+        </div>
       </div>
     </div>
 
@@ -180,18 +201,29 @@
       <h2 class="section-title"><svg lucideShieldCheck></svg> Policy</h2>
       <div class="form-grid">
         <label>
+          Suggested client
+          <app-select [options]="clientOptions()" [ngModel]="form.suggestedClientId" name="suggestedClientId"
+            (ngModelChange)="onClientChange($event)" placeholder="No suggestion…" />
+        </label>
+        @if (suggestedClient(); as client) {
+          <div class="plan-badges full">
+            @for (plan of planTypeOptions; track plan.value) {
+              <span class="plan-badge" [class.plan-badge--accepted]="client.acceptedPlans.includes(plan.value)">
+                @if (client.acceptedPlans.includes(plan.value)) { <svg lucideCircleCheck></svg> } @else { <svg lucideCircleX></svg> }
+                {{ plan.label }}
+              </span>
+            }
+          </div>
+        }
+        <label>
           Carrier name
-          <input type="text" name="carrierName" [(ngModel)]="form.carrierName" />
+          <app-select [options]="carrierOptions()" [ngModel]="form.carrierName" name="carrierName"
+            (ngModelChange)="form.carrierName = $event; touch()" placeholder="Select a carrier…" />
         </label>
         <label>
           Plan type
-          <app-select [options]="planTypeOptions" [ngModel]="form.planType" name="planType"
+          <app-select [options]="planOptions()" [ngModel]="form.planType" name="planType"
             (ngModelChange)="form.planType = $event; touch()" placeholder="Select a plan type…" />
-        </label>
-        <label>
-          Suggested client
-          <app-select [options]="clientOptions()" [ngModel]="form.suggestedClientId" name="suggestedClientId"
-            (ngModelChange)="form.suggestedClientId = $event; touch()" placeholder="No suggestion…" />
         </label>
         <label>
           <span>Coverage amount <span class="hint">Whole dollars</span></span>
@@ -199,6 +231,9 @@
         </label>
         <label>
           <span>Monthly premium <span class="hint">Whole dollars</span></span>
+          @if (suggestedMinimumPremium() !== null) {
+            <span class="chip"><svg lucideBanknote></svg>Min premium: {{ formatMoney(suggestedMinimumPremium()) }}</span>
+          }
           <input type="number" name="monthlyPremiums" min="0" [(ngModel)]="form.monthlyPremiums" />
         </label>
         <label>

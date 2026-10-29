@@ -74,6 +74,9 @@ export function leadCopyText(l: Lead, show: boolean): string {
       `Beneficiary Relation :${s(l.beneficiaryRelation)}`,
       `Beneficiary Name :${s(l.beneficiaryName)}`,
       `Beneficiary DOB :${date(l.beneficiaryDob)}`,
+      ...(l.extraBeneficiaries ?? []).map(
+        (b, i) => `Beneficiary ${i + 2} :${[b.name, b.relation, b.dob && date(b.dob)].filter(Boolean).join(', ')}`,
+      ),
       '____________',
       `Health Conditions :${s(l.healthConditions)}`,
       `Medications :${s(l.medications)}`,
@@ -392,6 +395,9 @@ export class LeadDetail {
           row('Name', l.beneficiaryName),
           row('Relation', l.beneficiaryRelation),
           row('Date of birth', l.beneficiaryDob, formatDate(l.beneficiaryDob)),
+          ...(l.extraBeneficiaries ?? []).map((b, i) =>
+            row(`Beneficiary ${i + 2}`, b.name, [b.name, b.relation && `(${b.relation})`, b.dob && formatDate(b.dob)].filter(Boolean).join(' ')),
+          ),
         ]),
       },
       {

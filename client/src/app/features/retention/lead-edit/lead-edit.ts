@@ -5,6 +5,8 @@ import {
   LucideArrowLeft,
   LucideBanknote,
   LucideCircleAlert,
+  LucideCircleCheck,
+  LucideCircleX,
   LucideHeartPulse,
   LucideNotebookPen,
   LucidePhoneCall,
@@ -16,6 +18,7 @@ import {
 } from '@lucide/angular';
 import { RetentionSubmitInput, LeadService } from '../../../core/services/lead.service';
 import { UserService } from '../../../core/services/user.service';
+import { ClientCoverage } from '../../../core/models/user.model';
 import { AuthService } from '../../../core/services/auth.service';
 import { ZoomPhoneService } from '../../../core/services/zoom-phone.service';
 import { Lead, LeadNote } from '../../../core/models/lead.model';
@@ -35,12 +38,11 @@ import {
   SMOKER_OPTIONS,
   US_STATE_OPTIONS,
 } from '../../../core/lead-options';
-import { formatCardExpiry, formatDateTime, getInitials, sanitizeDigits, toDateInput, todayDateInput } from '../../../core/format-utils';
+import { formatCardExpiry, formatMoney, formatDateTime, getInitials, sanitizeDigits, toDateInput, todayDateInput } from '../../../core/format-utils';
 import { SkeletonRows } from '../../../shared/ui/ui';
 import { Modal } from '../../../shared/ui/modal';
 import { Select } from '../../../shared/ui/select';
 import { FormSections } from '../../../shared/ui/form-sections';
-import { NoCopy } from '../../../shared/no-copy.directive';
 import { PhoneInput } from '../../../shared/ui/phone-input';
 import { ZipInput } from '../../../shared/ui/zip-input';
 import { DateInput } from '../../../shared/ui/date-input';
@@ -79,11 +81,6 @@ const TRACKED: (keyof RetentionSubmitInput)[] = [
   'cardExpiry',
 ];
 
-interface LookupUser {
-  id: string;
-  name: string;
-  email: string;
-}
 
 /**
  * Opens a sheet-imported RETENTION lead for editing — pre-filled with whatever the sheet
@@ -100,7 +97,6 @@ interface LookupUser {
     Modal,
     Select,
     FormSections,
-    NoCopy,
     LucideSend,
     LucideUser,
     LucideUsers,
@@ -109,6 +105,8 @@ interface LookupUser {
     LucideBanknote,
     LucideNotebookPen,
     LucideCircleAlert,
+    LucideCircleCheck,
+    LucideCircleX,
     LucideArrowLeft,
     LucidePhoneCall,
     LucidePhoneForwarded,
@@ -148,8 +146,38 @@ export class RetentionLeadEdit implements OnInit {
   readonly isCallback = computed(() => !!this.lead()?.callbackById);
   readonly savingCallback = signal(false);
 
-  readonly clients = signal<LookupUser[]>([]);
-  readonly clientOptions = computed(() => this.clients().map((c) => ({ value: c.id, label: c.name })));
+  readonly coverage = signal<ClientCoverage[]>([]);
+  /** Clients licensed in the chosen state; all clients until a state is picked. */
+  readonly clientOptions = computed(() => {
+    this.revision();
+    const state = this.form.state;
+    return this.coverage()
+      .filter((c) => !state || c.states.includes(state))
+      .map((c) => ({ value: c.id, label: c.name }));
+  });
+  /** Plans the suggested client doesn't take are shown crossed out and can't be picked. */
+  readonly planOptions = computed(() => {
+    const accepted = this.suggestedClient()?.acceptedPlans;
+    return PLAN_TYPE_OPTIONS.map((o) => ({ ...o, disabled: !!accepted && !accepted.includes(o.value) }));
+  });
+  readonly formatMoney = formatMoney;
+  /** Lowest monthly premium the suggested client accepts, if set. */
+  readonly suggestedClient = computed(() => {
+    this.revision();
+    return this.coverage().find((c) => c.id === this.form.suggestedClientId) ?? null;
+  });
+  readonly suggestedMinimumPremium = computed(() => this.suggestedClient()?.minimumPremium ?? null);
+  /** Carriers of the suggested client in the chosen state. */
+  readonly carrierOptions = computed(() => {
+    this.revision();
+    const { state, suggestedClientId, carrierName } = this.form;
+    const client = this.coverage().find((c) => c.id === suggestedClientId);
+    const list = client
+      ? (client.stateCarriers.find((s) => s.state === state)?.carriers ?? client.carriers)
+      : [];
+    const names = carrierName && !list.includes(carrierName) ? [...list, carrierName] : list;
+    return names.map((c) => ({ value: c, label: c }));
+  });
 
   readonly draftReasonOptions = DRAFT_REASON_OPTIONS;
   readonly maritalStatusOptions = MARITAL_STATUS_OPTIONS;
@@ -213,7 +241,7 @@ export class RetentionLeadEdit implements OnInit {
 
   async ngOnInit(): Promise<void> {
     try {
-      if (!this.managerMode()) this.clients.set(await this.userService.listClients());
+      if (!this.managerMode()) this.coverage.set(await this.userService.getStateSheet());
     } catch {
       // Non-fatal — the client picker is optional, the rest of the form still works.
     }
@@ -250,6 +278,7 @@ export class RetentionLeadEdit implements OnInit {
         beneficiaryRelation: lead.beneficiaryRelation ?? undefined,
         beneficiaryName: lead.beneficiaryName ?? undefined,
         beneficiaryDob: toDateInput(lead.beneficiaryDob) || undefined,
+        extraBeneficiaries: (lead.extraBeneficiaries ?? []).map((b) => ({ ...b, dob: toDateInput(b.dob) })),
         medications: lead.medications ?? undefined,
         carrierName: lead.carrierName ?? undefined,
         planType: lead.planType ?? undefined,
@@ -293,6 +322,31 @@ export class RetentionLeadEdit implements OnInit {
   /** Dials whatever is in the phone field now, so a corrected number is the one called. */
   dialLead(): void {
     if (!this.zoom.dial(this.form.phone)) this.error.set('This phone number cannot be dialed.');
+  }
+
+  onStateChange(state: string): void {
+    this.form.state = state;
+    const client = this.coverage().find((c) => c.id === this.form.suggestedClientId);
+    if (client && !client.states.includes(state)) this.onClientChange(undefined);
+    else this.touch();
+  }
+
+  onClientChange(clientId: string | undefined): void {
+    this.form.suggestedClientId = clientId;
+    this.form.carrierName = undefined;
+    const accepted = this.coverage().find((c) => c.id === clientId)?.acceptedPlans;
+    if (accepted && this.form.planType && !accepted.includes(this.form.planType)) this.form.planType = undefined;
+    this.touch();
+  }
+
+  addBeneficiary(): void {
+    this.form.extraBeneficiaries = [...(this.form.extraBeneficiaries ?? []), { name: '', relation: '', dob: '' }];
+    this.touch();
+  }
+
+  removeBeneficiary(index: number): void {
+    this.form.extraBeneficiaries = (this.form.extraBeneficiaries ?? []).filter((_, i) => i !== index);
+    this.touch();
   }
 
   touch(): void {

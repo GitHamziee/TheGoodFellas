@@ -12,7 +12,7 @@ import {
   signal,
 } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
-import { LucideCheck, LucideChevronDown } from '@lucide/angular';
+import { LucideCheck, LucideChevronDown, LucideCircleX } from '@lucide/angular';
 import { uiZoom } from '../../core/ui-zoom';
 
 export interface SelectOption {
@@ -41,7 +41,7 @@ export interface SelectOption {
  */
 @Component({
   selector: 'app-select',
-  imports: [LucideChevronDown, LucideCheck],
+  imports: [LucideChevronDown, LucideCheck, LucideCircleX],
   host: {
     '(document:click)': 'close()',
     '(window:resize)': 'close()',
@@ -100,6 +100,8 @@ export interface SelectOption {
             <span>{{ opt.label }}</span>
             @if (opt.value === value()) {
               <svg lucideCheck></svg>
+            } @else if (opt.disabled) {
+              <svg lucideCircleX></svg>
             }
           </li>
         }

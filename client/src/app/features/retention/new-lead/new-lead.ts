@@ -5,6 +5,8 @@ import {
   LucideArrowLeft,
   LucideBanknote,
   LucideCircleAlert,
+  LucideCircleCheck,
+  LucideCircleX,
   LucideHeartPulse,
   LucideNotebookPen,
   LucideSend,
@@ -15,7 +17,7 @@ import {
 } from '@lucide/angular';
 import { RetentionSubmitInput, LeadService } from '../../../core/services/lead.service';
 import { UserService } from '../../../core/services/user.service';
-import { calculateAge, formatCardExpiry, sanitizeDigits, todayDateInput } from '../../../core/format-utils';
+import { calculateAge, formatMoney, formatCardExpiry, sanitizeDigits, todayDateInput } from '../../../core/format-utils';
 import {
   ACCOUNT_OWNERSHIP_OPTIONS,
   ACCOUNT_TYPE_OPTIONS,
@@ -40,12 +42,7 @@ import { PhoneInput } from '../../../shared/ui/phone-input';
 import { ZipInput } from '../../../shared/ui/zip-input';
 import { DateInput } from '../../../shared/ui/date-input';
 import { apiErrorMessage } from '../../../core/api';
-
-interface LookupUser {
-  id: string;
-  name: string;
-  email: string;
-}
+import { ClientCoverage } from '../../../core/models/user.model';
 
 /** Fields tracked for the completeness meter — same set as Closer's new-lead form. */
 const TRACKED: (keyof RetentionSubmitInput)[] = [
@@ -104,6 +101,8 @@ const TRACKED: (keyof RetentionSubmitInput)[] = [
     LucideWallet,
     LucideNotebookPen,
     LucideCircleAlert,
+    LucideCircleCheck,
+    LucideCircleX,
     LucideArrowLeft,
   ],
   templateUrl: './new-lead.html',
@@ -120,8 +119,38 @@ export class RetentionNewLead implements OnInit {
   readonly showDraftReasonError = signal(false);
   readonly draftModalOpen = signal(false);
 
-  readonly clients = signal<LookupUser[]>([]);
-  readonly clientOptions = computed(() => this.clients().map((c) => ({ value: c.id, label: c.name })));
+  readonly coverage = signal<ClientCoverage[]>([]);
+  /** Clients licensed in the chosen state; all clients until a state is picked. */
+  readonly clientOptions = computed(() => {
+    this.revision();
+    const state = this.form.state;
+    return this.coverage()
+      .filter((c) => !state || c.states.includes(state))
+      .map((c) => ({ value: c.id, label: c.name }));
+  });
+  /** Plans the suggested client doesn't take are shown crossed out and can't be picked. */
+  readonly planOptions = computed(() => {
+    const accepted = this.suggestedClient()?.acceptedPlans;
+    return PLAN_TYPE_OPTIONS.map((o) => ({ ...o, disabled: !!accepted && !accepted.includes(o.value) }));
+  });
+  readonly formatMoney = formatMoney;
+  /** Lowest monthly premium the suggested client accepts, if set. */
+  readonly suggestedClient = computed(() => {
+    this.revision();
+    return this.coverage().find((c) => c.id === this.form.suggestedClientId) ?? null;
+  });
+  readonly suggestedMinimumPremium = computed(() => this.suggestedClient()?.minimumPremium ?? null);
+  /** Carriers of the suggested client in the chosen state. */
+  readonly carrierOptions = computed(() => {
+    this.revision();
+    const { state, suggestedClientId, carrierName } = this.form;
+    const client = this.coverage().find((c) => c.id === suggestedClientId);
+    const list = client
+      ? (client.stateCarriers.find((s) => s.state === state)?.carriers ?? client.carriers)
+      : [];
+    const names = carrierName && !list.includes(carrierName) ? [...list, carrierName] : list;
+    return names.map((c) => ({ value: c, label: c }));
+  });
 
   readonly draftReasonOptions = DRAFT_REASON_OPTIONS;
   readonly maritalStatusOptions = MARITAL_STATUS_OPTIONS;
@@ -148,7 +177,7 @@ export class RetentionNewLead implements OnInit {
 
   async ngOnInit(): Promise<void> {
     try {
-      this.clients.set(await this.userService.listClients());
+      this.coverage.set(await this.userService.getStateSheet());
     } catch {
       // Non-fatal — the client picker is optional, the rest of the form still works.
     }
@@ -189,6 +218,31 @@ export class RetentionNewLead implements OnInit {
     const monthly = this.form.monthlyPremiums;
     return typeof monthly === 'number' ? monthly * 12 : null;
   });
+
+  onStateChange(state: string): void {
+    this.form.state = state;
+    const client = this.coverage().find((c) => c.id === this.form.suggestedClientId);
+    if (client && !client.states.includes(state)) this.onClientChange(undefined);
+    else this.touch();
+  }
+
+  onClientChange(clientId: string | undefined): void {
+    this.form.suggestedClientId = clientId;
+    this.form.carrierName = undefined;
+    const accepted = this.coverage().find((c) => c.id === clientId)?.acceptedPlans;
+    if (accepted && this.form.planType && !accepted.includes(this.form.planType)) this.form.planType = undefined;
+    this.touch();
+  }
+
+  addBeneficiary(): void {
+    this.form.extraBeneficiaries = [...(this.form.extraBeneficiaries ?? []), { name: '', relation: '', dob: '' }];
+    this.touch();
+  }
+
+  removeBeneficiary(index: number): void {
+    this.form.extraBeneficiaries = (this.form.extraBeneficiaries ?? []).filter((_, i) => i !== index);
+    this.touch();
+  }
 
   touch(): void {
     this.revision.update((n) => n + 1);

@@ -339,6 +339,8 @@ model Lead {
   beneficiaryRelation String?
   beneficiaryName     String?
   beneficiaryDob      DateTime?
+  // Beneficiaries beyond the first (the three fields above): [{ name, relation, dob }]
+  extraBeneficiaries  Json?
 
   // ─── Closer enrichment — health ───
   medications String?
