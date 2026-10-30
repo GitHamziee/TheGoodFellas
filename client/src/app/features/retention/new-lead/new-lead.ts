@@ -43,7 +43,8 @@ import { ZipInput } from '../../../shared/ui/zip-input';
 import { DateInput } from '../../../shared/ui/date-input';
 import { DraftDate } from '../../../shared/ui/draft-date';
 import { apiErrorMessage } from '../../../core/api';
-import { clientNeedsLeadId, retentionMissing, scrollToFirstInvalid } from '../retention-required';
+import { INITIAL_DRAFT_MAX_DAYS, clientNeedsLeadId, retentionMissing, scrollToFirstInvalid } from '../retention-required';
+import { dateInputFromToday } from '../../../core/format-utils';
 import { ClientCoverage } from '../../../core/models/user.model';
 
 /** Fields tracked for the completeness meter — same set as Closer's new-lead form. */
@@ -143,6 +144,7 @@ export class RetentionNewLead implements OnInit {
   });
   /** AG / FCF leads carry the client's own lead ID; hidden for every other client. */
   readonly needsLeadId = computed(() => clientNeedsLeadId(this.suggestedClient()?.name));
+  readonly initialDraftMax = dateInputFromToday(INITIAL_DRAFT_MAX_DAYS);
   readonly suggestedMinimumPremium = computed(() => this.suggestedClient()?.minimumPremium ?? null);
   /** Carriers of the suggested client in the chosen state. */
   readonly carrierOptions = computed(() => {

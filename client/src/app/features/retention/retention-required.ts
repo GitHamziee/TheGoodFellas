@@ -1,4 +1,8 @@
+import { dateInputFromToday } from '../../core/format-utils';
 import { RetentionSubmitInput } from '../../core/services/lead.service';
+
+/** The initial draft can be at most this many days after today. */
+export const INITIAL_DRAFT_MAX_DAYS = 30;
 
 /** A field the Retention form won't submit without. `key` matches the input's `name`. */
 export interface MissingField {
@@ -67,6 +71,9 @@ export function retentionMissing(f: RetentionSubmitInput, needsLeadId = false): 
   need('monthlyPremiums', 'Monthly premium');
 
   need('initialDraftDate', 'Initial draft date');
+  if (f.initialDraftDate && f.initialDraftDate > dateInputFromToday(INITIAL_DRAFT_MAX_DAYS)) {
+    out.push({ key: 'initialDraftDate', label: `Initial draft date (within ${INITIAL_DRAFT_MAX_DAYS} days)` });
+  }
   need('futureDraftDate', 'Future draft date');
   need('payer', 'Who is paying');
   need('paymentMethod', 'Payment method');

@@ -283,7 +283,7 @@
         <div class="form-grid">
           <label>
             Initial draft date
-            <app-draft-date [invalid]="err('initialDraftDate')" [date]="form.initialDraftDate" [schedule]="form.initialDraftSchedule"
+            <app-draft-date [invalid]="err('initialDraftDate')" [maxDate]="initialDraftMax" [date]="form.initialDraftDate" [schedule]="form.initialDraftSchedule"
               (dateChange)="form.initialDraftDate = $event ?? undefined; touch()" (scheduleChange)="form.initialDraftSchedule = $event ?? undefined; touch()"></app-draft-date>
           </label>
           <label>

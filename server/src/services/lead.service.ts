@@ -10,6 +10,7 @@ import {
   FULL_LEAD_FIELDS,
   isSensitiveField,
   JUNIOR_INTAKE_FIELDS,
+  RETENTION_INITIAL_DRAFT_MAX_DAYS,
   RETENTION_INTAKE_FIELDS,
   sanitizeLeadFields,
 } from '../lib/lead-fields';
@@ -1379,7 +1380,7 @@ export async function createLeadByRetention(
   retentionId: string,
   input: Record<string, unknown>
 ): Promise<ServiceResult<{ lead: unknown }>> {
-  const sanitized = sanitizeLeadFields(input, FULL_LEAD_FIELDS, { retention: true });
+  const sanitized = sanitizeLeadFields(input, FULL_LEAD_FIELDS, { retention: true, maxInitialDraftDays: RETENTION_INITIAL_DRAFT_MAX_DAYS });
   if ('error' in sanitized) return { error: sanitized.error, status: 400 };
   const { data } = sanitized;
 
@@ -1418,7 +1419,7 @@ export async function createDraftByRetention(
   retentionId: string,
   input: Record<string, unknown>
 ): Promise<ServiceResult<{ lead: unknown }>> {
-  const sanitized = sanitizeLeadFields(input, FULL_LEAD_DRAFT_FIELDS, { retention: true });
+  const sanitized = sanitizeLeadFields(input, FULL_LEAD_DRAFT_FIELDS, { retention: true, maxInitialDraftDays: RETENTION_INITIAL_DRAFT_MAX_DAYS });
   if ('error' in sanitized) return { error: sanitized.error, status: 400 };
   const { data } = sanitized;
 
@@ -1488,7 +1489,7 @@ export async function enrichAndSubmitRetentionLead(
     return { error: 'Lead has already been submitted', status: 400 };
   }
 
-  const sanitized = sanitizeLeadFields(input, FULL_LEAD_FIELDS, { retention: true });
+  const sanitized = sanitizeLeadFields(input, FULL_LEAD_FIELDS, { retention: true, maxInitialDraftDays: RETENTION_INITIAL_DRAFT_MAX_DAYS });
   if ('error' in sanitized) return { error: sanitized.error, status: 400 };
 
   const suggested = await resolveSuggestedClientId((input as Record<string, unknown>).suggestedClientId);
@@ -1530,7 +1531,7 @@ export async function saveRetentionLeadAsDraft(
     return { error: 'Only a lead still in the queue can be saved as a draft', status: 400 };
   }
 
-  const sanitized = sanitizeLeadFields(input, FULL_LEAD_DRAFT_FIELDS, { retention: true });
+  const sanitized = sanitizeLeadFields(input, FULL_LEAD_DRAFT_FIELDS, { retention: true, maxInitialDraftDays: RETENTION_INITIAL_DRAFT_MAX_DAYS });
   if ('error' in sanitized) return { error: sanitized.error, status: 400 };
   const { data } = sanitized;
 

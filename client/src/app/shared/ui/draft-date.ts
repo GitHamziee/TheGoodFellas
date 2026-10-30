@@ -59,7 +59,7 @@ function addMonths(month: string, n: number): string {
         class="draft-date"
         aria-label="Draft date"
         min="2000-01-01"
-        max="2100-12-31"
+        [max]="maxDate() ?? '2100-12-31'"
         [ngModel]="date()"
         [ngModelOptions]="{ standalone: true }"
         [invalid]="invalid() && !date()"
@@ -78,6 +78,8 @@ export class DraftDate {
   readonly date = model<string | null | undefined>();
   readonly schedule = model<DraftSchedule | null | undefined>();
   readonly invalid = input(false);
+  /** Latest pickable date (YYYY-MM-DD); later dates and months starting after it are not offered. */
+  readonly maxDate = input<string | null>(null);
 
   protected readonly SPECIFIC_DATE = SPECIFIC_DATE;
   protected readonly formatDate = formatDate;
@@ -90,7 +92,8 @@ export class DraftDate {
   /** This month and the next twelve, plus the saved month if it's outside that range. */
   protected readonly monthOptions = computed(() => {
     const current = todayDateInput().slice(0, 7);
-    const months = Array.from({ length: MONTHS_AHEAD + 1 }, (_, i) => addMonths(current, i));
+    const maxMonth = this.maxDate()?.slice(0, 7);
+    const months = Array.from({ length: MONTHS_AHEAD + 1 }, (_, i) => addMonths(current, i)).filter((m) => !maxMonth || m <= maxMonth);
     const saved = this.month();
     if (saved && !months.includes(saved)) months.unshift(saved);
     return months.map((m) => ({ value: m, label: monthLabel(m) }));

@@ -125,6 +125,12 @@ export function todayDateInput(): string {
   return pacificIsoDate();
 }
 
+/** Today (Pacific) plus `days`, as YYYY-MM-DD. */
+export function dateInputFromToday(days: number): string {
+  const [y, m, d] = todayDateInput().split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+}
+
 /** Strips non-digit characters and caps length as you type — for SSN/routing/account/card
  * inputs where the server enforces an exact digit count; this just stops garbage before
  * it gets there (a plain text input has no digit-count limit on its own). */

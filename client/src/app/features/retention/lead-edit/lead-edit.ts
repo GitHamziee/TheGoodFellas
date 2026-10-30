@@ -48,7 +48,8 @@ import { ZipInput } from '../../../shared/ui/zip-input';
 import { DateInput } from '../../../shared/ui/date-input';
 import { DraftDate } from '../../../shared/ui/draft-date';
 import { apiErrorMessage } from '../../../core/api';
-import { clientNeedsLeadId, retentionMissing, scrollToFirstInvalid } from '../retention-required';
+import { INITIAL_DRAFT_MAX_DAYS, clientNeedsLeadId, retentionMissing, scrollToFirstInvalid } from '../retention-required';
+import { dateInputFromToday } from '../../../core/format-utils';
 
 /** Fields tracked for the completeness meter — same set the sheet import can fill plus
  * everything a Retention person can add on top of it. */
@@ -174,6 +175,7 @@ export class RetentionLeadEdit implements OnInit {
     return this.coverage().find((c) => c.id === this.form.suggestedClientId) ?? null;
   });
   /** AG / FCF leads carry the client's own lead ID; hidden for every other client. */
+  readonly initialDraftMax = dateInputFromToday(INITIAL_DRAFT_MAX_DAYS);
   readonly needsLeadId = computed(() => {
     this.revision();
     return clientNeedsLeadId(this.clientName(this.form.suggestedClientId));

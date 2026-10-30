@@ -150,7 +150,7 @@ const FIELD_SCHEMA: Record<string, FieldSpec> = {
   initialDraftSchedule: { type: 'string', enumValues: DRAFT_SCHEDULE_VALUES },
   futureDraftSchedule: { type: 'string', enumValues: DRAFT_SCHEDULE_VALUES },
   payer: { type: 'string', enumValues: ['SELF', 'SOMEONE_ELSE'] },
-  paymentMethod: { type: 'string', enumValues: ['BANK_ACCOUNT', 'CARD'] },
+  paymentMethod: { type: 'string', enumValues: ['BANK_ACCOUNT', 'CARD', 'ONLINE_BANK'] },
   bankName: { type: 'string' },
   accountTitle: { type: 'string' },
   payerSocial: { type: 'ssn' },
@@ -241,10 +241,13 @@ export const RETENTION_INTAKE_FIELDS = [
  * already been type-checked (and enum-checked) against it. */
 export type SanitizedLeadFields = Partial<Prisma.LeadUncheckedCreateInput>;
 
+/** A Retention lead's initial draft can be at most this many days after today. */
+export const RETENTION_INITIAL_DRAFT_MAX_DAYS = 30;
+
 export function sanitizeLeadFields(
   body: unknown,
   allowedKeys: readonly string[],
-  opts: { retention?: boolean } = {}
+  opts: { retention?: boolean; maxInitialDraftDays?: number } = {}
 ): { data: SanitizedLeadFields } | { error: string } {
   if (typeof body !== 'object' || body === null) return { error: 'Invalid request body' };
   const input = body as Record<string, unknown>;
@@ -342,6 +345,19 @@ export function sanitizeLeadFields(
     const s = data[schedule] as DraftSchedule | undefined;
     if (s) data[date] = draftScheduleDate(s, d.getUTCFullYear(), d.getUTCMonth());
     else if (allowedKeys.includes(schedule)) cleared[schedule] = null;
+  }
+
+  const limit = opts.maxInitialDraftDays;
+  const initial = data.initialDraftDate;
+  if (limit !== undefined && initial instanceof Date) {
+    // "Today" is the Pacific calendar day, matching the client's date pickers.
+    const [y, m, d] = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' })
+      .format(new Date())
+      .split('-')
+      .map(Number);
+    if (initial.getTime() > Date.UTC(y, m - 1, d + limit)) {
+      return { error: `Initial draft date can't be more than ${limit} days from today` };
+    }
   }
 
   return { data: { ...data, ...cleared } as SanitizedLeadFields };
