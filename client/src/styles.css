@@ -57,8 +57,8 @@
   --text: var(--ink-900);
   --text-muted: var(--gray-500);
   /* Lightly filled inputs on the long lead-entry forms (.page--form) */
-  --field-bg: #f8f6f1;
-  --field-border: #e7e1d4;
+  --field-bg: #f6f7f9;
+  --field-border: #dfe3e8;
 
   /* Scale */
   --radius-sm: 0.5rem;

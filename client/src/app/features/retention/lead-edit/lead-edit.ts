@@ -412,7 +412,7 @@ export class RetentionLeadEdit implements OnInit {
     this.showErrors.set(true);
     const missing = this.missingFields().length;
     if (missing > 0) {
-      this.error.set(`Fill in the ${missing} highlighted field${missing === 1 ? '' : 's'} before submitting.`);
+      this.error.set(null);
       scrollToFirstInvalid();
       return;
     }

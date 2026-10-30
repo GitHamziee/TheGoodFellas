@@ -98,3 +98,14 @@ export function scrollToFirstInvalid(): void {
     (el?.matches('input, textarea') ? el : el?.querySelector<HTMLElement>('input, button'))?.focus({ preventScroll: true });
   });
 }
+
+/** Scrolls to the next highlighted field below the current viewport centre, wrapping to the first. */
+export function scrollToNextInvalid(): void {
+  setTimeout(() => {
+    const all = Array.from(document.querySelectorAll<HTMLElement>('form .invalid'));
+    const mid = window.innerHeight / 2;
+    const el = all.find((e) => e.getBoundingClientRect().top > mid + 24) ?? all[0];
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    (el?.matches('input, textarea') ? el : el?.querySelector<HTMLElement>('input, button'))?.focus({ preventScroll: true });
+  });
+}

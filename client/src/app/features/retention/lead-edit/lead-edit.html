@@ -399,7 +399,9 @@
 
       <div class="form-actions">
         @if (missingFields().length > 0) {
-          <span class="pending-note">{{ missingFields().length }} required field{{ missingFields().length === 1 ? '' : 's' }} left</span>
+          <span class="pending-note" [class.pending-note--alert]="showErrors()">
+          {{ missingFields().length }} required field{{ missingFields().length === 1 ? '' : 's' }} left
+        </span>
         } @else {
           <span class="pending-note ok">{{ managerMode() ? 'Application' : 'Ready to submit — ' + completeness() + '% of the application filled in' }}</span>
         }

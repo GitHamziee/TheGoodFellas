@@ -731,6 +731,22 @@ input[readonly] {
   margin-right: auto;
 }
 
+.pending-note--alert {
+  color: var(--danger-700);
+  font-weight: 600;
+}
+
+.pending-note .link-btn {
+  margin-left: 0.5rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .pending-note.ok {
   color: var(--success-700);
   font-weight: 600;
@@ -2087,14 +2103,19 @@ button.badge--admin-empty { background: transparent; color: var(--gray-500); box
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  background: var(--danger-50);
-  color: var(--danger-700);
-  border: 1px solid #fecaca;
+  background: var(--surface);
+  color: var(--gray-800, #1f2937);
+  border: 1px solid var(--gray-200, #e5e7eb);
+  border-left: 3px solid var(--danger-700);
   border-radius: var(--radius-sm);
   padding: 0.65rem 0.9rem;
   font-size: 0.85rem;
   font-weight: 500;
   margin-bottom: 1rem;
+}
+
+.error svg {
+  color: var(--danger-700);
 }
 
 .success {

@@ -171,14 +171,23 @@ export class RetentionLeads implements OnInit {
     pageSize: 1000,
   });
 
-  readonly highlightId = highlightFromQuery(() => this.pending(), (lead) => {
-    this.chargeBacksOnly.set(false);
-    this.declinedOnly.set(false);
-    this.teammateFilter.set('');
-    this.declinedOnly.set(isRejected(lead) && !lead.callbackById);
-    this.pendingTab.set(lead.callbackById ? 'callbacks' : lead.status === 'DRAFT' ? 'drafts' : 'new');
-    this.pendingView.reveal((l) => l.id === lead.id);
-  });
+  // A charge-back notification can arrive after the lead was already resubmitted, so it is no
+  // longer in the work queue — fall back to the Charge-backs view, where it still lives.
+  readonly highlightId = highlightFromQuery(
+    () => [...this.pending(), ...this.ownChargeBacks(), ...this.sharedChargeBacks()],
+    (lead) => {
+      this.chargeBacksOnly.set(false);
+      this.declinedOnly.set(false);
+      this.teammateFilter.set('');
+      if (this.pending().some((l) => l.id === lead.id)) {
+        this.declinedOnly.set(isRejected(lead) && !lead.callbackById);
+        this.pendingTab.set(lead.callbackById ? 'callbacks' : lead.status === 'DRAFT' ? 'drafts' : 'new');
+      } else {
+        this.chargeBacksOnly.set(true);
+      }
+      this.pendingView.reveal((l) => l.id === lead.id);
+    },
+  );
 
   async ngOnInit(): Promise<void> {
     // Default the filter to "assigned to me" once we know who's logged in.
