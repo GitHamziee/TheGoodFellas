@@ -119,7 +119,13 @@
                   }
                 </td>
                 <td class="hide-md">{{ lead.client?.name || '—' }}</td>
-                <td><app-status-badge [status]="isRejected(lead) ? 'REJECTED' : lead.status" [hideDecided]="!isRejected(lead)" /><app-admin-status-badge [status]="lead.adminStatus" /></td>
+                <td>
+                  @if (lead.adminStatus) {
+                    <app-admin-status-badge [status]="lead.adminStatus" />
+                  } @else {
+                    <app-status-badge [status]="isRejected(lead) ? 'REJECTED' : lead.status" [hideDecided]="!isRejected(lead)" />
+                  }
+                </td>
                 <td class="right hide-sm">
                   <span class="chip"><svg lucideClock></svg>{{ timeAgo(chargeBacksOnly() ? lead.chargeBacks[0].createdAt : lead.updatedAt) }}</span>
                 </td>

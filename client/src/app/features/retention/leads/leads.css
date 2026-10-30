@@ -46,6 +46,13 @@
   transition: background 0.15s ease, color 0.15s ease;
 }
 
+/* Same footprint as .dial-btn so names line up on rows that can't be dialed. */
+.dial-spacer {
+  flex: none;
+  width: 30px;
+  height: 30px;
+}
+
 .dial-btn:hover:not(:disabled) {
   background: var(--success-600, #059669);
   color: #fff;

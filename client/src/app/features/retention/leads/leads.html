@@ -95,6 +95,8 @@
                     >
                       <svg lucidePhoneCall></svg>
                     </button>
+                    } @else {
+                    <span class="dial-spacer"></span>
                     }
                     {{ lead.customerName }}
                     @if (chargeBacksOnly()) {
@@ -135,6 +137,10 @@
                       <a class="btn btn--sm btn--ghost" [routerLink]="['/retention/leads', lead.id]">
                         <svg lucideSquarePen></svg> Open
                       </a>
+                    </div>
+                  } @else if (lead.status === 'SUBMITTED') {
+                    <div class="row-actions">
+                      <span class="chip"><svg lucideSend></svg>With admin</span>
                     </div>
                   }
                 </td>
