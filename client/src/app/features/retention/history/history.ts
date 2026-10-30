@@ -18,6 +18,9 @@ import { Period, PeriodFilter, inPeriod } from '../../../shared/ui/period-filter
 import { NoCopy } from '../../../shared/no-copy.directive';
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 
+/** Admin/client rejection of a Retention lead: sent back to the queue with a rejectionReason. */
+const isRejected = (l: Lead): boolean => l.status === 'RETURNED_TO_RETENTION' && !!l.rejectionReason;
+
 /**
  * What the Retention team has already sent onward, by period — the team's outcome view.
  * Masked like the Closer's history: customer, who worked it, client and outcome only.
@@ -75,6 +78,7 @@ export class RetentionHistory implements OnInit {
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
 
+  readonly isRejected = isRejected;
   readonly getInitials = getInitials;
   readonly getAvatarTone = getAvatarTone;
   readonly timeAgo = timeAgo;
@@ -90,7 +94,7 @@ export class RetentionHistory implements OnInit {
   readonly view = createListView<Lead>({
     source: this.past,
     searchFields: (l) => [l.customerName, l.retention?.name, l.client?.name],
-    statusOf: (l) => l.status,
+    statusOf: (l) => (isRejected(l) ? 'REJECTED' : l.status),
     sorters: {
       customerName: (l) => l.customerName,
       status: (l) => l.status,
@@ -105,14 +109,17 @@ export class RetentionHistory implements OnInit {
     const rows = this.past();
     const counts: Record<string, number> = { '': rows.length };
     for (const f of this.statusFilters) if (f.value) counts[f.value] = 0;
-    for (const l of rows) counts[l.status] = (counts[l.status] ?? 0) + 1;
+    for (const l of rows) {
+      const s = isRejected(l) ? 'REJECTED' : l.status;
+      counts[s] = (counts[s] ?? 0) + 1;
+    }
     return counts;
   });
 
   readonly stats = computed(() => {
     const past = this.past();
     const accepted = past.filter((l) => l.status === 'ACCEPTED').length;
-    const rejected = past.filter((l) => l.status === 'REJECTED').length;
+    const rejected = past.filter(isRejected).length;
     const decided = accepted + rejected;
     return {
       submitted: past.length,

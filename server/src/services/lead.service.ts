@@ -241,9 +241,11 @@ const RETENTION_HISTORY_SELECT = {
   id: true,
   adminStatus: true,
   customerName: true,
+  state: true,
   status: true,
   createdAt: true,
   updatedAt: true,
+  rejectionReason: true,
   retention: { select: { id: true, name: true } },
   client: { select: { id: true, name: true } },
   // Dates only — no PKR amount, no reason. Drives the History page's Charge-backs toggle.
@@ -266,6 +268,7 @@ const RETENTION_QUEUE_PREVIEW_SELECT = {
   draftReason: true,
   draftReasonNote: true,
   returnReason: true,
+  rejectionReason: true,
   callbackById: true,
   callbackAt: true,
   retention: { select: { id: true, name: true } },
@@ -469,7 +472,7 @@ export async function saveLeadAsDraft(
 
   const updated = await prisma.lead.updateMany({
     where: { id: leadId, status: lead.status, closerId },
-    data: { ...data, ...suggested, status: 'DRAFT' },
+    data: { ...data, ...suggested, status: 'DRAFT', ...(lead.leadType === 'RETENTION' ? { rejectionReason: null } : {}) },
   });
   if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
 
@@ -925,7 +928,7 @@ export async function returnLeadForEdit(
 
   const updated = await prisma.lead.updateMany({
     where: { id: leadId, status: lead.status },
-    data: { status, returnReason: reason.trim(), adminStatus: null },
+    data: { status, returnReason: reason.trim(), adminStatus: null, ...(target === 'RETENTION' ? { rejectionReason: null } : {}) },
   });
   if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
 
@@ -1129,7 +1132,7 @@ function chargeBackGoesToRetention(lead: { leadType: string; retentionId: string
   return month === 1 && lead.leadType === 'RETENTION' && !!lead.retentionId;
 }
 
-const CHARGED_BACK_RESET = { clientId: null, paymentStatus: 'UNPAID', closedAt: null, adminStatus: null } as const;
+const CHARGED_BACK_RESET = { clientId: null, paymentStatus: 'UNPAID', closedAt: null, adminStatus: null, rejectionReason: null } as const;
 // A later-draft charge-back belongs to the Retention Manager, who keeps seeing the tracking
 // labels the lead already carries (Approval confirmed etc.) — only a 1st draft (back to
 // Retention) clears them.
@@ -1489,7 +1492,7 @@ export async function enrichAndSubmitRetentionLead(
 
   const updated = await prisma.lead.updateMany({
     where: { id: leadId, status: lead.status },
-    data: { ...sanitized.data, ...suggested, retentionId: submitterId, status: 'SUBMITTED', submittedAt: new Date(), draftReason: null, draftReasonNote: null, returnReason: null, callbackById: null, callbackAt: null },
+    data: { ...sanitized.data, ...suggested, retentionId: submitterId, status: 'SUBMITTED', submittedAt: new Date(), draftReason: null, draftReasonNote: null, returnReason: null, rejectionReason: null, callbackById: null, callbackAt: null },
   });
   if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
 
@@ -1535,7 +1538,7 @@ export async function saveRetentionLeadAsDraft(
 
   const updated = await prisma.lead.updateMany({
     where: { id: leadId, status: lead.status },
-    data: { ...data, ...suggested, status: 'DRAFT' },
+    data: { ...data, ...suggested, status: 'DRAFT', ...(lead.leadType === 'RETENTION' ? { rejectionReason: null } : {}) },
   });
   if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
 
@@ -1977,7 +1980,7 @@ export async function rejectLead(leadId: string, clientId: string, reason?: stri
       : toJunior
       ? { status: 'RETURNED_TO_JUNIOR', clientId: null, rejectionReason: trimmed, adminStatus: null, returnReason: trimmed ?? 'Rejected by client' }
       : toRetention
-      ? { status: 'RETURNED_TO_RETENTION', clientId: null, rejectionReason: trimmed, adminStatus: null, returnReason: trimmed ?? 'Rejected by client' }
+      ? { status: 'RETURNED_TO_RETENTION', clientId: null, rejectionReason: trimmed ?? 'Rejected by client', adminStatus: null, returnReason: trimmed ?? 'Rejected by client' }
       : { status: 'REJECTED', clientId: null, rejectionReason: reason ?? null, adminStatus: null },
   });
   if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
@@ -2112,7 +2115,7 @@ export async function batchDecideAsAdmin(
     }),
     prisma.lead.updateMany({
       where: { id: { in: toRetentionIds }, ...awaiting },
-      data: { ...cleared, status: 'RETURNED_TO_RETENTION', returnReason: trimmed ?? 'Rejected by admin' },
+      data: { ...cleared, status: 'RETURNED_TO_RETENTION', rejectionReason: trimmed ?? 'Rejected by admin', returnReason: trimmed ?? 'Rejected by admin' },
     }),
     prisma.lead.updateMany({
       where: { id: { in: toAdminIds }, ...awaiting },

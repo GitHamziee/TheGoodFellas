@@ -29,6 +29,11 @@ import { apiErrorMessage } from '../../../core/api';
  */
 type PendingTab = 'new' | 'drafts' | 'callbacks';
 
+/** An admin/client rejection sends a Retention lead back to the queue as RETURNED_TO_RETENTION
+ *  with a rejectionReason (cleared on resubmit) — that is what separates it from a sent-back
+ *  or charge-back return, and it belongs under Declined, not New Leads. */
+const isRejected = (l: Lead): boolean => l.status === 'RETURNED_TO_RETENTION' && !!l.rejectionReason;
+
 @Component({
   selector: 'app-retention-leads',
   imports: [AdminStatusBadge, 
@@ -59,10 +64,10 @@ export class RetentionLeads implements OnInit {
   readonly chargeBacksOnly = signal(false);
   private readonly chargeBackLeads = signal<Lead[]>([]);
   readonly chargeBackCount = computed(() => this.chargeBackLeads().length);
-  /** Declined toggle: this person's leads a client turned down (also from the history feed). */
+  /** Declined toggle: leads an admin/client turned down, back in the queue for a re-write.
+   *  Follows the teammate filter like New Leads and Drafts. */
   readonly declinedOnly = signal(false);
-  private readonly declinedLeads = signal<Lead[]>([]);
-  readonly declinedCount = computed(() => this.declinedLeads().length);
+  readonly declinedCount = computed(() => this.pendingSplit().declined.length);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
 
@@ -70,6 +75,7 @@ export class RetentionLeads implements OnInit {
   /** '' = everyone, otherwise a specific teammate's user id — defaults to "me". */
   readonly teammateFilter = signal('');
 
+  readonly isRejected = isRejected;
   readonly getInitials = getInitials;
   readonly getAvatarTone = getAvatarTone;
   readonly timeAgo = timeAgo;
@@ -100,13 +106,13 @@ export class RetentionLeads implements OnInit {
   /** The server only returns callbacks the caller marked, so any callbackById here is "mine". */
   readonly pendingSplit = computed(() => {
     const filter = this.teammateFilter();
-    const split: Record<PendingTab, Lead[]> = { new: [], drafts: [], callbacks: [] };
+    const split: Record<PendingTab | 'declined', Lead[]> = { new: [], drafts: [], callbacks: [], declined: [] };
     for (const l of this.pending()) {
       if (l.callbackById) {
         // Callbacks ignore the teammate filter — they can sit on anyone's assignment.
         split.callbacks.push(l);
       } else if (!filter || l.retention?.id === filter) {
-        split[l.status === 'DRAFT' ? 'drafts' : 'new'].push(l);
+        split[isRejected(l) ? 'declined' : l.status === 'DRAFT' ? 'drafts' : 'new'].push(l);
       }
     }
     return split;
@@ -116,7 +122,7 @@ export class RetentionLeads implements OnInit {
     this.chargeBacksOnly()
       ? this.chargeBackLeads()
       : this.declinedOnly()
-        ? this.declinedLeads()
+        ? this.pendingSplit().declined
         : this.pendingSplit()[this.pendingTab()],
   );
 
@@ -148,12 +154,15 @@ export class RetentionLeads implements OnInit {
       updatedAt: (l) => new Date(l.updatedAt ?? l.createdAt).getTime(),
     },
     initialSort: { key: 'updatedAt', dir: 'desc' },
+    // The team's queue is shown in full — no pager on this page.
+    pageSize: 1000,
   });
 
   readonly highlightId = highlightFromQuery(() => this.pending(), (lead) => {
     this.chargeBacksOnly.set(false);
     this.declinedOnly.set(false);
     this.teammateFilter.set('');
+    this.declinedOnly.set(isRejected(lead) && !lead.callbackById);
     this.pendingTab.set(lead.callbackById ? 'callbacks' : lead.status === 'DRAFT' ? 'drafts' : 'new');
     this.pendingView.reveal((l) => l.id === lead.id);
   });
@@ -170,7 +179,6 @@ export class RetentionLeads implements OnInit {
       const [queue, history] = await Promise.all([this.leadService.retentionQueue(), this.leadService.retentionHistory()]);
       this.pending.set(queue);
       this.chargeBackLeads.set(history.filter((l) => l.chargeBacks?.length));
-      this.declinedLeads.set(history.filter((l) => l.status === 'REJECTED'));
     } catch {
       this.error.set('Could not load the leads. Refresh to try again.');
     } finally {

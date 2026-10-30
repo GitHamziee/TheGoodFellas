@@ -56,6 +56,7 @@ import { toastNotice } from '../../../core/toast-notice';
 const STATUS_FILTERS: { label: string; value: string }[] = [
   { label: 'All', value: '' },
   { label: 'New', value: 'NEW' },
+  { label: 'Submitted', value: 'SUBMITTED' },
   { label: 'Assigned', value: 'ASSIGNED' },
   { label: 'Approved', value: 'ACCEPTED' },
   { label: 'Declined', value: 'REJECTED' },

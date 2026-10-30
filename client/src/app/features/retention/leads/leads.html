@@ -46,7 +46,7 @@
           <span class="n">{{ chargeBackCount() }}</span>
         </button>
       </div>
-      @if (pendingTab() !== 'callbacks' && !chargeBacksOnly() && !declinedOnly()) {
+      @if (pendingTab() !== 'callbacks' && !chargeBacksOnly()) {
         <app-select
           [options]="teammateOptions()"
           [ngModel]="teammateFilter()"
@@ -98,15 +98,15 @@
                     }
                     {{ lead.customerName }}
                     @if (chargeBacksOnly()) {
-                      <app-status-badge [status]="lead.status" hideDecided />
+                      <app-status-badge [status]="isRejected(lead) ? 'REJECTED' : lead.status" [hideDecided]="!isRejected(lead)" />
                       <app-admin-status-badge [status]="lead.adminStatus" />
                     } @else if ((lead.status === 'DRAFT' && !lead.callbackById) || lead.status === 'RETURNED_TO_RETENTION') {
-                      <app-status-badge [status]="lead.status" hideDecided />
+                      <app-status-badge [status]="isRejected(lead) ? 'REJECTED' : lead.status" [hideDecided]="!isRejected(lead)" />
                       <app-admin-status-badge [status]="lead.adminStatus" />
                     }
                   </div>
                   @if (lead.status === 'RETURNED_TO_RETENTION' && lead.returnReason) {
-                    <div class="row-reason row-reason--returned"><b>Admin:</b> {{ lead.returnReason }}</div>
+                    <div class="row-reason row-reason--returned"><b>{{ lead.rejectionReason ? 'Reason' : 'Admin' }}:</b> {{ lead.returnReason }}</div>
                   } @else if (lead.status === 'DRAFT' && !lead.callbackById && draftReasonText(lead); as reason) {
                     <div class="row-reason">{{ reason }}</div>
                   }

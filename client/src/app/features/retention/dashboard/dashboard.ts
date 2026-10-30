@@ -66,7 +66,7 @@ export class RetentionDashboard implements OnInit {
     const past = this.history();
     const mine = this.currentUserId();
     const accepted = past.filter((l) => l.status === 'ACCEPTED').length;
-    const rejected = past.filter((l) => l.status === 'REJECTED').length;
+    const rejected = past.filter((l) => l.status === 'REJECTED' || (l.status === 'RETURNED_TO_RETENTION' && !!l.rejectionReason)).length;
     const decided = accepted + rejected;
     return {
       queueTotal: queue.length,

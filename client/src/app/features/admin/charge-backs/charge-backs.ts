@@ -198,12 +198,13 @@ export class AdminChargeBacks implements OnInit {
   readonly statusFilter = signal('');
   readonly reasonFilter = signal('');
 
-  readonly planOptions = [{ value: '', label: 'All plans' }, ...PLAN_TYPE_OPTIONS];
+  readonly planOptions = [{ value: '', label: 'All plans' }, ...PLAN_TYPE_OPTIONS, { value: 'NONE', label: 'No plan' }];
   readonly statusOptions = [
     { value: '', label: 'All statuses' },
     { value: 'AWAITING', label: 'Waiting for a new client' },
     { value: 'SENT_BACK', label: 'Sent back for correction' },
     { value: 'REASSIGNED', label: 'Given to a new client' },
+    { value: 'WITH_ADMIN', label: 'Back with admin' },
   ];
 
   private readonly allRows = computed<ChargeBackRecent[]>(() => this.analytics()?.recent ?? []);
@@ -216,9 +217,12 @@ export class AdminChargeBacks implements OnInit {
   readonly reasonOptions = [{ value: '', label: 'All reasons' }, ...CHARGE_BACK_REASON_OPTIONS];
 
   /** Bucket for the status filter — where the lead went after this charge-back. */
-  private stateOf(r: ChargeBackRecent): 'AWAITING' | 'SENT_BACK' | 'REASSIGNED' {
+  private stateOf(r: ChargeBackRecent): 'AWAITING' | 'SENT_BACK' | 'REASSIGNED' | 'WITH_ADMIN' {
     if (this.leadFor(r)) return 'AWAITING';
-    return r.leadStatus.startsWith('RETURNED_TO_') ? 'SENT_BACK' : 'REASSIGNED';
+    if (r.leadStatus.startsWith('RETURNED_TO_')) return 'SENT_BACK';
+    // The row reads "Given to X" only once it has a new client; a lead fixed and resubmitted
+    // is just back in the admin's queue, so it must not be filed as given away.
+    return r.reassignedTo ? 'REASSIGNED' : 'WITH_ADMIN';
   }
 
   isSentBack(r: ChargeBackRecent): boolean {
@@ -268,7 +272,7 @@ export class AdminChargeBacks implements OnInit {
       (r) =>
         (!client || r.client.id === client) &&
         (!reason || this.reasonBucket(r) === reason) &&
-        (!plan || r.planType === plan) &&
+        (!plan || (plan === 'NONE' ? !r.planType : r.planType === plan)) &&
         (!status || this.stateOf(r) === status),
     );
   });
