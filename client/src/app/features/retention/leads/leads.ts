@@ -62,7 +62,20 @@ export class RetentionLeads implements OnInit {
   /** Charge-backs toggle: this person's own leads that have ever been charged back (from the
    *  history feed — they've left the work queue, so there's nothing to open or dial). */
   readonly chargeBacksOnly = signal(false);
-  private readonly chargeBackLeads = signal<Lead[]>([]);
+  private readonly ownChargeBacks = signal<Lead[]>([]);
+  /** Teammates' draft-1 charge-backs (shared with the whole team) — only those still to rework. */
+  private readonly sharedChargeBacks = signal<Lead[]>([]);
+  /** Follows the teammate filter like New Leads / Drafts / Declined: "me" = own, a teammate or
+   *  "All teammates" brings in the shared ones too. */
+  private readonly chargeBackLeads = computed(() => {
+    const filter = this.teammateFilter();
+    const seen = new Set<string>();
+    return [...this.ownChargeBacks(), ...this.sharedChargeBacks()].filter((l) => {
+      if (seen.has(l.id) || (filter && l.retention?.id !== filter)) return false;
+      seen.add(l.id);
+      return true;
+    });
+  });
   readonly chargeBackCount = computed(() => this.chargeBackLeads().length);
   /** Declined toggle: leads an admin/client turned down, back in the queue for a re-write.
    *  Follows the teammate filter like New Leads and Drafts. */
@@ -176,9 +189,14 @@ export class RetentionLeads implements OnInit {
   async refresh(): Promise<void> {
     if (!isSilentReload()) this.loading.set(true);
     try {
-      const [queue, history] = await Promise.all([this.leadService.retentionQueue(), this.leadService.retentionHistory()]);
+      const [queue, history, shared] = await Promise.all([
+        this.leadService.retentionQueue(),
+        this.leadService.retentionHistory(),
+        this.leadService.retentionSharedHistory(),
+      ]);
       this.pending.set(queue);
-      this.chargeBackLeads.set(history.filter((l) => l.chargeBacks?.length));
+      this.ownChargeBacks.set(history.filter((l) => l.chargeBacks?.length));
+      this.sharedChargeBacks.set(shared.filter((l) => l.chargeBacks?.length));
     } catch {
       this.error.set('Could not load the leads. Refresh to try again.');
     } finally {

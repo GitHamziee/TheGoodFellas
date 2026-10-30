@@ -46,7 +46,7 @@
           <span class="n">{{ chargeBackCount() }}</span>
         </button>
       </div>
-      @if (pendingTab() !== 'callbacks' && !chargeBacksOnly()) {
+      @if (pendingTab() !== 'callbacks') {
         <app-select
           [options]="teammateOptions()"
           [ngModel]="teammateFilter()"
@@ -84,7 +84,7 @@
               <tr [id]="'hl-' + lead.id" [class.row-highlight]="lead.id === highlightId()">
                 <td>
                   <div class="cell-main name-row">
-                    @if (!chargeBacksOnly()) {
+                    @if (!chargeBacksOnly() || lead.status === 'RETURNED_TO_RETENTION') {
                     <button
                       type="button"
                       class="dial-btn"
@@ -130,7 +130,7 @@
                   <span class="chip"><svg lucideClock></svg>{{ timeAgo(chargeBacksOnly() ? lead.chargeBacks[0].createdAt : lead.createdAt) }}</span>
                 </td>
                 <td>
-                  @if (!chargeBacksOnly()) {
+                  @if (!chargeBacksOnly() || lead.status === 'RETURNED_TO_RETENTION') {
                     <div class="row-actions">
                       <a class="btn btn--sm btn--ghost" [routerLink]="['/retention/leads', lead.id]">
                         <svg lucideSquarePen></svg> Open
