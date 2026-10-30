@@ -24,6 +24,7 @@ export interface RetentionHistoryRow {
   status: LeadStatus;
   state: RetentionHistoryState;
   createdAt: string;
+  lastActivityAt: string;
   closer: string | null;
   paidAt: string | null;
   chargedBackAt: string | null;

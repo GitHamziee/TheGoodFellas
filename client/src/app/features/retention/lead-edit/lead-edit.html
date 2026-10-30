@@ -126,10 +126,6 @@
             <span>DL / State ID # <span class="hint">Optional</span></span>
             <input type="text" name="dlStateId" [(ngModel)]="form.dlStateId" />
           </label>
-          <label>
-            <span>Yearly income <span class="hint">Whole dollars, optional</span></span>
-            <input type="number" name="yearlyIncome" min="0" [(ngModel)]="form.yearlyIncome" />
-          </label>
         </div>
       </div>
 
@@ -275,7 +271,7 @@
             </label>
           }
           <label>
-            <span>Annual income <span class="hint">Whole dollars</span></span>
+            <span>Annual income <span class="hint">Whole dollars, optional</span></span>
             <input type="number" name="annualIncome" [class.invalid]="err('annualIncome')" min="0" [(ngModel)]="form.annualIncome" />
           </label>
         </div>

@@ -40,7 +40,6 @@ export type CloserLeadInput = Partial<Pick<Lead, (typeof SHARED_KEYS)[number]>> 
       Lead,
       | 'mailingAddress'
       | 'email'
-      | 'yearlyIncome'
       | 'ssn'
       | 'dlStateId'
       | 'doctorName'

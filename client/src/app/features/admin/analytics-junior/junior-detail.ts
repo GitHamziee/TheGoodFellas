@@ -448,8 +448,9 @@ export class JuniorDetail {
     sorters: {
       customerName: (l) => l.customerName.toLowerCase(),
       createdAt: (l) => new Date(l.createdAt).getTime(),
+      updatedAt: (l) => new Date(l.updatedAt).getTime(),
     },
-    initialSort: { key: 'createdAt', dir: 'desc' },
+    initialSort: { key: 'updatedAt', dir: 'desc' },
     pageSize: 10,
   });
 

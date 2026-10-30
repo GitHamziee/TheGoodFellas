@@ -286,7 +286,6 @@ export class RetentionLeadEdit implements OnInit {
         annualIncome: lead.annualIncome ?? undefined,
         mailingAddress: lead.mailingAddress ?? undefined,
         email: lead.email ?? undefined,
-        yearlyIncome: lead.yearlyIncome ?? undefined,
         // Stored as xxx-xx-xxxx; the field holds the 9 digits (maxlength 9, validated as 9).
         ssn: lead.ssn?.replace(/\D/g, '') || undefined,
         dlStateId: lead.dlStateId ?? undefined,

@@ -187,6 +187,7 @@ export class RetentionHistory implements OnInit {
   });
 
   readonly sortOptions = [
+    { value: 'latest:desc', label: 'Sort: Latest activity' },
     { value: 'createdAt:desc', label: 'Sort: Newest first' },
     { value: 'createdAt:asc', label: 'Sort: Oldest first' },
     { value: 'chargedBackAt:desc', label: 'Sort: Latest charge-back' },
@@ -231,10 +232,11 @@ export class RetentionHistory implements OnInit {
     sorters: {
       customerName: (l) => l.customerName,
       createdAt: (l) => new Date(l.createdAt).getTime(),
+      latest: (l) => new Date(l.lastActivityAt).getTime(),
       monthsOnBook: (l) => l.monthsOnBook ?? -1,
       chargedBackAt: (l) => (l.chargedBackAt ? new Date(l.chargedBackAt).getTime() : 0),
     },
-    initialSort: { key: 'createdAt', dir: 'desc' },
+    initialSort: { key: 'latest', dir: 'desc' },
     pageSize: 10,
   });
 

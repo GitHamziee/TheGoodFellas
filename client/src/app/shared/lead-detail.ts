@@ -375,7 +375,6 @@ export class LeadDetail {
           row('Retired income type', l.retiredIncomeType, humanizeEnum(l.retiredIncomeType)),
           row('Nature of disability', l.natureOfDisability),
           row('Annual income', l.annualIncome, formatMoney(l.annualIncome)),
-          row('Yearly income', l.yearlyIncome, formatMoney(l.yearlyIncome)),
         ]),
       },
       {

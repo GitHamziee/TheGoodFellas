@@ -18,6 +18,8 @@ export interface RetentionHistoryRow {
   status: LeadStatus;
   state: RetentionHistoryState;
   createdAt: Date;
+  /** Most recent thing that happened to the lead (event, payment, charge-back) — drives the default sort. */
+  lastActivityAt: Date;
   closer: string | null;
   paidAt: Date | null;
   chargedBackAt: Date | null;
@@ -144,6 +146,14 @@ function summarize(r: LeadRecord, names: Map<string, string>, now: Date): Retent
     status: r.status,
     state,
     createdAt: r.createdAt,
+    lastActivityAt: new Date(
+      Math.max(
+        r.createdAt.getTime(),
+        r.incomePayment?.createdAt.getTime() ?? 0,
+        ...r.chargeBacks.map((c) => c.createdAt.getTime()),
+        ...r.events.map((e) => e.createdAt.getTime())
+      )
+    ),
     closer: nameOf(closerEvent?.actorId ?? null) ?? r.closer?.name ?? r.retention?.name ?? null,
     paidAt,
     chargedBackAt,

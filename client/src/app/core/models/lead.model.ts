@@ -150,7 +150,6 @@ export interface Lead {
   // closer-only
   mailingAddress?: string | null;
   email?: string | null;
-  yearlyIncome?: number | null;
   ssn?: string | null;
   dlStateId?: string | null;
   doctorName?: string | null;

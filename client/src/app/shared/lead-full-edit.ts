@@ -46,7 +46,7 @@ const DATE_KEYS = ['dob', 'beneficiaryDob', 'initialDraftDate', 'futureDraftDate
 
 const FORM_KEYS = [
   'customerName', 'phone', 'state', 'zipcode', 'mailingAddress', 'email', 'maritalStatus', 'birthState',
-  'gender', 'dob', 'age', 'ssn', 'dlStateId', 'yearlyIncome', 'smoker', 'need', 'decisionMaker', 'bankAccount',
+  'gender', 'dob', 'age', 'ssn', 'dlStateId', 'smoker', 'need', 'decisionMaker', 'bankAccount',
   'dCode', 'incomeSource', 'retiredIncomeType', 'natureOfDisability', 'annualIncome', 'height', 'weight',
   'doctorName', 'healthConditions', 'medications', 'beneficiaryName', 'beneficiaryRelation', 'beneficiaryDob',
   'carrierName', 'clientLeadId', 'planType', 'coverageAmount', 'monthlyPremiums', 'initialDraftDate', 'futureDraftDate',
@@ -134,10 +134,6 @@ const FORM_KEYS = [
                 DL / State ID #
                 <input type="text" name="dlStateId" [(ngModel)]="form['dlStateId']" />
               </label>
-              <label>
-                Yearly income <span class="hint">Whole dollars</span>
-                <input type="number" name="yearlyIncome" min="0" [(ngModel)]="form['yearlyIncome']" />
-              </label>
             } @else {
               <label>
                 Smoker
@@ -181,7 +177,7 @@ const FORM_KEYS = [
                 <input type="text" name="natureOfDisability" [(ngModel)]="form['natureOfDisability']" />
               </label>
               <label>
-                Annual income <span class="hint">Whole dollars</span>
+                Annual income <span class="hint">Whole dollars, optional</span>
                 <input type="number" name="annualIncome" min="0" [(ngModel)]="form['annualIncome']" />
               </label>
             }

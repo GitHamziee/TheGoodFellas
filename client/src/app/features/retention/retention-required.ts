@@ -47,7 +47,6 @@ export function retentionMissing(f: RetentionSubmitInput, needsLeadId = false): 
   need('incomeSource', 'Source of income');
   if (f.incomeSource === 'RETIRED') need('retiredIncomeType', 'Retired income type');
   if (f.incomeSource === 'RETIRED' && f.retiredIncomeType === 'SSDI') need('natureOfDisability', 'Nature of disability');
-  need('annualIncome', 'Annual income');
 
   need('height', 'Height');
   need('weight', 'Weight');

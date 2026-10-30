@@ -132,7 +132,6 @@ const FIELD_SCHEMA: Record<string, FieldSpec> = {
   // Closer enrichment only
   mailingAddress: { type: 'string' },
   email: { type: 'string' },
-  yearlyIncome: { type: 'int' },
   ssn: { type: 'ssn' },
   dlStateId: { type: 'string' },
   doctorName: { type: 'string' },
@@ -194,7 +193,7 @@ export const JUNIOR_ONLY_FIELDS = [
 ] as const;
 
 export const CLOSER_ONLY_FIELDS = [
-  'mailingAddress', 'email', 'yearlyIncome', 'ssn', 'dlStateId', 'doctorName',
+  'mailingAddress', 'email', 'ssn', 'dlStateId', 'doctorName',
   'beneficiaryRelation', 'beneficiaryName', 'beneficiaryDob', 'extraBeneficiaries',
   'medications',
   'carrierName', 'clientLeadId', 'planType', 'coverageAmount', 'monthlyPremiums',
@@ -275,6 +274,8 @@ export function sanitizeLeadFields(
       case 'int': {
         const n = typeof raw === 'number' ? raw : typeof raw === 'string' ? Number(raw) : NaN;
         if (!Number.isFinite(n)) return { error: `Invalid ${key}` };
+        // Postgres INT4 — anything larger throws inside Prisma and surfaces as a 500.
+        if (n > 2147483647 || n < -2147483648) return { error: `Invalid ${key}` };
         data[key] = Math.trunc(n);
         break;
       }
