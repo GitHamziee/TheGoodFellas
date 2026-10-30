@@ -1,6 +1,6 @@
 import { AdminStatusBadge } from '../../../shared/ui/admin-status';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import {
   LucideBanknoteArrowUp,
   LucideCircleCheck,
@@ -27,7 +27,7 @@ const isRejected = (l: Lead): boolean => l.status === 'RETURNED_TO_RETENTION' &&
  */
 @Component({
   selector: 'app-retention-history',
-  imports: [AdminStatusBadge, 
+  imports: [AdminStatusBadge, RouterLink,
     PeriodFilter,
     NoCopy,
     StatTile,
@@ -50,15 +50,32 @@ export class RetentionHistory implements OnInit {
   private readonly liveReload = reloadOnChange(() => this.refresh());
   private readonly leadService = inject(LeadService);
 
-  readonly allPast = signal<Lead[]>([]);
+  readonly mine = signal<Lead[]>([]);
+  readonly shared = signal<Lead[]>([]);
+  readonly tab = signal<'mine' | 'shared'>('mine');
+  /** Shared leads are all awaiting rework, so only All / Declined (and Charge-backs) apply. */
+  readonly filters = computed(() =>
+    this.tab() === 'shared' ? this.statusFilters.filter((f) => f.value === '' || f.value === 'REJECTED') : this.statusFilters,
+  );
+
+  setTab(tab: 'mine' | 'shared'): void {
+    this.tab.set(tab);
+    // A status / charge-back filter left over from the other tab would silently empty this one.
+    this.chargeBacksOnly.set(false);
+    this.view.setStatus('');
+  }
+  readonly allPast = computed(() => (this.tab() === 'shared' ? this.shared() : this.mine()));
   readonly period = signal<Period>('day');
   readonly anchor = signal(pacificIsoDate(pacificToday()));
   /** Charge-backs toggle: only leads that have ever been charged back, placed in the period
    *  by their latest charge-back date rather than when they were last worked. */
   readonly chargeBacksOnly = signal(false);
   readonly highlightId = signal<string | null>(inject(ActivatedRoute).snapshot.queryParamMap.get('highlight'));
+  // The Shared tab is a to-do list of teammates' leads, so it is not cut down by the period.
   readonly past = computed(() =>
-    this.chargeBacksOnly()
+    this.tab() === 'shared'
+      ? this.allPast()
+      : this.chargeBacksOnly()
       ? inPeriod(
           this.allPast().filter((l) => l.chargeBacks?.length),
           this.period(),
@@ -137,7 +154,9 @@ export class RetentionHistory implements OnInit {
   async refresh(): Promise<void> {
     if (!isSilentReload()) this.loading.set(true);
     try {
-      this.allPast.set(await this.leadService.retentionHistory());
+      const [mine, shared] = await Promise.all([this.leadService.retentionHistory(), this.leadService.retentionSharedHistory()]);
+      this.mine.set(mine);
+      this.shared.set(shared);
       if (this.highlightId()) {
         setTimeout(() => document.getElementById('hl-' + this.highlightId())?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
         setTimeout(() => this.highlightId.set(null), 6000);

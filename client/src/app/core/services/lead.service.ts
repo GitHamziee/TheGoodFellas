@@ -489,6 +489,12 @@ export class LeadService {
     return res.data.leads;
   }
 
+  /** History page's Shared tab — teammates' declined / charged-back leads, open to the whole team. */
+  async retentionSharedHistory(): Promise<Lead[]> {
+    const res = await firstValueFrom(this.http.get<ApiSuccess<{ leads: Lead[] }>>(`${BASE}/retention/history/shared`));
+    return res.data.leads;
+  }
+
   /** Retention Manager's own history — leads he submitted, edited or left a note on. */
   async retentionManagerHistory(): Promise<ManagerHistoryRow[]> {
     const res = await firstValueFrom(

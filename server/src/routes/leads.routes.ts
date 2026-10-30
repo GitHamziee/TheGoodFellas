@@ -549,6 +549,15 @@ router.get(
   })
 );
 
+router.get(
+  '/retention/history/shared',
+  requireRole('RETENTION'),
+  asyncHandler(async (req, res) => {
+    const leads = await leadService.listSharedRetentionHistory(req.user!.id);
+    return apiSuccess(res, { leads });
+  })
+);
+
 // ─── Team Lead ──────────────────────────────────────────────────
 router.get(
   '/team-lead/leads',

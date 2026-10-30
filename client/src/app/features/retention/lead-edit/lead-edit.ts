@@ -287,7 +287,8 @@ export class RetentionLeadEdit implements OnInit {
         mailingAddress: lead.mailingAddress ?? undefined,
         email: lead.email ?? undefined,
         yearlyIncome: lead.yearlyIncome ?? undefined,
-        ssn: lead.ssn ?? undefined,
+        // Stored as xxx-xx-xxxx; the field holds the 9 digits (maxlength 9, validated as 9).
+        ssn: lead.ssn?.replace(/\D/g, '') || undefined,
         dlStateId: lead.dlStateId ?? undefined,
         doctorName: lead.doctorName ?? undefined,
         beneficiaryRelation: lead.beneficiaryRelation ?? undefined,
@@ -317,7 +318,7 @@ export class RetentionLeadEdit implements OnInit {
               : undefined),
         bankName: lead.bankName ?? undefined,
         accountTitle: lead.accountTitle ?? undefined,
-        payerSocial: lead.payerSocial ?? undefined,
+        payerSocial: lead.payerSocial?.replace(/\D/g, '') || undefined,
         accountType: lead.accountType ?? undefined,
         accountOwnership: lead.accountOwnership ?? undefined,
         accountOpeningState: lead.accountOpeningState ?? undefined,

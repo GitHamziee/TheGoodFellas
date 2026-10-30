@@ -1350,10 +1350,13 @@ function retentionWindowStart(): Date {
 /** True when `requesterId` may not see the lead: someone else marked it as a Callback (only
  * they see it, even over the assignee), or it is still inside its assignee's exclusive window. */
 function isHiddenFromRetentionTeammate(
-  lead: { retentionId: string | null; retentionAssignedAt: Date | null; callbackById: string | null },
+  lead: { retentionId: string | null; retentionAssignedAt: Date | null; callbackById: string | null; status?: LeadStatus },
   requesterId: string
 ): boolean {
   if (lead.callbackById) return lead.callbackById !== requesterId;
+  // Declined / charged-back leads come back as RETURNED_TO_RETENTION and are shared with the
+  // whole team straight away — the exclusive window only covers a freshly handed-out lead.
+  if (lead.status === 'RETURNED_TO_RETENTION') return false;
   return (
     lead.retentionId !== requesterId &&
     lead.retentionAssignedAt !== null &&
@@ -1455,6 +1458,7 @@ export async function listRetentionQueue(requesterId: string) {
           callbackById: null,
           OR: [
             { retentionId: requesterId },
+            { status: 'RETURNED_TO_RETENTION' },
             { retentionAssignedAt: null },
             { retentionAssignedAt: { lte: retentionWindowStart() } },
           ],
@@ -1538,7 +1542,16 @@ export async function saveRetentionLeadAsDraft(
 
   const updated = await prisma.lead.updateMany({
     where: { id: leadId, status: lead.status },
-    data: { ...data, ...suggested, status: 'DRAFT', ...(lead.leadType === 'RETENTION' ? { rejectionReason: null } : {}) },
+    data: {
+      ...data,
+      ...suggested,
+      status: 'DRAFT',
+      rejectionReason: null,
+      // A teammate working a returned (declined / charged-back) lead takes it over, same as
+      // submitting it does — otherwise it drops into the owner's drafts and, inside the exclusive
+      // window, the teammate who just saved it can no longer see it.
+      ...(lead.status === 'RETURNED_TO_RETENTION' ? { retentionId: requesterId } : {}),
+    },
   });
   if (updated.count === 0) return { error: 'Lead was already updated', status: 409 };
 
@@ -1676,13 +1689,36 @@ export async function listRetentionHistory(requesterId: string) {
     select: { ...RETENTION_HISTORY_SELECT, paymentStatus: true, chargeBacks: { select: { createdAt: true, chargeMonth: true }, orderBy: { createdAt: 'desc' } } },
     orderBy: { updatedAt: 'desc' },
   });
+  return shapeRetentionHistory(leads);
+}
 
+/** The History page's Shared tab: declined and 1st-draft charged-back leads (RETURNED_TO_RETENTION)
+ * belonging to a teammate. Open to the whole team to edit and resubmit; a lead someone holds as a
+ * Callback stays theirs alone. */
+export async function listSharedRetentionHistory(requesterId: string) {
+  const leads = await prisma.lead.findMany({
+    where: {
+      leadType: 'RETENTION',
+      retentionId: { not: requesterId },
+      status: 'RETURNED_TO_RETENTION',
+      callbackById: null,
+      OR: [{ rejectionReason: { not: null } }, { chargeBacks: { some: {} } }],
+    },
+    select: { ...RETENTION_HISTORY_SELECT, paymentStatus: true, chargeBacks: { select: { createdAt: true, chargeMonth: true }, orderBy: { createdAt: 'desc' } } },
+    orderBy: { updatedAt: 'desc' },
+  });
+  return shapeRetentionHistory(leads);
+}
+
+type HistoryBase = { status: LeadStatus; paymentStatus: unknown; chargeBacks: { createdAt: Date; chargeMonth: number | null }[] };
+
+function shapeRetentionHistory<T extends HistoryBase & { adminStatus: unknown }>(leads: T[]) {
   // A Retention person answers only for the 1st draft (those come straight back to them as
   // RETURNED_TO_RETENTION). A later-draft charge-back belongs to the Retention Manager and the
   // admin, so whatever they do with it (charged back, submitted, re-assigned) must not show here:
   // keep showing it as Approved / Approval confirmed until it is paid again. The Retention
   // Manager and Admin still see the real status.
-  const withManager = (l: (typeof leads)[number]) =>
+  const withManager = (l: HistoryBase) =>
     l.paymentStatus !== 'PAID' &&
     ['CHARGED_BACK', 'SUBMITTED', 'ASSIGNED', 'ASSIGNED_EXTERNAL', 'ACCEPTED'].includes(l.status) &&
     (l.status === 'CHARGED_BACK' || (l.chargeBacks[0]?.chargeMonth ?? 0) > 1);

@@ -1,12 +1,23 @@
 <div class="page" appNoCopy>
   <div class="period-bar">
-    <app-period-filter [(period)]="period" [(anchor)]="anchor" />
+    <div class="pills">
+      <button type="button" class="pill" [class.active]="tab() === 'mine'" (click)="setTab('mine')">
+        Mine <span class="n">{{ mine().length }}</span>
+      </button>
+      <button type="button" class="pill" [class.active]="tab() === 'shared'" (click)="setTab('shared')">
+        Shared <span class="n">{{ shared().length }}</span>
+      </button>
+    </div>
+    @if (tab() === 'mine') {
+      <app-period-filter [(period)]="period" [(anchor)]="anchor" />
+    }
   </div>
 
   @if (error()) {
     <div class="error">{{ error() }}</div>
   }
 
+  @if (tab() === 'mine') {
   <div class="stats-row">
     <app-stat-tile [value]="stats().submitted" label="Submitted" tone="tone-d">
       <svg lucideSend></svg>
@@ -28,6 +39,7 @@
       <svg lucideBanknoteArrowUp></svg>
     </app-stat-tile>
   </div>
+  }
 
   <div class="toolbar">
     <app-search-box [value]="view.search()" placeholder="Search history…" (valueChange)="view.setSearch($event)" />
@@ -36,7 +48,7 @@
   <div class="card card--flush">
     <div class="section-head">
       <div class="pills">
-        @for (filter of statusFilters; track filter.value) {
+        @for (filter of filters(); track filter.value) {
           <button
             type="button"
             class="pill"
@@ -87,7 +99,13 @@
           <tbody>
             @for (lead of view.rows(); track lead.id) {
               <tr [id]="'hl-' + lead.id" [class.row-highlight]="lead.id === highlightId()">
-                <td><div class="cell-main">{{ lead.customerName }}</div></td>
+                <td>
+                  @if (tab() === 'shared') {
+                    <a class="cell-main" [routerLink]="['/retention/leads', lead.id]">{{ lead.customerName }}</a>
+                  } @else {
+                    <div class="cell-main">{{ lead.customerName }}</div>
+                  }
+                </td>
                 <td class="hide-md">
                   @if (lead.retention) {
                     <div class="person">

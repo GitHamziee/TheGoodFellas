@@ -130,6 +130,11 @@ describe('retention exclusive window', () => {
     callbackById,
   });
 
+  it('shares a declined / charged-back lead (RETURNED_TO_RETENTION) with teammates inside the window', async () => {
+    db.lead.findUnique.mockResolvedValueOnce({ ...retentionLead(1 * HOUR), status: 'RETURNED_TO_RETENTION' });
+    expect(await getLeadById('lead-1', { id: 'r-2', role: 'RETENTION' })).toHaveProperty('data');
+  });
+
   it('hides a freshly assigned lead from teammates', async () => {
     db.lead.findUnique.mockResolvedValueOnce(retentionLead(1 * HOUR));
     expect(await getLeadById('lead-1', { id: 'r-2', role: 'RETENTION' })).toEqual({ error: 'Lead not found', status: 404 });
@@ -164,6 +169,7 @@ describe('retention exclusive window', () => {
         callbackById: null,
         OR: [
           { retentionId: 'r-2' },
+          { status: 'RETURNED_TO_RETENTION' },
           { retentionAssignedAt: null },
           { retentionAssignedAt: { lte: expect.any(Date) } },
         ],
