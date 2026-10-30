@@ -155,6 +155,7 @@ enum PayerType {
 enum PaymentMethod {
   BANK_ACCOUNT
   CARD
+  ONLINE_BANK
 }
 
 enum CardType {

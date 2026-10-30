@@ -129,6 +129,7 @@ export const PAYER_OPTIONS: { value: PayerType; label: string }[] = [
 export const PAYMENT_METHOD_OPTIONS: { value: PaymentMethod; label: string }[] = [
   { value: 'BANK_ACCOUNT', label: 'Bank account' },
   { value: 'CARD', label: 'Card' },
+  { value: 'ONLINE_BANK', label: 'Online bank' },
 ];
 
 export const CARD_TYPE_OPTIONS: { value: CardType; label: string }[] = [

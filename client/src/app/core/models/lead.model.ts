@@ -52,7 +52,7 @@ export type RetiredIncomeType = 'SSI' | 'SSDI';
 export type AccountType = 'CHECKING' | 'SAVINGS';
 export type PayerType = 'SELF' | 'SOMEONE_ELSE';
 export type PlanType = 'LEVEL' | 'GRADED' | 'MODIFIED' | 'GI';
-export type PaymentMethod = 'BANK_ACCOUNT' | 'CARD';
+export type PaymentMethod = 'BANK_ACCOUNT' | 'CARD' | 'ONLINE_BANK';
 /** A recurring draft day, picked instead of a calendar draft date. */
 export type DraftSchedule =
   | 'FIRST_OF_MONTH'
