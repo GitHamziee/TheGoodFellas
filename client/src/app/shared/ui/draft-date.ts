@@ -58,7 +58,7 @@ function addMonths(month: string, n: number): string {
       <app-date-input
         class="draft-date"
         aria-label="Draft date"
-        min="2000-01-01"
+        [min]="minDate() ?? '2000-01-01'"
         [max]="maxDate() ?? '2100-12-31'"
         [ngModel]="date()"
         [ngModelOptions]="{ standalone: true }"
@@ -80,6 +80,12 @@ export class DraftDate {
   readonly invalid = input(false);
   /** Latest pickable date (YYYY-MM-DD); later dates and months starting after it are not offered. */
   readonly maxDate = input<string | null>(null);
+  /** Draft must fall in a month after this one ("YYYY-MM" or a full date): earlier months aren't offered. */
+  readonly afterMonth = input<string | null>(null);
+  protected readonly minDate = computed(() => {
+    const after = this.afterMonth()?.slice(0, 7);
+    return after ? `${addMonths(after, 1)}-01` : null;
+  });
 
   protected readonly SPECIFIC_DATE = SPECIFIC_DATE;
   protected readonly formatDate = formatDate;
@@ -93,7 +99,10 @@ export class DraftDate {
   protected readonly monthOptions = computed(() => {
     const current = todayDateInput().slice(0, 7);
     const maxMonth = this.maxDate()?.slice(0, 7);
-    const months = Array.from({ length: MONTHS_AHEAD + 1 }, (_, i) => addMonths(current, i)).filter((m) => !maxMonth || m <= maxMonth);
+    const minMonth = this.minDate()?.slice(0, 7);
+    const months = Array.from({ length: MONTHS_AHEAD + 1 }, (_, i) => addMonths(current, i)).filter(
+      (m) => (!maxMonth || m <= maxMonth) && (!minMonth || m >= minMonth),
+    );
     const saved = this.month();
     if (saved && !months.includes(saved)) months.unshift(saved);
     return months.map((m) => ({ value: m, label: monthLabel(m) }));
@@ -126,6 +135,8 @@ export class DraftDate {
   private nextMonthFor(schedule: DraftSchedule): string {
     const today = todayDateInput();
     const current = today.slice(0, 7);
-    return draftScheduleDate(schedule, current) >= today ? current : addMonths(current, 1);
+    const month = draftScheduleDate(schedule, current) >= today ? current : addMonths(current, 1);
+    const minMonth = this.minDate()?.slice(0, 7);
+    return minMonth && month < minMonth ? minMonth : month;
   }
 }

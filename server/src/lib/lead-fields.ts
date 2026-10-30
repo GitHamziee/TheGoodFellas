@@ -360,5 +360,14 @@ export function sanitizeLeadFields(
     }
   }
 
+  // Retention only: the future draft must fall in a later month than the initial one.
+  const future = data.futureDraftDate;
+  if (limit !== undefined && initial instanceof Date && future instanceof Date) {
+    const monthIndex = (x: Date) => x.getUTCFullYear() * 12 + x.getUTCMonth();
+    if (monthIndex(future) <= monthIndex(initial)) {
+      return { error: 'Future draft date must be in a month after the initial draft date' };
+    }
+  }
+
   return { data: { ...data, ...cleared } as SanitizedLeadFields };
 }

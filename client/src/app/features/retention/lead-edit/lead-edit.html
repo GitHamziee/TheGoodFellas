@@ -288,7 +288,7 @@
           </label>
           <label>
             Future draft date
-            <app-draft-date [invalid]="err('futureDraftDate')" [date]="form.futureDraftDate" [schedule]="form.futureDraftSchedule"
+            <app-draft-date [invalid]="err('futureDraftDate')" [afterMonth]="form.initialDraftDate ?? null" [date]="form.futureDraftDate" [schedule]="form.futureDraftSchedule"
               (dateChange)="form.futureDraftDate = $event ?? undefined; touch()" (scheduleChange)="form.futureDraftSchedule = $event ?? undefined; touch()"></app-draft-date>
           </label>
           <label class="full">

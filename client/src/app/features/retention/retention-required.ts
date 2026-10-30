@@ -75,6 +75,9 @@ export function retentionMissing(f: RetentionSubmitInput, needsLeadId = false): 
     out.push({ key: 'initialDraftDate', label: `Initial draft date (within ${INITIAL_DRAFT_MAX_DAYS} days)` });
   }
   need('futureDraftDate', 'Future draft date');
+  if (f.initialDraftDate && f.futureDraftDate && f.futureDraftDate.slice(0, 7) <= f.initialDraftDate.slice(0, 7)) {
+    out.push({ key: 'futureDraftDate', label: 'Future draft date (a month after the initial draft)' });
+  }
   need('payer', 'Who is paying');
   need('paymentMethod', 'Payment method');
 
