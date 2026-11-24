@@ -37,6 +37,22 @@ export function parseStates(raw: unknown): ParseResult | undefined {
   return { value: states };
 }
 
+export const ACCEPTED_CARDS = ["DIRECT_EXPRESS", "DEBIT_CARD", "CREDIT_CARD"] as const;
+const ACCEPTED_CARD_SET = new Set<string>(ACCEPTED_CARDS);
+
+/** Card types a client accepts — a deduped subset of ACCEPTED_CARDS. `undefined` means the
+ * key was absent from input. */
+export function parseAcceptedCards(raw: unknown): ParseResult | undefined {
+  if (raw === undefined) return undefined;
+  if (!Array.isArray(raw)) return { error: "Accepted cards must be a list" };
+
+  const cards = [...new Set(raw)];
+  for (const c of cards) {
+    if (typeof c !== "string" || !ACCEPTED_CARD_SET.has(c)) return { error: `Invalid card type: ${String(c)}` };
+  }
+  return { value: cards };
+}
+
 /** Carriers are freehand text (no fixed list) — trimmed, deduped case-insensitively,
  * empty entries dropped. `undefined` means the key was absent from input. */
 export function parseCarriers(raw: unknown): ParseResult | undefined {

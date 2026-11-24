@@ -33,6 +33,8 @@ export interface AppUser {
   minimumPremium?: number | null;
   /** Whether this client can take payment via online bank transfer — CLIENT accounts only. */
   acceptsOnlineBankPayment?: boolean;
+  /** Card types this client accepts (DIRECT_EXPRESS / DEBIT_CARD / CREDIT_CARD) — CLIENT accounts only. */
+  acceptedCards?: string[];
   /** Licensed states + carrier roster, CLIENT accounts only — empty array for every other
    * role. Feeds the State Sheet page (state -> clients -> carriers available there). */
   states?: string[];

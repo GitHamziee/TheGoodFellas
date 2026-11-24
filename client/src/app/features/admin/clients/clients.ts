@@ -110,6 +110,21 @@ export class AdminClients implements OnInit, OnDestroy {
    * coverage editor on the detail modal, same as states/carriers below. */
   acceptsOnlineBankPayment = false;
 
+  /** Card types this client accepts — multi-select, independent of online bank above. */
+  readonly cardOptions = [
+    { value: 'DIRECT_EXPRESS', label: 'Direct Express' },
+    { value: 'DEBIT_CARD', label: 'Debit Card' },
+    { value: 'CREDIT_CARD', label: 'Credit Card' },
+  ];
+  acceptedCards: string[] = [];
+
+  toggleCard(value: string, autoSave = false): void {
+    this.acceptedCards = this.acceptedCards.includes(value)
+      ? this.acceptedCards.filter((c) => c !== value)
+      : [...this.acceptedCards, value];
+    if (autoSave) this.queueCoverageAutoSave();
+  }
+
   /** Licensed states. Same create-form / detail-modal split as the pricing fields above. */
   readonly usStates = US_STATES;
   selectedStates: string[] = [];
@@ -206,6 +221,7 @@ export class AdminClients implements OnInit, OnDestroy {
     this.giCost = null;
     this.minimumPremium = null;
     this.acceptsOnlineBankPayment = false;
+    this.acceptedCards = [];
     this.selectedStates = [];
     this.stateCarriers = {};
     this.carrierEditStates = [];
@@ -375,6 +391,7 @@ export class AdminClients implements OnInit, OnDestroy {
         giCost: this.giCost,
         minimumPremium: this.minimumPremium,
         acceptsOnlineBankPayment: this.acceptsOnlineBankPayment,
+        acceptedCards: this.acceptedCards,
         states: this.selectedStates,
         carriers: this.carriers,
         stateCarriers: Object.entries(this.stateCarriers).map(([state, carriers]) => ({ state, carriers })),
@@ -402,6 +419,7 @@ export class AdminClients implements OnInit, OnDestroy {
     this.giCost = user.giCost ?? null;
     this.minimumPremium = user.minimumPremium ?? null;
     this.acceptsOnlineBankPayment = user.acceptsOnlineBankPayment ?? false;
+    this.acceptedCards = user.acceptedCards ?? [];
     this.selectedStates = user.states ?? [];
     this.stateCarriers = Object.fromEntries((user.stateCarriers ?? []).map((sc) => [sc.state, sc.carriers]));
     this.carrierEditStates = [];
@@ -478,6 +496,7 @@ export class AdminClients implements OnInit, OnDestroy {
         states: this.selectedStates,
         carriers: this.carriers,
         acceptsOnlineBankPayment: this.acceptsOnlineBankPayment,
+        acceptedCards: this.acceptedCards,
       });
       this.clients.update((rows) => rows.map((u) => (u.id === user.id ? updated : u)));
       this.selected.set(updated);

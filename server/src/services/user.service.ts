@@ -1,6 +1,6 @@
 import type { PlanType, Role } from "@prisma/client";
 import prisma from "../lib/prisma";
-import { isValidState, parseCarriers, parseStates } from "../lib/client-coverage";
+import { isValidState, parseAcceptedCards, parseCarriers, parseStates } from "../lib/client-coverage";
 import { INVALID_PHONE_MESSAGE, isNonEmptyString, isValidEmail, normalizeUsPhone } from "../lib/validation";
 
 const PUBLIC_SELECT = {
@@ -16,6 +16,7 @@ const PUBLIC_SELECT = {
   giCost: true,
   minimumPremium: true,
   acceptsOnlineBankPayment: true,
+  acceptedCards: true,
   states: true,
   carriers: true,
   stateCarriers: { select: { state: true, carriers: true } },
@@ -232,6 +233,10 @@ export async function updateClientCoverage(
   if (typeof input.acceptsOnlineBankPayment === "boolean") {
     data.acceptsOnlineBankPayment = input.acceptsOnlineBankPayment;
   }
+
+  const cards = parseAcceptedCards(input.acceptedCards);
+  if (cards && "error" in cards) return { error: cards.error, status: 400 };
+  if (cards) data.acceptedCards = cards.value;
 
   await prisma.$transaction(async (tx) => {
     await tx.user.update({ where: { id }, data });

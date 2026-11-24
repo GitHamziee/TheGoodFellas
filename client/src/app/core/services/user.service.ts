@@ -77,6 +77,7 @@ export class UserService {
     giCost?: number | null;
     minimumPremium?: number | null;
     acceptsOnlineBankPayment?: boolean;
+    acceptedCards?: string[];
     states?: string[];
     carriers?: string[];
     stateCarriers?: { state: string; carriers: string[] }[];
@@ -106,7 +107,7 @@ export class UserService {
    * acceptance after creation. */
   async updateCoverage(
     id: string,
-    coverage: { states?: string[]; carriers?: string[]; acceptsOnlineBankPayment?: boolean },
+    coverage: { states?: string[]; carriers?: string[]; acceptsOnlineBankPayment?: boolean; acceptedCards?: string[] },
   ): Promise<AppUser> {
     const res = await firstValueFrom(
       this.http.patch<ApiSuccess<{ user: AppUser }>>(`${BASE}/${id}/coverage`, coverage),

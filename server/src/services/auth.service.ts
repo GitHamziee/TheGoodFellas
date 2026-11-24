@@ -3,7 +3,7 @@ import { Role } from "@prisma/client";
 import prisma from "../lib/prisma";
 import { signToken } from "../lib/jwt";
 import { INVALID_PHONE_MESSAGE, isNonEmptyString, isValidEmail, isValidPassword, normalizeUsPhone } from "../lib/validation";
-import { parseCarriers, parseStates } from "../lib/client-coverage";
+import { parseAcceptedCards, parseCarriers, parseStates } from "../lib/client-coverage";
 import { IP_EXEMPT_ROLES, isIpWhitelisted } from "../lib/ip-whitelist";
 import type { ServiceResult } from "../lib/service-result";
 
@@ -22,6 +22,7 @@ function publicUser(user: {
   giCost?: number | null;
   minimumPremium?: number | null;
   acceptsOnlineBankPayment?: boolean;
+  acceptedCards?: string[];
   states?: string[];
   carriers?: string[];
   stateCarriers?: { state: string; carriers: string[] }[];
@@ -38,6 +39,7 @@ function publicUser(user: {
     giCost: user.giCost ?? null,
     minimumPremium: user.minimumPremium ?? null,
     acceptsOnlineBankPayment: user.acceptsOnlineBankPayment ?? false,
+    acceptedCards: user.acceptedCards ?? [],
     states: user.states ?? [],
     carriers: user.carriers ?? [],
     stateCarriers: (user.stateCarriers ?? []).map((sc) => ({ state: sc.state, carriers: sc.carriers })),
@@ -98,6 +100,7 @@ export async function createStaffUser(input: {
   giCost?: unknown;
   minimumPremium?: unknown;
   acceptsOnlineBankPayment?: unknown;
+  acceptedCards?: unknown;
   states?: unknown;
   carriers?: unknown;
   stateCarriers?: unknown;
@@ -132,6 +135,10 @@ export async function createStaffUser(input: {
     if (typeof input.acceptsOnlineBankPayment === "boolean") {
       coverage.acceptsOnlineBankPayment = input.acceptsOnlineBankPayment;
     }
+
+    const cards = parseAcceptedCards(input.acceptedCards);
+    if (cards && "error" in cards) return { error: cards.error, status: 400 };
+    if (cards) coverage.acceptedCards = cards.value;
 
     const states = parseStates(input.states);
     if (states && "error" in states) return { error: states.error, status: 400 };

@@ -214,6 +214,10 @@ model User {
   // Checkbox at account creation; filterable on the State Sheet.
   acceptsOnlineBankPayment Boolean @default(false)
 
+  // CLIENT accounts only — which card types this client accepts (multi-select): any of
+  // DIRECT_EXPRESS, DEBIT_CARD, CREDIT_CARD. Separate from the online-bank option above.
+  acceptedCards String[] @default([])
+
   // CLIENT accounts only — the states this client is licensed/covers and the carriers
   // they write business through. Feeds the State Sheet page (state -> clients -> carriers
   // available there), viewed by Closer/Team Lead/Admin. Meaningless for other roles, left
