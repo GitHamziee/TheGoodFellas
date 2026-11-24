@@ -110,57 +110,73 @@
                           <div class="breakdown-item">
                             <span class="chip breakdown-item__client"><svg lucideUsers></svg>{{ client.name }}</span>
 
-                            <div class="breakdown-item__body">
-                              @if (client.carriers.length) {
-                                <div class="chip-wrap">
-                                  @for (carrier of client.carriers; track carrier) {
-                                    <span class="chip"><svg lucideBuilding2></svg>{{ carrier }}</span>
+                            <div class="breakdown-item__body spec-list">
+                              <div class="spec-row">
+                                <span class="spec-row__label">Carriers</span>
+                                @if (client.carriers.length) {
+                                  <div class="chip-wrap">
+                                    @for (carrier of client.carriers; track carrier) {
+                                      <span class="chip"><svg lucideBuilding2></svg>{{ carrier }}</span>
+                                    }
+                                  </div>
+                                } @else {
+                                  <span class="empty empty--inline">None assigned to this state</span>
+                                }
+                              </div>
+
+                              <div class="spec-row">
+                                <span class="spec-row__label">Plans</span>
+                                <div class="plan-badges">
+                                  @for (plan of planTypes; track plan.value) {
+                                    <span class="plan-badge" [class.plan-badge--accepted]="client.acceptedPlans.includes(plan.value)">
+                                      @if (client.acceptedPlans.includes(plan.value)) {
+                                        <svg lucideCircleCheck></svg>
+                                      } @else {
+                                        <svg lucideCircleX></svg>
+                                      }
+                                      {{ plan.label }}
+                                    </span>
                                   }
                                 </div>
-                              } @else {
-                                <span class="empty empty--inline">No carriers assigned to this state</span>
+                              </div>
+
+                              <div class="spec-row">
+                                <span class="spec-row__label">Payments</span>
+                                <div class="plan-badges">
+                                  <span class="plan-badge" [class.plan-badge--accepted]="client.acceptsOnlineBankPayment">
+                                    @if (client.acceptsOnlineBankPayment) {
+                                      <svg lucideCircleCheck></svg>
+                                    } @else {
+                                      <svg lucideCircleX></svg>
+                                    }
+                                    Online bank
+                                  </span>
+                                  @for (card of cardOptions; track card.value) {
+                                    <span class="plan-badge" [class.plan-badge--accepted]="client.acceptedCards.includes(card.value)">
+                                      @if (client.acceptedCards.includes(card.value)) {
+                                        <svg lucideCircleCheck></svg>
+                                      } @else {
+                                        <svg lucideCircleX></svg>
+                                      }
+                                      {{ card.label }}
+                                    </span>
+                                  }
+                                </div>
+                              </div>
+
+                              @if (client.minimumPremium != null || client.maxAge != null) {
+                                <div class="spec-row">
+                                  <span class="spec-row__label">Terms</span>
+                                  <div class="chip-wrap">
+                                    @if (client.minimumPremium != null) {
+                                      <span class="chip"><svg lucideBanknote></svg>Min premium {{ formatMoney(client.minimumPremium) }}</span>
+                                    }
+                                    @if (client.maxAge != null) {
+                                      <span class="chip"><svg lucideUsers></svg>Max age {{ client.maxAge }}</span>
+                                    }
+                                  </div>
+                                </div>
                               }
-
-                              <div class="plan-badges">
-                                @for (plan of planTypes; track plan.value) {
-                                  <span
-                                    class="plan-badge"
-                                    [class.plan-badge--accepted]="client.acceptedPlans.includes(plan.value)"
-                                  >
-                                    @if (client.acceptedPlans.includes(plan.value)) {
-                                      <svg lucideCircleCheck></svg>
-                                    } @else {
-                                      <svg lucideCircleX></svg>
-                                    }
-                                    {{ plan.label }}
-                                  </span>
-                                }
-                              </div>
-
-                              <div class="plan-badges">
-                                @for (card of cardOptions; track card.value) {
-                                  <span class="plan-badge" [class.plan-badge--accepted]="client.acceptedCards.includes(card.value)">
-                                    @if (client.acceptedCards.includes(card.value)) {
-                                      <svg lucideCircleCheck></svg>
-                                    } @else {
-                                      <svg lucideCircleX></svg>
-                                    }
-                                    {{ card.label }}
-                                  </span>
-                                }
-                              </div>
-
-                              <div class="chip-wrap">
-                                @if (client.minimumPremium != null) {
-                                  <span class="chip"><svg lucideBanknote></svg>Min premium: {{ formatMoney(client.minimumPremium) }}</span>
-                                }
-                                @if (client.maxAge != null) {
-                                  <span class="chip"><svg lucideUsers></svg>Max age: {{ client.maxAge }}</span>
-                                }
-                                @if (client.acceptsOnlineBankPayment) {
-                                  <span class="chip"><svg lucideBanknote></svg>Accepts online bank</span>
-                                }
-                              </div>
                             </div>
                           </div>
                         }

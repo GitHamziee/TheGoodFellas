@@ -1857,6 +1857,43 @@ tr.expand-row td {
   color: var(--success-700);
 }
 
+/* Labelled rows inside a client's State Sheet breakdown: caption on the left, badges on the right. */
+.spec-list {
+  gap: 0.6rem;
+}
+
+.spec-row {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.spec-row__label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-500);
+}
+
+.spec-row .plan-badge {
+  padding: 0.3rem 0.7rem;
+  font-size: 0.78rem;
+}
+
+.spec-row .plan-badge svg {
+  width: 14px;
+  height: 14px;
+}
+
+@media (max-width: 560px) {
+  .spec-row {
+    grid-template-columns: 1fr;
+    gap: 0.3rem;
+  }
+}
+
 @keyframes expand-row-in {
   from { opacity: 0; }
   to { opacity: 1; }
