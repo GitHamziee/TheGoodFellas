@@ -16,6 +16,7 @@ const SELECT = {
   modifiedCost: true,
   giCost: true,
   minimumPremium: true,
+  maxAge: true,
   acceptsOnlineBankPayment: true,
   states: true,
   carriers: true,
@@ -26,7 +27,7 @@ const SELECT = {
 
 // minimumPremium isn't a plan cost, but shares the same nullable-non-negative-whole-amount
 // validation, so it rides the same parse loop as the four plan costs below.
-const PLAN_COST_KEYS = ['levelCost', 'gradedCost', 'modifiedCost', 'giCost', 'minimumPremium'] as const;
+const PLAN_COST_KEYS = ['levelCost', 'gradedCost', 'modifiedCost', 'giCost', 'minimumPremium', 'maxAge'] as const;
 
 type ExternalClientInput = {
   name?: unknown;
@@ -39,6 +40,7 @@ type ExternalClientInput = {
   modifiedCost?: unknown;
   giCost?: unknown;
   minimumPremium?: unknown;
+  maxAge?: unknown;
   acceptsOnlineBankPayment?: unknown;
   states?: unknown;
   carriers?: unknown;

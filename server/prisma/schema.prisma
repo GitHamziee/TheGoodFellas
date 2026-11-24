@@ -209,6 +209,9 @@ model User {
   // set at creation, editable after like the four costs above. Shown against the client on
   // the State Sheet.
   minimumPremium Int?
+  // Oldest customer age this client will take on a lead — CLIENT accounts only. Shown on the
+  // State Sheet since leads are sold against it.
+  maxAge Int?
 
   // CLIENT accounts only — whether this client can take payment via online bank transfer.
   // Checkbox at account creation; filterable on the State Sheet.
@@ -651,6 +654,7 @@ model ExternalClient {
   // stateCarriers, acceptsOnlineBankPayment) — an external client is priced and licensed
   // the same way a real CLIENT account is, it just has no login.
   minimumPremium           Int?
+  maxAge                   Int?
   acceptsOnlineBankPayment Boolean  @default(false)
   states                   String[] @default([])
   carriers                 String[] @default([])

@@ -73,6 +73,7 @@ export class AdminExternalClients implements OnInit {
   /** Lowest monthly premium (USD) this external client will accept — same split as the four
    * plan costs above. */
   minimumPremium: number | null = null;
+  maxAge: number | null = null;
   /** Whether this external client can take payment via online bank transfer. */
   acceptsOnlineBankPayment = false;
 
@@ -129,6 +130,7 @@ export class AdminExternalClients implements OnInit {
 
   private resetCoverageDraft(): void {
     this.minimumPremium = null;
+    this.maxAge = null;
     this.acceptsOnlineBankPayment = false;
     this.selectedStates = [];
     this.stateCarriers = {};
@@ -243,6 +245,7 @@ export class AdminExternalClients implements OnInit {
         modifiedCost: this.modifiedCost,
         giCost: this.giCost,
         minimumPremium: this.minimumPremium,
+        maxAge: this.maxAge,
         acceptsOnlineBankPayment: this.acceptsOnlineBankPayment,
         states: this.selectedStates,
         carriers: this.carriers,
@@ -272,6 +275,7 @@ export class AdminExternalClients implements OnInit {
     this.modifiedCost = client.modifiedCost ?? null;
     this.giCost = client.giCost ?? null;
     this.minimumPremium = client.minimumPremium ?? null;
+    this.maxAge = client.maxAge ?? null;
     this.acceptsOnlineBankPayment = client.acceptsOnlineBankPayment ?? false;
     this.selectedStates = client.states ?? [];
     this.stateCarriers = Object.fromEntries((client.stateCarriers ?? []).map((sc) => [sc.state, sc.carriers]));
@@ -303,6 +307,7 @@ export class AdminExternalClients implements OnInit {
         modifiedCost: this.modifiedCost,
         giCost: this.giCost,
         minimumPremium: this.minimumPremium,
+        maxAge: this.maxAge,
         acceptsOnlineBankPayment: this.acceptsOnlineBankPayment,
         states: this.selectedStates,
         carriers: this.carriers,

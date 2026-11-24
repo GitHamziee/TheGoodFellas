@@ -21,6 +21,7 @@ function publicUser(user: {
   modifiedCost?: number | null;
   giCost?: number | null;
   minimumPremium?: number | null;
+  maxAge?: number | null;
   acceptsOnlineBankPayment?: boolean;
   acceptedCards?: string[];
   states?: string[];
@@ -38,6 +39,7 @@ function publicUser(user: {
     modifiedCost: user.modifiedCost ?? null,
     giCost: user.giCost ?? null,
     minimumPremium: user.minimumPremium ?? null,
+    maxAge: user.maxAge ?? null,
     acceptsOnlineBankPayment: user.acceptsOnlineBankPayment ?? false,
     acceptedCards: user.acceptedCards ?? [],
     states: user.states ?? [],
@@ -74,7 +76,7 @@ export async function login(email: unknown, password: unknown, ip: string): Prom
 const STAFF_ROLES = Object.values(Role) as Role[];
 // minimumPremium isn't a plan cost, but shares the same nullable-non-negative-whole-dollar
 // validation, so it rides the same parse loop as the four plan costs below.
-const PLAN_COST_KEYS = ["levelCost", "gradedCost", "modifiedCost", "giCost", "minimumPremium"] as const;
+const PLAN_COST_KEYS = ["levelCost", "gradedCost", "modifiedCost", "giCost", "minimumPremium", "maxAge"] as const;
 
 /** A whole-dollar amount, or null/undefined to leave it unset. Rejects negative or non-numeric input. */
 function parsePlanCost(raw: unknown): number | null | undefined {
@@ -99,6 +101,7 @@ export async function createStaffUser(input: {
   modifiedCost?: unknown;
   giCost?: unknown;
   minimumPremium?: unknown;
+  maxAge?: unknown;
   acceptsOnlineBankPayment?: unknown;
   acceptedCards?: unknown;
   states?: unknown;

@@ -15,6 +15,7 @@ const PUBLIC_SELECT = {
   modifiedCost: true,
   giCost: true,
   minimumPremium: true,
+  maxAge: true,
   acceptsOnlineBankPayment: true,
   acceptedCards: true,
   states: true,
@@ -23,7 +24,7 @@ const PUBLIC_SELECT = {
 } as const;
 // minimumPremium isn't a plan cost, but shares the same nullable-non-negative-whole-dollar
 // validation, so it rides the same parse/update path as the four plan costs below.
-const PLAN_COST_KEYS = ["levelCost", "gradedCost", "modifiedCost", "giCost", "minimumPremium"] as const;
+const PLAN_COST_KEYS = ["levelCost", "gradedCost", "modifiedCost", "giCost", "minimumPremium", "maxAge"] as const;
 
 const PLAN_COST_TO_TYPE: Record<"levelCost" | "gradedCost" | "modifiedCost" | "giCost", PlanType> = {
   levelCost: "LEVEL",
@@ -99,6 +100,7 @@ export async function listClientCoverage() {
       modifiedCost: true,
       giCost: true,
       minimumPremium: true,
+      maxAge: true,
       acceptsOnlineBankPayment: true,
     },
     orderBy: { name: "asc" },
@@ -112,6 +114,7 @@ export async function listClientCoverage() {
     stateCarriers: c.stateCarriers,
     acceptedPlans: acceptedPlansFor(c),
     minimumPremium: c.minimumPremium,
+    maxAge: c.maxAge,
     acceptsOnlineBankPayment: c.acceptsOnlineBankPayment,
   }));
 }

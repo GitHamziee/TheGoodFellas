@@ -22,6 +22,7 @@ interface ClientBreakdown {
   carriers: string[];
   acceptedPlans: PlanType[];
   minimumPremium: number | null;
+  maxAge: number | null;
   acceptsOnlineBankPayment: boolean;
 }
 
@@ -92,6 +93,7 @@ export class StateSheet implements OnInit {
         carriers: [...(c.stateCarriers.find((sc) => sc.state === state)?.carriers ?? [])].sort(),
         acceptedPlans: c.acceptedPlans,
         minimumPremium: c.minimumPremium,
+        maxAge: c.maxAge,
         acceptsOnlineBankPayment: c.acceptsOnlineBankPayment,
       }));
       return {

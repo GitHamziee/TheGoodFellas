@@ -105,6 +105,7 @@ export class AdminClients implements OnInit, OnDestroy {
   giCost: number | null = null;
   /** Lowest monthly premium (USD) this client will accept — same pricing-editor split. */
   minimumPremium: number | null = null;
+  maxAge: number | null = null;
 
   /** Whether this client can take payment via online bank transfer. Auto-saves through the
    * coverage editor on the detail modal, same as states/carriers below. */
@@ -220,6 +221,7 @@ export class AdminClients implements OnInit, OnDestroy {
     this.modifiedCost = null;
     this.giCost = null;
     this.minimumPremium = null;
+    this.maxAge = null;
     this.acceptsOnlineBankPayment = false;
     this.acceptedCards = [];
     this.selectedStates = [];
@@ -390,6 +392,7 @@ export class AdminClients implements OnInit, OnDestroy {
         modifiedCost: this.modifiedCost,
         giCost: this.giCost,
         minimumPremium: this.minimumPremium,
+        maxAge: this.maxAge,
         acceptsOnlineBankPayment: this.acceptsOnlineBankPayment,
         acceptedCards: this.acceptedCards,
         states: this.selectedStates,
@@ -418,6 +421,7 @@ export class AdminClients implements OnInit, OnDestroy {
     this.modifiedCost = user.modifiedCost ?? null;
     this.giCost = user.giCost ?? null;
     this.minimumPremium = user.minimumPremium ?? null;
+    this.maxAge = user.maxAge ?? null;
     this.acceptsOnlineBankPayment = user.acceptsOnlineBankPayment ?? false;
     this.acceptedCards = user.acceptedCards ?? [];
     this.selectedStates = user.states ?? [];
@@ -471,6 +475,7 @@ export class AdminClients implements OnInit, OnDestroy {
         modifiedCost: this.modifiedCost,
         giCost: this.giCost,
         minimumPremium: this.minimumPremium,
+        maxAge: this.maxAge,
       });
       this.clients.update((rows) => rows.map((u) => (u.id === user.id ? updated : u)));
       this.selected.set(updated);

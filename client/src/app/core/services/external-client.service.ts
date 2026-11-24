@@ -18,6 +18,7 @@ export type ExternalClientInput = {
   modifiedCost?: number | null;
   giCost?: number | null;
   minimumPremium?: number | null;
+  maxAge?: number | null;
   acceptsOnlineBankPayment?: boolean;
   states?: string[];
   carriers?: string[];

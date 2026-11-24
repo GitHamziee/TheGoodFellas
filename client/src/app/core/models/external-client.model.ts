@@ -13,6 +13,7 @@ export interface ExternalClient {
   giCost?: number | null;
   /** Same coverage fields as a CLIENT-role AppUser — see user.model.ts. */
   minimumPremium?: number | null;
+  maxAge?: number | null;
   acceptsOnlineBankPayment?: boolean;
   states?: string[];
   carriers?: string[];

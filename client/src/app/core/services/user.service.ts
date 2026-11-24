@@ -76,6 +76,7 @@ export class UserService {
     modifiedCost?: number | null;
     giCost?: number | null;
     minimumPremium?: number | null;
+    maxAge?: number | null;
     acceptsOnlineBankPayment?: boolean;
     acceptedCards?: string[];
     states?: string[];
@@ -95,6 +96,7 @@ export class UserService {
       modifiedCost?: number | null;
       giCost?: number | null;
       minimumPremium?: number | null;
+    maxAge?: number | null;
     },
   ): Promise<AppUser> {
     const res = await firstValueFrom(

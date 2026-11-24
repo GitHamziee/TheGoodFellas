@@ -31,6 +31,8 @@ export interface AppUser {
   giCost?: number | null;
   /** Lowest monthly premium (USD) this client will accept — CLIENT accounts only. */
   minimumPremium?: number | null;
+  /** Oldest customer age this client accepts — CLIENT accounts only. */
+  maxAge?: number | null;
   /** Whether this client can take payment via online bank transfer — CLIENT accounts only. */
   acceptsOnlineBankPayment?: boolean;
   /** Card types this client accepts (DIRECT_EXPRESS / DEBIT_CARD / CREDIT_CARD) — CLIENT accounts only. */
@@ -54,5 +56,6 @@ export interface ClientCoverage {
   /** Derived from the per-plan cost fields being non-null — see PLAN_TYPE_LABEL. */
   acceptedPlans: PlanType[];
   minimumPremium: number | null;
+  maxAge: number | null;
   acceptsOnlineBankPayment: boolean;
 }

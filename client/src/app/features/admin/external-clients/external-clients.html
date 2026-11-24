@@ -144,6 +144,10 @@
           Minimum premium
           <input type="number" min="0" [(ngModel)]="minimumPremium" name="minimumPremium" placeholder="0" />
         </label>
+        <label>
+          Max age
+          <input type="number" min="0" max="120" [(ngModel)]="maxAge" name="maxAge" placeholder="0" />
+        </label>
       </div>
       <label class="checkbox-row">
         <input type="checkbox" [(ngModel)]="acceptsOnlineBankPayment" name="acceptsOnlineBankPayment" />
@@ -345,6 +349,10 @@
           <label>
             Minimum premium
             <input type="number" min="0" [(ngModel)]="minimumPremium" name="detailMinimumPremium" placeholder="0" />
+          </label>
+          <label>
+            Max age
+            <input type="number" min="0" max="120" [(ngModel)]="maxAge" name="detailMaxAge" placeholder="0" />
           </label>
         </div>
         <label class="checkbox-row">

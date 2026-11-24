@@ -141,6 +141,9 @@
                                 @if (client.minimumPremium != null) {
                                   <span class="chip"><svg lucideBanknote></svg>Min premium: {{ formatMoney(client.minimumPremium) }}</span>
                                 }
+                                @if (client.maxAge != null) {
+                                  <span class="chip"><svg lucideUsers></svg>Max age: {{ client.maxAge }}</span>
+                                }
                                 @if (client.acceptsOnlineBankPayment) {
                                   <span class="chip"><svg lucideBanknote></svg>Accepts online bank</span>
                                 }
