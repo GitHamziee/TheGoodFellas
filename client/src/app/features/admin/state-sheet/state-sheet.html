@@ -137,6 +137,19 @@
                                 }
                               </div>
 
+                              <div class="plan-badges">
+                                @for (card of cardOptions; track card.value) {
+                                  <span class="plan-badge" [class.plan-badge--accepted]="client.acceptedCards.includes(card.value)">
+                                    @if (client.acceptedCards.includes(card.value)) {
+                                      <svg lucideCircleCheck></svg>
+                                    } @else {
+                                      <svg lucideCircleX></svg>
+                                    }
+                                    {{ card.label }}
+                                  </span>
+                                }
+                              </div>
+
                               <div class="chip-wrap">
                                 @if (client.minimumPremium != null) {
                                   <span class="chip"><svg lucideBanknote></svg>Min premium: {{ formatMoney(client.minimumPremium) }}</span>
@@ -146,9 +159,6 @@
                                 }
                                 @if (client.acceptsOnlineBankPayment) {
                                   <span class="chip"><svg lucideBanknote></svg>Accepts online bank</span>
-                                }
-                                @for (card of client.acceptedCards; track card) {
-                                  <span class="chip"><svg lucideCreditCard></svg>{{ cardLabels[card] ?? card }}</span>
                                 }
                               </div>
                             </div>
