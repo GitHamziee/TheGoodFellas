@@ -147,6 +147,9 @@
                                 @if (client.acceptsOnlineBankPayment) {
                                   <span class="chip"><svg lucideBanknote></svg>Accepts online bank</span>
                                 }
+                                @for (card of client.acceptedCards; track card) {
+                                  <span class="chip"><svg lucideCreditCard></svg>{{ cardLabels[card] ?? card }}</span>
+                                }
                               </div>
                             </div>
                           </div>

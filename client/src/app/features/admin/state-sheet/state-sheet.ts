@@ -1,6 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import {
   LucideBanknote,
+  LucideCreditCard,
   LucideBuilding2,
   LucideChevronDown,
   LucideCircleCheck,
@@ -24,6 +25,7 @@ interface ClientBreakdown {
   minimumPremium: number | null;
   maxAge: number | null;
   acceptsOnlineBankPayment: boolean;
+  acceptedCards: string[];
 }
 
 interface StateRow {
@@ -57,6 +59,7 @@ interface StateRow {
     LucideUsers,
     LucideChevronDown,
     LucideBanknote,
+    LucideCreditCard,
     LucideCircleCheck,
     LucideCircleX,
   ],
@@ -79,6 +82,11 @@ export class StateSheet implements OnInit {
 
   readonly planTypes = PLAN_TYPE_OPTIONS;
   readonly formatMoney = formatMoney;
+  readonly cardLabels: Record<string, string> = {
+    DIRECT_EXPRESS: 'Direct Express',
+    DEBIT_CARD: 'Debit Card',
+    CREDIT_CARD: 'Credit Card',
+  };
 
   /** One row per US state, regardless of coverage — this is a reference sheet, so a gap
    * (no client covering a state) is as useful to see as a match. */
@@ -95,6 +103,7 @@ export class StateSheet implements OnInit {
         minimumPremium: c.minimumPremium,
         maxAge: c.maxAge,
         acceptsOnlineBankPayment: c.acceptsOnlineBankPayment,
+        acceptedCards: c.acceptedCards ?? [],
       }));
       return {
         state,

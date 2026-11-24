@@ -102,6 +102,7 @@ export async function listClientCoverage() {
       minimumPremium: true,
       maxAge: true,
       acceptsOnlineBankPayment: true,
+      acceptedCards: true,
     },
     orderBy: { name: "asc" },
   });
@@ -116,6 +117,7 @@ export async function listClientCoverage() {
     minimumPremium: c.minimumPremium,
     maxAge: c.maxAge,
     acceptsOnlineBankPayment: c.acceptsOnlineBankPayment,
+    acceptedCards: c.acceptedCards,
   }));
 }
 

@@ -58,4 +58,5 @@ export interface ClientCoverage {
   minimumPremium: number | null;
   maxAge: number | null;
   acceptsOnlineBankPayment: boolean;
+  acceptedCards: string[];
 }

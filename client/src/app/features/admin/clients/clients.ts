@@ -2,6 +2,7 @@ import { Component, OnInit, computed, inject, signal, OnDestroy } from '@angular
 import { FormsModule } from '@angular/forms';
 import {
   LucideBanknote,
+  LucideCreditCard,
   LucideBriefcase,
   LucideBuilding2,
   LucideCircleCheck,
@@ -54,6 +55,7 @@ const ROLE_TONE: Record<Role, string> = {
     LucideBriefcase,
     LucideUserPlus,
     LucideBanknote,
+    LucideCreditCard,
     LucideMapPin,
     LucideSave,
     LucideCircleCheck,
