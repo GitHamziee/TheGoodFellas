@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import { Component, OnInit, computed, inject, signal, OnDestroy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
@@ -7,7 +8,6 @@ import {
   LucideBuilding2,
   LucideCircleCheck,
   LucideKeyRound,
-  LucideMapPin,
   LucideSave,
   LucideUserPlus,
   LucideX,
@@ -20,10 +20,12 @@ import { US_STATES } from '../../../core/us-states';
 import { createListView } from '../../../core/list-view';
 import { getAvatarTone, getInitials } from '../../../core/format-utils';
 import { Modal } from '../../../shared/ui/modal';
+import { Select, SelectOption } from '../../../shared/ui/select';
 import { PageHero, EmptyState, Pagination, SearchBox, SkeletonRows, StatTile } from '../../../shared/ui/ui';
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
-import { PhoneInput } from '../../../shared/ui/phone-input';
 import { apiErrorMessage } from '../../../core/api';
+import { PLAN_TYPE_OPTIONS } from '../../../core/lead-options';
+import { PlanType } from '../../../core/models/lead.model';
 import { toastNotice } from '../../../core/toast-notice';
 
 const ROLE_TONE: Record<Role, string> = {
@@ -44,7 +46,7 @@ const ROLE_TONE: Record<Role, string> = {
  * (Junior Closer/Closer/Admin/Team Lead) live on the separate Team page instead. */
 @Component({
   selector: 'app-admin-clients',
-  imports: [PageHero, PhoneInput, 
+  imports: [PageHero, Select, NgTemplateOutlet, 
     FormsModule,
     Modal,
     StatTile,
@@ -56,7 +58,6 @@ const ROLE_TONE: Record<Role, string> = {
     LucideUserPlus,
     LucideBanknote,
     LucideCreditCard,
-    LucideMapPin,
     LucideSave,
     LucideCircleCheck,
     LucideKeyRound,
@@ -97,7 +98,6 @@ export class AdminClients implements OnInit, OnDestroy {
   name = '';
   email = '';
   password = '';
-  phone = '';
   newPassword = '';
 
   /** Per-plan lead cost (USD), on both the create form and the detail modal's pricing editor. */
@@ -121,6 +121,11 @@ export class AdminClients implements OnInit, OnDestroy {
   ];
   acceptedCards: string[] = [];
 
+  toggleOnlineBank(): void {
+    this.acceptsOnlineBankPayment = !this.acceptsOnlineBankPayment;
+    this.queueCoverageAutoSave();
+  }
+
   toggleCard(value: string, autoSave = false): void {
     this.acceptedCards = this.acceptedCards.includes(value)
       ? this.acceptedCards.filter((c) => c !== value)
@@ -132,24 +137,36 @@ export class AdminClients implements OnInit, OnDestroy {
   readonly usStates = US_STATES;
   selectedStates: string[] = [];
 
-  /** Which carriers this client writes business through in each selected state — e.g.
-   * Sunrise writes NRG in Alaska but MPG in Alabama. Keyed by state; each state's list is
-   * independent freehand text, entered only for whichever state(s) are currently checked
-   * (`carrierEditStates`) — carriers typed for one state never leak into another unless
-   * multiple states are checked at once. On the detail modal, edits auto-save per state via
-   * a small debounce (see addStateCarrierValue/removeStateCarrier). */
-  stateCarriers: Record<string, string[]> = {};
-  /** Which licensed state(s) the "Carrier availability by state" editor is currently
-   * showing/targeting — checked states share whatever carrier gets typed next, so one
-   * carrier (e.g. a carrier newly licensed region-wide) can be added to several states in
-   * one go instead of repeating the same entry per state. The existing-carriers tag list
-   * only renders when exactly one state is checked, since with more than one selected their
-   * carrier sets aren't necessarily the same and showing one would be misleading. */
-  carrierEditStates: string[] = [];
-  carrierEditStateInput = '';
-  /** States with unsaved carrier changes, flushed together on the debounce timer. */
-  private dirtyStateCarriers = new Set<string>();
-  private stateCarrierSaveTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Each licensed state has its own carriers, and each carrier in a state has its own plans —
+   * keyed `state|carrier`. A key present means the carrier is available in that state (its
+   * plan list may still be empty). The server derives the per-state carrier lists from this. */
+  cellPlans: Record<string, PlanType[]> = {};
+  /** True once the carriers/plans grid has been edited in the open detail modal. Only then does
+   * auto-save send `statePlans`, so toggling a payment option never rewrites plan data. */
+  private plansDirty = false;
+
+  readonly planOptions = PLAN_TYPE_OPTIONS;
+  private readonly baseCarrierCatalog = [
+    'TransAmerica', 'Aetna', 'AHL', 'UHL', 'CICA', 'AIG', 'RNA', 'Combined',
+    'Securico', 'MOO', 'Ethos', 'InstaBrain', 'Gerber', 'GTL', 'AMAM',
+  ];
+  /** Carriers typed in for one client become pickable on the next. */
+  private readonly extraCarriers = signal<string[]>([]);
+  /** Which state card ("__bulk__" = the multi-state bar) has its "new carrier" name box open. */
+  creatingCarrierFor: string | null = null;
+  newCarrierName = '';
+  /** Always null at rest so the dropdowns show their placeholder; set briefly on pick. */
+  readonly carrierPicker = signal<string | null>(null);
+  readonly statePicker = signal<string | null>(null);
+  /** States ticked for adding one carrier to several at once. */
+  checkedStates: string[] = [];
+  /** The state whose carriers are open in the right-hand pane. */
+  activeState: string | null = null;
+
+  /** `activeState` if it's still licensed, otherwise the first licensed state. */
+  get currentState(): string | null {
+    return this.activeState && this.selectedStates.includes(this.activeState) ? this.activeState : (this.sortedSelectedStates[0] ?? null);
+  }
 
   readonly currentUserId = computed(() => this.auth.user()?.id ?? null);
 
@@ -217,7 +234,6 @@ export class AdminClients implements OnInit, OnDestroy {
     this.name = '';
     this.email = '';
     this.password = '';
-    this.phone = '';
     this.levelCost = null;
     this.gradedCost = null;
     this.modifiedCost = null;
@@ -227,12 +243,11 @@ export class AdminClients implements OnInit, OnDestroy {
     this.acceptsOnlineBankPayment = false;
     this.acceptedCards = [];
     this.selectedStates = [];
-    this.stateCarriers = {};
-    this.carrierEditStates = [];
-    this.carrierEditStateInput = '';
-    this.dirtyStateCarriers.clear();
-    if (this.stateCarrierSaveTimer) clearTimeout(this.stateCarrierSaveTimer);
-    this.stateCarrierSaveTimer = null;
+    this.cellPlans = {};
+    this.checkedStates = [];
+    this.activeState = null;
+    this.creatingCarrierFor = null;
+    this.newCarrierName = '';
     this.showCreate.set(true);
   }
 
@@ -244,134 +259,178 @@ export class AdminClients implements OnInit, OnDestroy {
     const adding = !this.selectedStates.includes(state);
     this.selectedStates = adding ? [...this.selectedStates, state] : this.selectedStates.filter((s) => s !== state);
     if (!adding) {
-      const { [state]: _removed, ...rest } = this.stateCarriers;
-      this.stateCarriers = rest;
-      this.carrierEditStates = this.carrierEditStates.filter((s) => s !== state);
+      this.cellPlans = Object.fromEntries(Object.entries(this.cellPlans).filter(([key]) => !key.startsWith(`${state}|`)));
+      this.checkedStates = this.checkedStates.filter((s) => s !== state);
     }
-    this.queueCoverageAutoSave();
+    this.queuePlansAutoSave();
   }
 
-  /** The client's overall carrier roster — derived, not typed directly: the union of
-   * whatever carriers are entered across all its licensed states. Sent to the server so
-   * `User.carriers` stays in sync, but there is no standalone "type a carrier" field for it
-   * any more — that used to be a second, disconnected place to enter the same kind of data
-   * and was a source of confusion. */
+  /** The client's overall carrier roster — every carrier used in any state, sent so
+   * `User.carriers` stays in sync. */
   get carriers(): string[] {
-    return [...new Set(Object.values(this.stateCarriers).flat())].sort((a, b) => a.localeCompare(b));
+    return [...new Set(Object.keys(this.cellPlans).map((k) => k.slice(k.indexOf('|') + 1)))].sort((x, y) => x.localeCompare(y));
   }
 
-  /** Licensed states in display order (alphabetical, matching `usStates`) — used by the
-   * "Carriers by state" browse list so row order doesn't jump around as states are added. */
+  /** Every carrier in every state with its plans — what the server stores. */
+  get statePlans(): { state: string; carrier: string; plans: PlanType[] }[] {
+    return this.sortedSelectedStates.flatMap((state) =>
+      this.carriersFor(state).map((c) => ({ state, carrier: c.name, plans: c.plans })),
+    );
+  }
+
+  /** Licensed states in display order (alphabetical, matching `usStates`). */
   get sortedSelectedStates(): string[] {
     return this.usStates.filter((s) => this.selectedStates.includes(s));
   }
 
-  /** Checks/unchecks a state in the "Carriers by state" panel — pure navigation, never a
-   * data change. Multiple states can be checked at once so a carrier typed next gets added
-   * to all of them in one go, instead of repeating the same entry per state. */
-  toggleCarrierEditState(state: string): void {
-    this.carrierEditStates = this.carrierEditStates.includes(state)
-      ? this.carrierEditStates.filter((s) => s !== state)
-      : [...this.carrierEditStates, state];
-    this.carrierEditStateInput = '';
+  /** The carriers available in one state, each with the plans taken through it there. */
+  carriersFor(state: string): { name: string; plans: PlanType[] }[] {
+    const prefix = `${state}|`;
+    return Object.entries(this.cellPlans)
+      .filter(([key]) => key.startsWith(prefix))
+      .map(([key, plans]) => ({ name: key.slice(prefix.length), plans }))
+      .sort((x, y) => x.name.localeCompare(y.name));
   }
 
-  /** Human label for a state's carrier count, e.g. "2 carriers" / "No carriers" — used by
-   * the browse list on the left of the "Carriers by state" panel. */
-  carrierCountLabel(state: string): string {
-    const count = (this.stateCarriers[state] ?? []).length;
-    if (count === 0) return 'No carriers';
-    return count === 1 ? '1 carrier' : `${count} carriers`;
-  }
-
-  /** Carriers for the currently checked state(s) (`carrierEditStates`) — has no fixed list,
-   * typed manually the same way the general roster above does. */
-  addStateCarrier(): void {
-    this.addStateCarrierValue(this.carrierEditStateInput);
-    this.carrierEditStateInput = '';
-  }
-
-  /** Adds one carrier to every checked state, skipping states that already have it (a
-   * case-insensitive match) rather than erroring — the common case is broadening a carrier
-   * to a few more states, not renaming one that's already there. */
-  private addStateCarrierValue(raw: string): void {
-    const states = this.carrierEditStates;
-    if (!states.length) return;
-    const value = raw.trim();
-    if (!value) return;
-    const next = { ...this.stateCarriers };
-    let changed = false;
-    for (const state of states) {
-      const current = next[state] ?? [];
-      if (current.some((c) => c.toLowerCase() === value.toLowerCase())) continue;
-      next[state] = [...current, value];
-      this.dirtyStateCarriers.add(state);
-      changed = true;
+  /** Dropdown source for one state (or, with `null`, the multi-state bar): the preset list plus
+   * carriers already used on any client, minus what's already in that state. */
+  carrierOptionsFor(state: string | null): SelectOption[] {
+    const taken = new Set(state ? this.carriersFor(state).map((c) => c.name.toLowerCase()) : []);
+    const catalog = new Map<string, string>();
+    for (const n of [...this.baseCarrierCatalog, ...this.extraCarriers(), ...this.clients().flatMap((u) => u.carriers ?? []), ...this.carriers]) {
+      if (!catalog.has(n.toLowerCase())) catalog.set(n.toLowerCase(), n);
     }
-    if (!changed) return;
-    this.stateCarriers = next;
-    this.scheduleStateCarrierAutoSave();
+    return [
+      ...[...catalog.values()].filter((n) => !taken.has(n.toLowerCase())).sort((x, y) => x.localeCompare(y)).map((n) => ({ value: n, label: n })),
+      { value: '__new__', label: '+ New carrier…' },
+    ];
   }
 
-  /** Same comma-splitting UX as the general roster's onCarrierInputChange. */
-  onCarrierEditStateInputChange(value: string): void {
-    if (!value.includes(',')) {
-      this.carrierEditStateInput = value;
+  get stateAddOptions(): SelectOption[] {
+    return this.usStates.filter((s) => !this.selectedStates.includes(s)).map((s) => ({ value: s, label: s }));
+  }
+
+  pickState(state: string): void {
+    this.statePicker.set(state);
+    if (state && !this.selectedStates.includes(state)) {
+      this.toggleState(state);
+      this.activeState = state;
+    }
+    setTimeout(() => this.statePicker.set(null));
+  }
+
+  toggleCheckedState(state: string): void {
+    this.checkedStates = this.checkedStates.includes(state)
+      ? this.checkedStates.filter((s) => s !== state)
+      : [...this.checkedStates, state];
+  }
+
+  /** Picks a carrier for one state, or for every ticked state when `state` is null. */
+  pickCarrier(state: string | null, name: string): void {
+    this.carrierPicker.set(name);
+    setTimeout(() => this.carrierPicker.set(null));
+    if (name === '__new__') {
+      this.creatingCarrierFor = state ?? '__bulk__';
+      this.newCarrierName = '';
       return;
     }
-    const segments = value.split(',');
-    this.carrierEditStateInput = segments.pop() ?? '';
-    for (const segment of segments) this.addStateCarrierValue(segment);
+    this.addCarrier(state ? [state] : this.checkedStates, name);
   }
 
-  /** Only available when exactly one state is checked — see the `carrierEditStates` doc for
-   * why the tag list (and so its remove button) doesn't render otherwise. */
-  removeStateCarrier(carrier: string): void {
-    if (this.carrierEditStates.length !== 1) return;
-    const state = this.carrierEditStates[0];
-    this.stateCarriers = { ...this.stateCarriers, [state]: (this.stateCarriers[state] ?? []).filter((c) => c !== carrier) };
-    this.dirtyStateCarriers.add(state);
-    this.scheduleStateCarrierAutoSave();
+  createCarrier(state: string | null): void {
+    const name = this.newCarrierName.trim();
+    if (!name) return;
+    this.extraCarriers.update((list) => [...list, name]);
+    this.addCarrier(state ? [state] : this.checkedStates, name);
+    this.newCarrierName = '';
+    this.creatingCarrierFor = null;
   }
 
-  /** Debounced auto-save for whatever states are in `dirtyStateCarriers` — only while an
-   * existing account is open (`selected()`); the create form saves everything together on
-   * submit. One shared debounce rather than one per state, so adding a carrier to several
-   * checked states at once flushes them together instead of firing a request per state. */
-  private scheduleStateCarrierAutoSave(): void {
-    if (!this.selected()) return;
-    this.coverageStatus.set('idle');
-    if (this.stateCarrierSaveTimer) clearTimeout(this.stateCarrierSaveTimer);
-    this.stateCarrierSaveTimer = setTimeout(() => this.flushStateCarrierSaves(), 700);
-  }
-
-  private async flushStateCarrierSaves(): Promise<void> {
-    const user = this.selected();
-    if (!user || this.dirtyStateCarriers.size === 0) return;
-
-    const states = [...this.dirtyStateCarriers];
-    this.dirtyStateCarriers.clear();
-    this.coverageStatus.set('saving');
-    try {
-      let updated = user;
-      for (const state of states) {
-        updated = await this.userService.updateStateCarriers(user.id, state, this.stateCarriers[state] ?? []);
-      }
-      this.clients.update((rows) => rows.map((u) => (u.id === user.id ? updated : u)));
-      this.selected.set(updated);
-      this.coverageStatus.set('saved');
-      setTimeout(() => {
-        if (this.coverageStatus() === 'saved') this.coverageStatus.set('idle');
-      }, 2500);
-    } catch (err) {
-      this.error.set(apiErrorMessage(err, 'Could not update carrier availability.'));
-      this.coverageStatus.set('idle');
+  private addCarrier(states: string[], name: string): void {
+    if (!name || !states.length) return;
+    const next = { ...this.cellPlans };
+    for (const state of states) {
+      const existing = Object.keys(next).find((k) => k.toLowerCase() === `${state}|${name}`.toLowerCase());
+      if (!existing) next[`${state}|${name}`] = [];
     }
+    this.cellPlans = next;
+    this.queuePlansAutoSave();
+  }
+
+  /** Removes one carrier from one state only. */
+  removeCarrier(state: string, name: string): void {
+    const { [`${state}|${name}`]: _removed, ...rest } = this.cellPlans;
+    this.cellPlans = rest;
+    this.queuePlansAutoSave();
+  }
+
+  plansIn(state: string, carrier: string): PlanType[] {
+    return this.cellPlans[`${state}|${carrier}`] ?? [];
+  }
+
+  private get allPlans(): PlanType[] {
+    return this.planOptions.map((o) => o.value);
+  }
+
+  private setPlans(entries: { state: string; carrier: string }[], plans: PlanType[]): void {
+    const next = { ...this.cellPlans };
+    for (const { state, carrier } of entries) next[`${state}|${carrier}`] = plans;
+    this.cellPlans = next;
+    this.queuePlansAutoSave();
+  }
+
+  /** One plan chip on one carrier in one state. */
+  togglePlan(state: string, carrier: string, plan: PlanType): void {
+    const current = this.plansIn(state, carrier);
+    this.setPlans([{ state, carrier }], current.includes(plan) ? current.filter((p) => p !== plan) : [...current, plan]);
+  }
+
+  hasAllPlans(state: string, carrier: string): boolean {
+    return this.plansIn(state, carrier).length === this.allPlans.length;
+  }
+
+  /** "All" on a carrier: every plan, or none if it already has them all. */
+  toggleCarrierAllPlans(state: string, carrier: string): void {
+    this.setPlans([{ state, carrier }], this.hasAllPlans(state, carrier) ? [] : this.allPlans);
+  }
+
+  stateFull(state: string): boolean {
+    const list = this.carriersFor(state);
+    return list.length > 0 && list.every((c) => c.plans.length === this.allPlans.length);
+  }
+
+  /** "All plans" on a state: every plan on every carrier in it, or none if already full. */
+  toggleStateAllPlans(state: string): void {
+    const entries = this.carriersFor(state).map((c) => ({ state, carrier: c.name }));
+    this.setPlans(entries, this.stateFull(state) ? [] : this.allPlans);
+  }
+
+  /** Copies this state's carriers and plans onto every other licensed state. */
+  copyStateToAll(source: string): void {
+    const list = this.carriersFor(source);
+    const next = Object.fromEntries(Object.entries(this.cellPlans).filter(([key]) => key.startsWith(`${source}|`)));
+    for (const state of this.selectedStates) {
+      if (state === source) continue;
+      for (const c of list) next[`${state}|${c.name}`] = [...c.plans];
+    }
+    // Other states keep any carrier they already had that the source doesn't list.
+    this.cellPlans = { ...this.cellPlans, ...next };
+    this.queuePlansAutoSave();
+  }
+
+  /** Short label for a plan chip. */
+  planShort(plan: PlanType): string {
+    return { LEVEL: 'Level', GRADED: 'Graded', MODIFIED: 'Mod', GI: 'GI' }[plan];
   }
 
   /** Debounced auto-save for the detail modal's coverage editor — only while an existing
    * account is open (`selected()`); the create form saves everything together on submit.
    * Not private: also bound directly from the template on the online-bank-payment checkbox. */
+  private queuePlansAutoSave(): void {
+    this.plansDirty = true;
+    this.queueCoverageAutoSave();
+  }
+
   queueCoverageAutoSave(): void {
     if (!this.selected()) return;
     this.coverageStatus.set('idle');
@@ -388,7 +447,6 @@ export class AdminClients implements OnInit, OnDestroy {
         email: this.email.trim(),
         password: this.password,
         role: 'CLIENT',
-        phone: this.phone.trim() || undefined,
         levelCost: this.levelCost,
         gradedCost: this.gradedCost,
         modifiedCost: this.modifiedCost,
@@ -399,7 +457,7 @@ export class AdminClients implements OnInit, OnDestroy {
         acceptedCards: this.acceptedCards,
         states: this.selectedStates,
         carriers: this.carriers,
-        stateCarriers: Object.entries(this.stateCarriers).map(([state, carriers]) => ({ state, carriers })),
+        statePlans: this.statePlans,
       });
       this.clients.update((rows) => [...rows, created]);
       this.showCreate.set(false);
@@ -417,7 +475,6 @@ export class AdminClients implements OnInit, OnDestroy {
     this.newPassword = '';
     this.name = user.name;
     this.email = user.email;
-    this.phone = user.phone ?? '';
     this.levelCost = user.levelCost ?? null;
     this.gradedCost = user.gradedCost ?? null;
     this.modifiedCost = user.modifiedCost ?? null;
@@ -427,19 +484,27 @@ export class AdminClients implements OnInit, OnDestroy {
     this.acceptsOnlineBankPayment = user.acceptsOnlineBankPayment ?? false;
     this.acceptedCards = user.acceptedCards ?? [];
     this.selectedStates = user.states ?? [];
-    this.stateCarriers = Object.fromEntries((user.stateCarriers ?? []).map((sc) => [sc.state, sc.carriers]));
-    this.carrierEditStates = [];
-    this.carrierEditStateInput = '';
-    this.dirtyStateCarriers.clear();
-    if (this.stateCarrierSaveTimer) clearTimeout(this.stateCarrierSaveTimer);
-    this.stateCarrierSaveTimer = null;
+    const plansByCell = new Map((user.statePlans ?? []).map((p) => [`${p.state}|${p.carrier}`, p.plans]));
+    // Accounts saved before per-state plans existed: carriers listed for a state load with no plans
+    // ticked — nothing is assumed about what they take.
+    for (const sc of user.stateCarriers ?? []) {
+      for (const carrier of sc.carriers) {
+        if (!plansByCell.has(`${sc.state}|${carrier}`)) plansByCell.set(`${sc.state}|${carrier}`, []);
+      }
+    }
+    this.cellPlans = Object.fromEntries(plansByCell);
+    this.plansDirty = false;
+    this.checkedStates = [];
+    this.activeState = null;
+    this.creatingCarrierFor = null;
+    this.newCarrierName = '';
     if (this.coverageSaveTimer) clearTimeout(this.coverageSaveTimer);
     this.coverageSaveTimer = null;
     this.coverageStatus.set('idle');
     this.selected.set(user);
   }
 
-  /** Saves name/email/phone from the detail modal — the client has no self-service way to
+  /** Saves name/email from the detail modal — the client has no self-service way to
    * fix these (Settings is password-change only), so this is the only edit path. */
   async saveProfile(): Promise<void> {
     const user = this.selected();
@@ -451,7 +516,6 @@ export class AdminClients implements OnInit, OnDestroy {
       const updated = await this.userService.updateProfile(user.id, {
         name: this.name.trim(),
         email: this.email.trim(),
-        phone: this.phone.trim() || null,
       });
       this.clients.update((rows) => rows.map((u) => (u.id === user.id ? updated : u)));
       this.selected.set(updated);
@@ -463,7 +527,16 @@ export class AdminClients implements OnInit, OnDestroy {
     }
   }
 
-  /** Saves the per-plan lead cost + minimum premium from the detail modal. */
+  /** The detail modal's single Save button: account details, then pricing + max age. Stops
+   * after the first failure so its error isn't overwritten by the second request. */
+  async saveChanges(): Promise<void> {
+    await this.saveProfile();
+    if (this.error()) return;
+    await this.savePricing();
+    if (!this.error()) this.notice.set(`Saved changes for ${this.selected()?.name ?? 'client'}.`);
+  }
+
+  /** Saves the per-plan lead cost + minimum premium + max age from the detail modal. */
   async savePricing(): Promise<void> {
     const user = this.selected();
     if (!user) return;
@@ -498,10 +571,13 @@ export class AdminClients implements OnInit, OnDestroy {
 
     this.error.set(null);
     this.coverageStatus.set('saving');
+    const sendPlans = this.plansDirty;
+    this.plansDirty = false;
     try {
       const updated = await this.userService.updateCoverage(user.id, {
         states: this.selectedStates,
         carriers: this.carriers,
+        ...(sendPlans ? { statePlans: this.statePlans } : {}),
         acceptsOnlineBankPayment: this.acceptsOnlineBankPayment,
         acceptedCards: this.acceptedCards,
       });
@@ -512,6 +588,7 @@ export class AdminClients implements OnInit, OnDestroy {
         if (this.coverageStatus() === 'saved') this.coverageStatus.set('idle');
       }, 2500);
     } catch (err) {
+      if (sendPlans) this.plansDirty = true;
       this.error.set(apiErrorMessage(err, 'Could not update coverage.'));
       this.coverageStatus.set('idle');
     }
@@ -525,11 +602,6 @@ export class AdminClients implements OnInit, OnDestroy {
       clearTimeout(this.coverageSaveTimer);
       this.coverageSaveTimer = null;
       await this.autoSaveCoverage();
-    }
-    if (this.stateCarrierSaveTimer) {
-      clearTimeout(this.stateCarrierSaveTimer);
-      this.stateCarrierSaveTimer = null;
-      await this.flushStateCarrierSaves();
     }
     this.selected.set(null);
   }

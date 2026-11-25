@@ -1,6 +1,6 @@
 import type { PlanType, Role } from "@prisma/client";
 import prisma from "../lib/prisma";
-import { isValidState, parseAcceptedCards, parseCarriers, parseStates } from "../lib/client-coverage";
+import { isValidState, parseAcceptedCards, carriersByState, parseCarriers, parseStatePlans, parseStates } from "../lib/client-coverage";
 import { INVALID_PHONE_MESSAGE, isNonEmptyString, isValidEmail, normalizeUsPhone } from "../lib/validation";
 
 const PUBLIC_SELECT = {
@@ -21,6 +21,7 @@ const PUBLIC_SELECT = {
   states: true,
   carriers: true,
   stateCarriers: { select: { state: true, carriers: true } },
+  statePlans: { select: { state: true, carrier: true, plans: true } },
 } as const;
 // minimumPremium isn't a plan cost, but shares the same nullable-non-negative-whole-dollar
 // validation, so it rides the same parse/update path as the four plan costs below.
@@ -95,6 +96,7 @@ export async function listClientCoverage() {
       states: true,
       carriers: true,
       stateCarriers: { select: { state: true, carriers: true } },
+      statePlans: { select: { state: true, carrier: true, plans: true } },
       levelCost: true,
       gradedCost: true,
       modifiedCost: true,
@@ -113,6 +115,7 @@ export async function listClientCoverage() {
     states: c.states,
     carriers: c.carriers,
     stateCarriers: c.stateCarriers,
+    statePlans: c.statePlans,
     acceptedPlans: acceptedPlansFor(c),
     minimumPremium: c.minimumPremium,
     maxAge: c.maxAge,
@@ -243,13 +246,34 @@ export async function updateClientCoverage(
   if (cards && "error" in cards) return { error: cards.error, status: 400 };
   if (cards) data.acceptedCards = cards.value;
 
+  const statePlans = parseStatePlans(input.statePlans);
+  if (statePlans && "error" in statePlans) return { error: statePlans.error, status: 400 };
+  const finalStates = states ? states.value : user.states;
+  if (statePlans && statePlans.value.some((p) => !finalStates.includes(p.state))) {
+    return { error: "Plans given for a state the client is not licensed in", status: 400 };
+  }
+
   await prisma.$transaction(async (tx) => {
     await tx.user.update({ where: { id }, data });
+
+    if (statePlans) {
+      await tx.clientStateCarrierPlan.deleteMany({ where: { clientId: id } });
+      if (statePlans.value.length) {
+        await tx.clientStateCarrierPlan.createMany({ data: statePlans.value.map((p) => ({ clientId: id, ...p })) });
+      }
+      // Keep the per-state carrier lists in step: available iff it has a row.
+      const derived = carriersByState(statePlans.value);
+      await tx.clientStateCarrier.deleteMany({ where: { clientId: id } });
+      if (derived.length) {
+        await tx.clientStateCarrier.createMany({ data: derived.map((d) => ({ clientId: id, ...d })) });
+      }
+    }
 
     if (states) {
       const removedStates = user.states.filter((s) => !states.value.includes(s));
       if (removedStates.length) {
         await tx.clientStateCarrier.deleteMany({ where: { clientId: id, state: { in: removedStates } } });
+        await tx.clientStateCarrierPlan.deleteMany({ where: { clientId: id, state: { in: removedStates } } });
       }
     }
   });

@@ -12,6 +12,13 @@ export type Role =
   | 'MANAGER'
   | 'RETENTION_MANAGER';
 
+/** Plan types a client takes through one carrier in one licensed state. */
+export interface StatePlan {
+  state: string;
+  carrier: string;
+  plans: PlanType[];
+}
+
 /** Which of a client's roster carriers (AppUser.carriers) apply in one licensed state. */
 export interface StateCarriers {
   state: string;
@@ -43,6 +50,8 @@ export interface AppUser {
   carriers?: string[];
   /** Which roster carriers apply in each licensed state — CLIENT accounts only. */
   stateCarriers?: StateCarriers[];
+  /** Plans taken per state x carrier, CLIENT accounts only. */
+  statePlans?: StatePlan[];
 }
 
 /** One row of the State Sheet data set — narrower than AppUser, since Closer/Team Lead
@@ -53,6 +62,7 @@ export interface ClientCoverage {
   states: string[];
   carriers: string[];
   stateCarriers: StateCarriers[];
+  statePlans: StatePlan[];
   /** Derived from the per-plan cost fields being non-null — see PLAN_TYPE_LABEL. */
   acceptedPlans: PlanType[];
   minimumPremium: number | null;

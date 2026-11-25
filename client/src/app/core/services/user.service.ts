@@ -3,6 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { API_BASE_URL } from '../config';
 import { AppUser, ClientCoverage, Role } from '../models/user.model';
+import { PlanType } from '../models/lead.model';
 import type { ApiSuccess } from '../api';
 
 type LookupUser = Pick<AppUser, 'id' | 'name' | 'email'>;
@@ -82,6 +83,7 @@ export class UserService {
     states?: string[];
     carriers?: string[];
     stateCarriers?: { state: string; carriers: string[] }[];
+    statePlans?: { state: string; carrier: string; plans: PlanType[] }[];
   }): Promise<AppUser> {
     const res = await firstValueFrom(this.http.post<ApiSuccess<{ user: AppUser }>>(BASE, input));
     return res.data.user;
@@ -109,7 +111,7 @@ export class UserService {
    * acceptance after creation. */
   async updateCoverage(
     id: string,
-    coverage: { states?: string[]; carriers?: string[]; acceptsOnlineBankPayment?: boolean; acceptedCards?: string[] },
+    coverage: { states?: string[]; carriers?: string[]; acceptsOnlineBankPayment?: boolean; acceptedCards?: string[]; statePlans?: { state: string; carrier: string; plans: PlanType[] }[] },
   ): Promise<AppUser> {
     const res = await firstValueFrom(
       this.http.patch<ApiSuccess<{ user: AppUser }>>(`${BASE}/${id}/coverage`, coverage),

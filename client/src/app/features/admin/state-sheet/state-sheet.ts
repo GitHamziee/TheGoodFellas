@@ -2,24 +2,45 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import {
   LucideBanknote,
   LucideBuilding2,
-  LucideChevronDown,
-  LucideCircleCheck,
-  LucideCircleX,
+  LucideCheck,
+  LucideChevronUp,
+  LucideCreditCard,
+  LucideLandmark,
   LucideMapPin,
+  LucideMinus,
   LucideUsers,
 } from '@lucide/angular';
 import { UserService } from '../../../core/services/user.service';
 import { ClientCoverage } from '../../../core/models/user.model';
 import { PlanType } from '../../../core/models/lead.model';
-import { US_STATES } from '../../../core/us-states';
+import { US_STATES, stateCode } from '../../../core/us-states';
 import { PLAN_TYPE_OPTIONS } from '../../../core/lead-options';
 import { formatMoney } from '../../../core/format-utils';
 import { PageHero, EmptyState, SearchBox, SkeletonRows, StatTile } from '../../../shared/ui/ui';
 import { isSilentReload, reloadOnChange } from '../../../core/live-reload';
 
+/** Two-letter avatar text: first letters of the first two words, else the first two letters. */
+function initials(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  const text = words.length > 1 ? words[0][0] + words[1][0] : (words[0] ?? '').slice(0, 2);
+  return text.toUpperCase();
+}
+
+/** A carrier in one state; `plans` is null when none have been set for it yet. */
+interface CarrierRow {
+  name: string;
+  initials: string;
+  plans: PlanType[] | null;
+}
+
 interface ClientBreakdown {
   name: string;
-  carriers: string[];
+  initials: string;
+  carriers: CarrierRow[];
+  /** Distinct plans this client takes in the state — from its carriers, else its own plan list. */
+  planCount: number;
+  /** How many of this client's carriers in the state offer each plan, in `planTypes` order. */
+  carriersPerPlan: number[];
   acceptedPlans: PlanType[];
   minimumPremium: number | null;
   maxAge: number | null;
@@ -29,16 +50,14 @@ interface ClientBreakdown {
 
 interface StateRow {
   state: string;
+  code: string;
   clients: string[];
   carriers: string[];
-  /** Union of accepted plans across whichever clients cover this state — a row-level
-   * glance; the per-client acceptance (e.g. "this client doesn't take GI") is in `breakdown`. */
-  acceptedPlans: PlanType[];
+  /** Distinct plans offered in the state across every covering client. */
+  planCount: number;
   /** Count of covering clients that accept online bank payments — drives the filter pill. */
   onlineBankClients: number;
-  /** Per-client carrier list, for the expanded row — pairs each covering client
-   * with the carriers *that client* supports *in this state*, unlike the flat `carriers`
-   * union above which can't tell you who backs which carrier. */
+  /** One entry per covering client — the panel's client sidebar and its detail. */
   breakdown: ClientBreakdown[];
 }
 
@@ -48,7 +67,8 @@ interface StateRow {
  * on the admin Users page. */
 @Component({
   selector: 'app-state-sheet',
-  imports: [PageHero, 
+  imports: [
+    PageHero,
     SearchBox,
     StatTile,
     EmptyState,
@@ -56,12 +76,15 @@ interface StateRow {
     LucideMapPin,
     LucideBuilding2,
     LucideUsers,
-    LucideChevronDown,
+    LucideChevronUp,
     LucideBanknote,
-    LucideCircleCheck,
-    LucideCircleX,
+    LucideCheck,
+    LucideMinus,
+    LucideLandmark,
+    LucideCreditCard,
   ],
   templateUrl: './state-sheet.html',
+  styleUrl: './state-sheet.css',
 })
 export class StateSheet implements OnInit {
   private readonly liveReload = reloadOnChange(() => this.ngOnInit());
@@ -75,16 +98,18 @@ export class StateSheet implements OnInit {
   readonly coveredOnly = signal(false);
   /** When on, states with no client accepting online bank payments are hidden. */
   readonly onlineBankOnly = signal(false);
-  /** Which state's row is expanded to show its per-client carrier breakdown — one at a time. */
+  /** Which state's panel is open — one at a time. */
   readonly expanded = signal<string | null>(null);
+  /** Which client is picked in each open panel's sidebar, keyed by state. */
+  private readonly pickedClient = signal<Record<string, string>>({});
 
   readonly planTypes = PLAN_TYPE_OPTIONS;
   readonly formatMoney = formatMoney;
-  readonly cardOptions = [
-    { value: 'DIRECT_EXPRESS', label: 'Direct Express' },
-    { value: 'DEBIT_CARD', label: 'Debit Card' },
-    { value: 'CREDIT_CARD', label: 'Credit Card' },
-  ];
+  readonly cardLabels: Record<string, string> = {
+    DIRECT_EXPRESS: 'Direct Express',
+    DEBIT_CARD: 'Debit Card',
+    CREDIT_CARD: 'Credit Card',
+  };
 
   /** One row per US state, regardless of coverage — this is a reference sheet, so a gap
    * (no client covering a state) is as useful to see as a match. */
@@ -92,22 +117,42 @@ export class StateSheet implements OnInit {
     const clients = this.clients();
     return US_STATES.map((state) => {
       const covering = clients.filter((c) => c.states.includes(state));
-      const breakdown: ClientBreakdown[] = covering.map((c) => ({
-        name: c.name,
+      const breakdown: ClientBreakdown[] = covering.map((c) => {
         // Which of this client's roster carriers apply in *this* state — not their whole
         // roster, which can differ state to state (e.g. NRG in Alaska, MPG in Alabama).
-        carriers: [...(c.stateCarriers.find((sc) => sc.state === state)?.carriers ?? [])].sort(),
-        acceptedPlans: c.acceptedPlans,
-        minimumPremium: c.minimumPremium,
-        maxAge: c.maxAge,
-        acceptsOnlineBankPayment: c.acceptsOnlineBankPayment,
-        acceptedCards: c.acceptedCards ?? [],
-      }));
+        const carriers: CarrierRow[] = [...(c.stateCarriers.find((sc) => sc.state === state)?.carriers ?? [])]
+          .sort((x, y) => x.localeCompare(y))
+          .map((name) => ({
+            name,
+            initials: initials(name),
+            plans: c.statePlans?.find((p) => p.state === state && p.carrier === name)?.plans ?? null,
+          }));
+        const fromCarriers = new Set(carriers.flatMap((r) => r.plans ?? []));
+        return {
+          name: c.name,
+          initials: initials(c.name),
+          carriers,
+          planCount: fromCarriers.size || c.acceptedPlans.length,
+          carriersPerPlan: this.planTypes.map((p) => carriers.filter((r) => r.plans?.includes(p.value)).length),
+          acceptedPlans: c.acceptedPlans,
+          minimumPremium: c.minimumPremium,
+          maxAge: c.maxAge,
+          acceptsOnlineBankPayment: c.acceptsOnlineBankPayment,
+          acceptedCards: c.acceptedCards ?? [],
+        };
+      });
+      const allPlans = new Set(
+        breakdown.flatMap((b) => {
+          const own = b.carriers.flatMap((r) => r.plans ?? []);
+          return own.length ? own : b.acceptedPlans;
+        }),
+      );
       return {
         state,
+        code: stateCode(state),
         clients: covering.map((c) => c.name),
-        carriers: [...new Set(breakdown.flatMap((b) => b.carriers))].sort(),
-        acceptedPlans: [...new Set(breakdown.flatMap((b) => b.acceptedPlans))],
+        carriers: [...new Set(breakdown.flatMap((b) => b.carriers.map((r) => r.name)))].sort(),
+        planCount: allPlans.size,
         onlineBankClients: breakdown.filter((b) => b.acceptsOnlineBankPayment).length,
         breakdown,
       };
@@ -116,6 +161,25 @@ export class StateSheet implements OnInit {
 
   toggle(state: string): void {
     this.expanded.set(this.expanded() === state ? null : state);
+  }
+
+  /** The client shown in a state's panel: the one picked in its sidebar, else the first. */
+  activeClient(row: StateRow): ClientBreakdown | null {
+    const name = this.pickedClient()[row.state];
+    return row.breakdown.find((b) => b.name === name) ?? row.breakdown[0] ?? null;
+  }
+
+  pickClient(state: string, name: string): void {
+    this.pickedClient.update((m) => ({ ...m, [state]: name }));
+  }
+
+  cardLabel(card: string): string {
+    return this.cardLabels[card] || card;
+  }
+
+  /** "2 of 4" style count for one carrier row; null while its plans haven't been set. */
+  offeredCount(carrier: CarrierRow): string {
+    return carrier.plans ? `${carrier.plans.length} of ${this.planTypes.length}` : 'Not set';
   }
 
   readonly filteredRows = computed<StateRow[]>(() => {

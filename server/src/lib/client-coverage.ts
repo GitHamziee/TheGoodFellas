@@ -53,6 +53,45 @@ export function parseAcceptedCards(raw: unknown): ParseResult | undefined {
   return { value: cards };
 }
 
+const PLAN_TYPES = ["LEVEL", "GRADED", "MODIFIED", "GI"] as const;
+export type StatePlan = { state: string; carrier: string; plans: (typeof PLAN_TYPES)[number][] };
+
+/** Per state x carrier plan selections: `[{ state, carrier, plans }]`. States must be real US
+ * states, carrier names follow the roster's trim rules, plans must be valid PlanType values.
+ * An entry with an empty plan list is kept: the carrier is available in that state, no plans
+ * ticked yet. `undefined` means the key was absent from input. */
+export function parseStatePlans(raw: unknown): { value: StatePlan[] } | { error: string } | undefined {
+  if (raw === undefined) return undefined;
+  if (!Array.isArray(raw)) return { error: "State plans must be a list" };
+
+  const out: StatePlan[] = [];
+  const seen = new Set<string>();
+  for (const entry of raw) {
+    if (typeof entry !== "object" || entry === null) return { error: "Invalid state plan entry" };
+    const { state, carrier, plans } = entry as Record<string, unknown>;
+    if (typeof state !== "string" || !US_STATE_SET.has(state)) return { error: `Invalid state: ${String(state)}` };
+    const name = parseCarriers([carrier]);
+    if (!name || "error" in name) return { error: name && "error" in name ? name.error : "Invalid carrier" };
+    if (!name.value.length) continue;
+    if (!Array.isArray(plans)) return { error: "Plans must be a list" };
+    for (const p of plans) {
+      if (typeof p !== "string" || !(PLAN_TYPES as readonly string[]).includes(p)) return { error: `Invalid plan: ${String(p)}` };
+    }
+    const key = `${state}|${name.value[0].toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ state, carrier: name.value[0], plans: [...new Set(plans)] as StatePlan["plans"] });
+  }
+  return { value: out };
+}
+
+/** Per-state carrier lists derived from state plans — the shape ClientStateCarrier stores. */
+export function carriersByState(plans: StatePlan[]): { state: string; carriers: string[] }[] {
+  const map = new Map<string, string[]>();
+  for (const p of plans) map.set(p.state, [...(map.get(p.state) ?? []), p.carrier]);
+  return [...map.entries()].map(([state, carriers]) => ({ state, carriers }));
+}
+
 /** Carriers are freehand text (no fixed list) — trimmed, deduped case-insensitively,
  * empty entries dropped. `undefined` means the key was absent from input. */
 export function parseCarriers(raw: unknown): ParseResult | undefined {

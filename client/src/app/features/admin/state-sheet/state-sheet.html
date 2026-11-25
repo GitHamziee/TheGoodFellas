@@ -42,157 +42,169 @@
     </div>
   </div>
 
-  <div class="card card--flush">
-    @if (loading()) {
-      <app-skeleton-rows [count]="8" />
-    } @else if (filteredRows().length === 0) {
+  @if (loading()) {
+    <div class="card card--flush"><app-skeleton-rows [count]="8" /></div>
+  } @else if (filteredRows().length === 0) {
+    <div class="card card--flush">
       <app-empty-state title="No states match" hint="Try a different search term or clear the filters.">
         <svg lucideMapPin></svg>
       </app-empty-state>
-    } @else {
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>State</th>
-              <th>Coverage</th>
-              <th>Carriers</th>
-              <th>Plans</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (row of filteredRows(); track row.state) {
-              <tr class="clickable state-row" (click)="toggle(row.state)">
-                <td>
-                  <span class="state-cell">
-                    <span class="state-dot" [class.state-dot--on]="row.clients.length > 0"></span>
-                    <span class="cell-main">{{ row.state }}</span>
-                  </span>
-                </td>
-                <td>
-                  @if (row.clients.length) {
-                    <span class="count-pill count-pill--clients">
-                      <svg lucideUsers></svg>{{ row.clients.length }} {{ row.clients.length === 1 ? 'client' : 'clients' }}
-                    </span>
-                  } @else {
-                    <span class="empty empty--inline">No coverage yet</span>
-                  }
-                </td>
-                <td>
-                  @if (row.carriers.length) {
-                    <span class="count-pill count-pill--carriers">
-                      <svg lucideBuilding2></svg>{{ row.carriers.length }} {{ row.carriers.length === 1 ? 'carrier' : 'carriers' }}
-                    </span>
-                  } @else {
-                    <span class="empty empty--inline">—</span>
-                  }
-                </td>
-                <td>
-                  @if (row.acceptedPlans.length) {
-                    <span class="count-pill count-pill--clients">
-                      {{ row.acceptedPlans.length }} {{ row.acceptedPlans.length === 1 ? 'plan' : 'plans' }}
-                    </span>
-                  } @else {
-                    <span class="empty empty--inline">—</span>
-                  }
-                </td>
-                <td class="right">
-                  <svg lucideChevronDown class="dropdown-chevron" [class.open]="expanded() === row.state"></svg>
-                </td>
-              </tr>
-              @if (expanded() === row.state) {
-                <tr class="expand-row">
-                  <td colspan="5">
-                    @if (row.breakdown.length) {
-                      <div class="breakdown">
-                        @for (client of row.breakdown; track client.name) {
-                          <div class="breakdown-item">
-                            <span class="chip breakdown-item__client"><svg lucideUsers></svg>{{ client.name }}</span>
+    </div>
+  } @else {
+    <div class="cv-list">
+      @for (row of filteredRows(); track row.state) {
+        <section class="cv-panel">
+          <header class="cv-header" [class.cv-header--open]="expanded() === row.state" (click)="toggle(row.state)">
+            <div class="cv-code">{{ row.code }}</div>
+            <div class="cv-title">
+              <div class="cv-title-row">
+                <h2>{{ row.state }}</h2>
+                @if (row.clients.length) {
+                  <span class="cv-status">Active</span>
+                } @else {
+                  <span class="cv-status cv-status--none">No coverage</span>
+                }
+              </div>
+              <span class="cv-sub">Coverage across all clients</span>
+            </div>
+            <div class="cv-spacer"></div>
+            <div class="cv-stats">
+              <div class="cv-stat"><span class="cv-stat-value">{{ row.clients.length }}</span><span class="cv-stat-label">Clients</span></div>
+              <div class="cv-stat"><span class="cv-stat-value">{{ row.carriers.length }}</span><span class="cv-stat-label">Carriers</span></div>
+              <div class="cv-stat"><span class="cv-stat-value">{{ row.planCount }}</span><span class="cv-stat-label">Plans</span></div>
+            </div>
+            <button
+              type="button"
+              class="cv-toggle"
+              [class.cv-toggle--collapsed]="expanded() !== row.state"
+              [attr.aria-label]="(expanded() === row.state ? 'Collapse ' : 'Expand ') + row.state"
+              [attr.aria-expanded]="expanded() === row.state"
+              (click)="$event.stopPropagation(); toggle(row.state)"
+            >
+              <svg lucideChevronUp></svg>
+            </button>
+          </header>
 
-                            <div class="breakdown-item__body spec-list">
-                              <div class="spec-row">
-                                <span class="spec-row__label">Carriers</span>
-                                @if (client.carriers.length) {
-                                  <div class="chip-wrap">
-                                    @for (carrier of client.carriers; track carrier) {
-                                      <span class="chip"><svg lucideBuilding2></svg>{{ carrier }}</span>
-                                    }
-                                  </div>
-                                } @else {
-                                  <span class="empty empty--inline">None assigned to this state</span>
-                                }
-                              </div>
+          @if (expanded() === row.state) {
+            @if (activeClient(row); as client) {
+              <div class="cv-body">
+                <nav class="cv-clients" [attr.aria-label]="'Clients in ' + row.state">
+                  <span class="cv-eyebrow">Clients · {{ row.clients.length }}</span>
+                  @for (b of row.breakdown; track b.name) {
+                    <button type="button" class="cv-client" [attr.aria-current]="b.name === client.name" (click)="pickClient(row.state, b.name)">
+                      <span class="cv-client-avatar">{{ b.initials }}</span>
+                      <span>
+                        <span class="cv-client-name">{{ b.name }}</span>
+                        <span class="cv-client-meta">{{ b.carriers.length }} {{ b.carriers.length === 1 ? 'carrier' : 'carriers' }} · {{ b.planCount }} {{ b.planCount === 1 ? 'plan' : 'plans' }}</span>
+                      </span>
+                    </button>
+                  }
+                </nav>
 
-                              <div class="spec-row">
-                                <span class="spec-row__label">Plans</span>
-                                <div class="plan-badges">
-                                  @for (plan of planTypes; track plan.value) {
-                                    <span class="plan-badge" [class.plan-badge--accepted]="client.acceptedPlans.includes(plan.value)">
-                                      @if (client.acceptedPlans.includes(plan.value)) {
-                                        <svg lucideCircleCheck></svg>
-                                      } @else {
-                                        <svg lucideCircleX></svg>
-                                      }
-                                      {{ plan.label }}
-                                    </span>
+                <div class="cv-main">
+                  <div class="cv-section-head">
+                    <h3>Carrier coverage</h3>
+                    <span class="cv-legend"><span><i class="on"></i>Offered</span><span><i class="off"></i>Not offered</span></span>
+                  </div>
+
+                  @if (client.carriers.length) {
+                    <div class="cv-matrix-wrap">
+                      <table class="cv-matrix">
+                        <thead>
+                          <tr>
+                            <th>Carrier</th>
+                            @for (plan of planTypes; track plan.value) {
+                              <th>{{ plan.label }}</th>
+                            }
+                            <th>Plans</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          @for (carrier of client.carriers; track carrier.name) {
+                            <tr>
+                              <td><span class="cv-carrier"><span class="cv-carrier-avatar">{{ carrier.initials }}</span>{{ carrier.name }}</span></td>
+                              @for (plan of planTypes; track plan.value) {
+                                <td>
+                                  @if (carrier.plans?.includes(plan.value)) {
+                                    <span class="cv-cell on"><svg lucideCheck role="img" aria-label="Offered"></svg></span>
+                                  } @else {
+                                    <span class="cv-cell off"><svg lucideMinus role="img" aria-label="Not offered"></svg></span>
                                   }
-                                </div>
-                              </div>
-
-                              <div class="spec-row">
-                                <span class="spec-row__label">Payments</span>
-                                <div class="plan-badges">
-                                  <span class="plan-badge" [class.plan-badge--accepted]="client.acceptsOnlineBankPayment">
-                                    @if (client.acceptsOnlineBankPayment) {
-                                      <svg lucideCircleCheck></svg>
-                                    } @else {
-                                      <svg lucideCircleX></svg>
-                                    }
-                                    Online bank
-                                  </span>
-                                  @for (card of cardOptions; track card.value) {
-                                    <span class="plan-badge" [class.plan-badge--accepted]="client.acceptedCards.includes(card.value)">
-                                      @if (client.acceptedCards.includes(card.value)) {
-                                        <svg lucideCircleCheck></svg>
-                                      } @else {
-                                        <svg lucideCircleX></svg>
-                                      }
-                                      {{ card.label }}
-                                    </span>
-                                  }
-                                </div>
-                              </div>
-
-                              @if (client.minimumPremium != null || client.maxAge != null) {
-                                <div class="spec-row">
-                                  <span class="spec-row__label">Terms</span>
-                                  <div class="chip-wrap">
-                                    @if (client.minimumPremium != null) {
-                                      <span class="chip"><svg lucideBanknote></svg>Min premium {{ formatMoney(client.minimumPremium) }}</span>
-                                    }
-                                    @if (client.maxAge != null) {
-                                      <span class="chip"><svg lucideUsers></svg>Max age {{ client.maxAge }}</span>
-                                    }
-                                  </div>
-                                </div>
+                                </td>
                               }
-                            </div>
-                          </div>
-                        }
-                      </div>
-                    } @else {
-                      <div class="breakdown-item">
-                        <span class="empty empty--inline">No coverage yet — add a client's licensed states on the Users page.</span>
-                      </div>
-                    }
-                  </td>
-                </tr>
-              }
+                              <td class="cv-row-count">{{ offeredCount(carrier) }}</td>
+                            </tr>
+                          }
+                        </tbody>
+                        <tfoot>
+                          <tr>
+                            <td>Carriers per plan</td>
+                            @for (count of client.carriersPerPlan; track $index) {
+                              <td>{{ count }}</td>
+                            }
+                            <td></td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  } @else {
+                    <div class="cv-empty">No carriers assigned to this state</div>
+                  }
+
+                  <div class="cv-cards">
+                    <div class="cv-card">
+                      <span class="cv-eyebrow">Plans</span>
+                      @if (client.acceptedPlans.length) {
+                        <div class="cv-chips">
+                          @for (plan of planTypes; track plan.value) {
+                            @if (client.acceptedPlans.includes(plan.value)) {
+                              <span class="cv-chip">{{ plan.label }}</span>
+                            }
+                          }
+                        </div>
+                      } @else {
+                        <span class="cv-none">None</span>
+                      }
+                    </div>
+                    <div class="cv-card">
+                      <span class="cv-eyebrow">Payment methods</span>
+                      @if (client.acceptsOnlineBankPayment || client.acceptedCards.length) {
+                        <div class="cv-chips">
+                          @if (client.acceptsOnlineBankPayment) {
+                            <span class="cv-chip"><svg lucideLandmark></svg>Online bank</span>
+                          }
+                          @for (card of client.acceptedCards; track card) {
+                            <span class="cv-chip"><svg lucideCreditCard></svg>{{ cardLabel(card) }}</span>
+                          }
+                        </div>
+                      } @else {
+                        <span class="cv-none">None</span>
+                      }
+                    </div>
+                    <div class="cv-card">
+                      <span class="cv-eyebrow">Terms</span>
+                      @if (client.minimumPremium || client.maxAge) {
+                        <div class="cv-terms">
+                          @if (client.minimumPremium) {
+                            <div class="cv-term"><span class="cv-term-value">{{ formatMoney(client.minimumPremium) }}</span><span class="cv-term-label">Min premium</span></div>
+                          }
+                          @if (client.maxAge) {
+                            <div class="cv-term"><span class="cv-term-value">{{ client.maxAge }}</span><span class="cv-term-label">Max issue age</span></div>
+                          }
+                        </div>
+                      } @else {
+                        <span class="cv-none">None</span>
+                      }
+                    </div>
+                  </div>
+                </div>
+              </div>
+            } @else {
+              <div class="cv-empty cv-empty--panel">No coverage yet — add a client's licensed states on the Users page.</div>
             }
-          </tbody>
-        </table>
-      </div>
-    }
-  </div>
+          }
+        </section>
+      }
+    </div>
+  }
 </div>

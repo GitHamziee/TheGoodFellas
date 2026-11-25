@@ -139,6 +139,7 @@ router.post(
       states,
       carriers,
       stateCarriers,
+      statePlans,
     } = req.body ?? {};
     if (!role) return apiError(res, "Role is required", 400);
     if (req.user!.role === "MANAGER" && MANAGER_FORBIDDEN_ROLES.includes(role)) {
@@ -162,6 +163,7 @@ router.post(
       states,
       carriers,
       stateCarriers,
+      statePlans,
     });
     return sendResult(res, result, "User created", 201);
   })

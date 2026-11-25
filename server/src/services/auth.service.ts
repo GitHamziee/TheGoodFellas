@@ -3,7 +3,7 @@ import { Role } from "@prisma/client";
 import prisma from "../lib/prisma";
 import { signToken } from "../lib/jwt";
 import { INVALID_PHONE_MESSAGE, isNonEmptyString, isValidEmail, isValidPassword, normalizeUsPhone } from "../lib/validation";
-import { parseAcceptedCards, parseCarriers, parseStates } from "../lib/client-coverage";
+import { parseAcceptedCards, carriersByState, parseCarriers, parseStatePlans, parseStates, type StatePlan } from "../lib/client-coverage";
 import { IP_EXEMPT_ROLES, isIpWhitelisted } from "../lib/ip-whitelist";
 import type { ServiceResult } from "../lib/service-result";
 
@@ -27,6 +27,7 @@ function publicUser(user: {
   states?: string[];
   carriers?: string[];
   stateCarriers?: { state: string; carriers: string[] }[];
+  statePlans?: { state: string; carrier: string; plans: string[] }[];
 }) {
   return {
     id: user.id,
@@ -45,6 +46,7 @@ function publicUser(user: {
     states: user.states ?? [],
     carriers: user.carriers ?? [],
     stateCarriers: (user.stateCarriers ?? []).map((sc) => ({ state: sc.state, carriers: sc.carriers })),
+    statePlans: (user.statePlans ?? []).map((p) => ({ state: p.state, carrier: p.carrier, plans: p.plans })),
   };
 }
 
@@ -107,6 +109,7 @@ export async function createStaffUser(input: {
   states?: unknown;
   carriers?: unknown;
   stateCarriers?: unknown;
+  statePlans?: unknown;
 }): Promise<ServiceResult<{ user: ReturnType<typeof publicUser> }>> {
   const { name, email, password, role, phone } = input;
 
@@ -128,6 +131,7 @@ export async function createStaffUser(input: {
   // ignored for other roles rather than erroring, since the create form only shows
   // these fields for CLIENT.
   const coverage: Record<string, number | null | string[] | boolean> = {};
+  let statePlansNested: StatePlan[] | undefined;
   let stateCarriersNested: { state: string; carriers: string[] }[] | undefined;
   if (role === "CLIENT") {
     for (const key of PLAN_COST_KEYS) {
@@ -151,7 +155,19 @@ export async function createStaffUser(input: {
     if (carriers && "error" in carriers) return { error: carriers.error, status: 400 };
     if (carriers) coverage.carriers = carriers.value;
 
-    if (Array.isArray(input.stateCarriers)) {
+    const statePlans = parseStatePlans(input.statePlans);
+    if (statePlans && "error" in statePlans) return { error: statePlans.error, status: 400 };
+    if (statePlans) {
+      const licensed = states && "value" in states ? states.value : [];
+      if (statePlans.value.some((p) => !licensed.includes(p.state))) {
+        return { error: "Plans given for a state the client is not licensed in", status: 400 };
+      }
+      statePlansNested = statePlans.value;
+      // Carriers available per state follow from the plans — same rule as updateClientCoverage.
+      stateCarriersNested = carriersByState(statePlans.value);
+    }
+
+    if (!statePlansNested && Array.isArray(input.stateCarriers)) {
       const finalStates = states && "value" in states ? states.value : [];
       const nested: { state: string; carriers: string[] }[] = [];
       for (const entry of input.stateCarriers) {
@@ -179,11 +195,15 @@ export async function createStaffUser(input: {
       phone: normalizedPhone,
       role: role as Role,
       ...coverage,
+      ...(statePlansNested && statePlansNested.length ? { statePlans: { create: statePlansNested } } : {}),
       ...(stateCarriersNested && stateCarriersNested.length
         ? { stateCarriers: { create: stateCarriersNested } }
         : {}),
     },
-    include: { stateCarriers: { select: { state: true, carriers: true } } },
+    include: {
+      stateCarriers: { select: { state: true, carriers: true } },
+      statePlans: { select: { state: true, carrier: true, plans: true } },
+    },
   });
 
   return { data: { user: publicUser(user) } };

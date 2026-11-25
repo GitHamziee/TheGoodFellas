@@ -120,6 +120,10 @@ export class Select implements ControlValueAccessor, OnDestroy {
   readonly invalid = input(false);
   /** Shows a type-to-filter box at the top of the open menu. */
   readonly searchable = input(false);
+  /** Overrides the stylesheet's 240px menu cap (still clamped to the room below the trigger). */
+  readonly menuMaxHeight = input<number | null>(null);
+  /** Leaves the menu open after a pick, for adding several values in a row. */
+  readonly keepOpen = input(false);
   readonly query = signal('');
   readonly filteredOptions = computed(() => {
     const q = this.query().trim().toLowerCase();
@@ -152,6 +156,7 @@ export class Select implements ControlValueAccessor, OnDestroy {
       top: `${rect.bottom / z + 6}px`,
       left: `${rect.left / z}px`,
       width: `${rect.width / z}px`,
+      ...this.maxHeightStyle(rect, z),
     });
     this.open.set(true);
     // Scroll events don't bubble, and every portal page scrolls an inner `.content` div
@@ -171,11 +176,19 @@ export class Select implements ControlValueAccessor, OnDestroy {
     );
   }
 
+  private maxHeightStyle(rect: DOMRect, z: number): Record<string, string> {
+    const want = this.menuMaxHeight();
+    if (want == null) return {};
+    const below = (window.innerHeight - rect.bottom) / z - 20;
+    return { maxHeight: `${Math.max(240, Math.min(want, below))}px` };
+  }
+
   pick(opt: SelectOption): void {
     if (opt.disabled) return;
     this.value.set(opt.value);
     this.onChange(opt.value);
-    this.closeMenu();
+    if (this.keepOpen()) this.query.set('');
+    else this.closeMenu();
   }
 
   pickFirst(): void {

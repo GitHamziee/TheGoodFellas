@@ -14,6 +14,7 @@ import { LucideX } from '@lucide/angular';
       <div
         class="modal"
         [class.modal--wide]="wide()"
+        [class.modal--xl]="xl()"
         role="dialog"
         aria-modal="true"
         (click)="$event.stopPropagation()"
@@ -69,6 +70,7 @@ import { LucideX } from '@lucide/angular';
     }
 
     .modal--wide { max-width: 780px; }
+    .modal--xl { max-width: min(1280px, 96vw); max-height: calc(94dvh / var(--ui-zoom)); }
 
     .head {
       display: flex;
@@ -142,5 +144,7 @@ export class Modal {
   readonly title = input('');
   readonly subtitle = input('');
   readonly wide = input(false);
+  /** Larger still — for long forms like New client. */
+  readonly xl = input(false);
   readonly close = output<void>();
 }

@@ -114,211 +114,34 @@
 @if (showCreate()) {
   <app-modal
     title="New client"
-    [wide]="true"
+    [xl]="true"
     (close)="showCreate.set(false)"
   >
     @if (error()) {
       <div class="error">{{ error() }}</div>
     }
 
-    <div class="form-grid">
-      <label class="full">
-        Full name
-        <input type="text" [(ngModel)]="name" name="name" placeholder="Jane Doe" />
-      </label>
-      <label class="full">
-        Email
-        <input type="email" [(ngModel)]="email" name="email" placeholder="jane@thegoodfellas.dev" />
-      </label>
-      <label>
-        Password
-        <input type="password" [(ngModel)]="password" name="password" placeholder="At least 8 characters" />
-        <span class="hint">Minimum 8 characters.</span>
-      </label>
-      <label>
-        <span>Phone <span class="hint">Optional</span></span>
-        <input appPhone [(ngModel)]="phone" name="phone" />
-      </label>
-    </div>
-
     <div class="section">
-      <h4 class="section-title">Lead cost by plan <span class="hint">$, optional</span></h4>
-      <div class="form-grid">
+      <h4 class="section-title">Account</h4>
+      <div class="form-grid form-grid--3">
         <label>
-          Level
-          <input type="number" min="0" [(ngModel)]="levelCost" name="levelCost" placeholder="0" />
+          Full name
+          <input type="text" [(ngModel)]="name" name="name" placeholder="Jane Doe" />
         </label>
         <label>
-          Graded
-          <input type="number" min="0" [(ngModel)]="gradedCost" name="gradedCost" placeholder="0" />
+          Email
+          <input type="email" [(ngModel)]="email" name="email" placeholder="jane@thegoodfellas.dev" />
         </label>
         <label>
-          Modified
-          <input type="number" min="0" [(ngModel)]="modifiedCost" name="modifiedCost" placeholder="0" />
+          Password
+          <input type="password" [(ngModel)]="password" name="password" placeholder="At least 8 characters" />
         </label>
-        <label>
-          GI
-          <input type="number" min="0" [(ngModel)]="giCost" name="giCost" placeholder="0" />
-        </label>
-        <label>
-          Minimum premium
-          <input type="number" min="0" [(ngModel)]="minimumPremium" name="minimumPremium" placeholder="0" />
-        </label>
-        <label>
-          Max age
-          <input type="number" min="0" max="120" [(ngModel)]="maxAge" name="maxAge" placeholder="0" />
-        </label>
-      </div>
-      <div class="pay-options">
-        <div class="pay-options__group">
-          <span class="pay-options__label">Online payments</span>
-          <div class="pay-options__row">
-            <button type="button" class="pay-opt" [class.active]="acceptsOnlineBankPayment" [attr.aria-pressed]="acceptsOnlineBankPayment" (click)="acceptsOnlineBankPayment = !acceptsOnlineBankPayment">
-              <svg lucideBanknote></svg>Online bank
-            </button>
-          </div>
-        </div>
-        <div class="pay-options__group">
-          <span class="pay-options__label">Accepts cards</span>
-          <div class="pay-options__row">
-            @for (card of cardOptions; track card.value) {
-              <button type="button" class="pay-opt" [class.active]="acceptedCards.includes(card.value)" [attr.aria-pressed]="acceptedCards.includes(card.value)" (click)="toggleCard(card.value)">
-                <svg lucideCreditCard></svg>{{ card.label }}
-              </button>
-            }
-          </div>
-        </div>
       </div>
     </div>
 
-    <div class="section">
-      <h4 class="section-title">
-        Licensed states <span class="hint">{{ selectedStates.length }} selected</span>
-      </h4>
-      <div class="pill-grid">
-        @for (state of usStates; track state) {
-          <button
-            type="button"
-            class="pill"
-            [class.active]="selectedStates.includes(state)"
-            (click)="toggleState(state)"
-          >
-            {{ state }}
-          </button>
-        }
-      </div>
-    </div>
-
-    @if (selectedStates.length) {
-      <div class="section">
-        <h4 class="section-title">Carriers by state</h4>
-        <p class="hint cbs-intro">
-          Check one or more states to view or add the carriers they write business through —
-          checking several at once adds the same carrier to all of them. This is just
-          navigation, it never changes which states are licensed. Use the <strong>×</strong> on a
-          row to stop covering that state entirely.
-        </p>
-        <div class="cbs-grid">
-          <div class="cbs-list" role="listbox" aria-label="Licensed states" aria-multiselectable="true">
-            @for (state of sortedSelectedStates; track state) {
-              <div
-                class="cbs-row"
-                [class.cbs-row--active]="carrierEditStates.includes(state)"
-                role="option"
-                [attr.aria-selected]="carrierEditStates.includes(state)"
-                tabindex="0"
-                (click)="toggleCarrierEditState(state)"
-                (keydown.enter)="toggleCarrierEditState(state)"
-                (keydown.space)="$event.preventDefault(); toggleCarrierEditState(state)"
-              >
-                <span class="cbs-row-main">
-                  <input
-                    type="checkbox"
-                    class="cbs-row-check"
-                    [checked]="carrierEditStates.includes(state)"
-                    (click)="$event.stopPropagation(); toggleCarrierEditState(state)"
-                    [attr.aria-label]="'Select ' + state"
-                    tabindex="-1"
-                  />
-                  <span class="cbs-row-labels">
-                    <span class="cbs-row-name">{{ state }}</span>
-                    <span class="cbs-row-count">{{ carrierCountLabel(state) }}</span>
-                  </span>
-                </span>
-                <button
-                  type="button"
-                  class="cbs-row-remove"
-                  [attr.aria-label]="'Stop covering ' + state"
-                  title="Stop covering this state"
-                  (click)="$event.stopPropagation(); toggleState(state)"
-                >
-                  <svg lucideX></svg>
-                </button>
-              </div>
-            }
-          </div>
-
-          <div class="cbs-detail">
-            @if (carrierEditStates.length === 1) {
-              <div class="cbs-detail-head">
-                <h5>Carriers in {{ carrierEditStates[0] }}</h5>
-                <span>{{ carrierCountLabel(carrierEditStates[0]) }}</span>
-              </div>
-              <div class="tag-input">
-                <input
-                  type="text"
-                  [ngModel]="carrierEditStateInput"
-                  (ngModelChange)="onCarrierEditStateInputChange($event)"
-                  name="carrierEditStateInput"
-                  placeholder="Type a carrier — comma or Enter to add"
-                  (keydown.enter)="$event.preventDefault(); addStateCarrier()"
-                />
-                <button type="button" class="btn btn--ghost btn--sm" (click)="addStateCarrier()">Add</button>
-              </div>
-              @if ((stateCarriers[carrierEditStates[0]] ?? []).length) {
-                <div class="tag-list">
-                  @for (carrier of stateCarriers[carrierEditStates[0]] ?? []; track carrier) {
-                    <span class="chip">
-                      <svg lucideBuilding2></svg>{{ carrier }}
-                      <button type="button" (click)="removeStateCarrier(carrier)" [attr.aria-label]="'Remove ' + carrier">
-                        <svg lucideX></svg>
-                      </button>
-                    </span>
-                  }
-                </div>
-              } @else {
-                <p class="cbs-empty-inline">No carriers entered for {{ carrierEditStates[0] }} yet — add one above.</p>
-              }
-            } @else if (carrierEditStates.length > 1) {
-              <div class="cbs-detail-head">
-                <h5>Add carrier to {{ carrierEditStates.length }} states</h5>
-                <span>{{ carrierEditStates.join(', ') }}</span>
-              </div>
-              <div class="tag-input">
-                <input
-                  type="text"
-                  [ngModel]="carrierEditStateInput"
-                  (ngModelChange)="onCarrierEditStateInputChange($event)"
-                  name="carrierEditStateInput"
-                  placeholder="Type a carrier — comma or Enter to add to all checked states"
-                  (keydown.enter)="$event.preventDefault(); addStateCarrier()"
-                />
-                <button type="button" class="btn btn--ghost btn--sm" (click)="addStateCarrier()">Add</button>
-              </div>
-              <p class="cbs-empty-inline">
-                Adds to every checked state above. Uncheck down to one state to view or remove its
-                existing carriers individually.
-              </p>
-            } @else {
-              <div class="cbs-empty-state">
-                <svg lucideMapPin></svg>
-                <p>Check one or more states on the left to view or add their carriers.</p>
-              </div>
-            }
-          </div>
-        </div>
-      </div>
-    }
+    <ng-container *ngTemplateOutlet="pricingBlock" />
+    <ng-container *ngTemplateOutlet="acceptsBlock" />
+    <ng-container *ngTemplateOutlet="coverageEditor" />
 
     <div footer>
       <button type="button" class="btn" [disabled]="!canSubmitCreate() || creating()" (click)="createUser()">
@@ -334,258 +157,28 @@
 
 <!-- Client detail -->
 @if (selected(); as user) {
-  <app-modal title="Client" [subtitle]="user.name" [wide]="true" (close)="closeDetail()">
+  <app-modal [title]="user.name" [subtitle]="user.email" [xl]="true" (close)="closeDetail()">
     @if (error()) {
       <div class="error">{{ error() }}</div>
     }
 
-    <div class="profile-head">
-      <span class="avatar-lg" [class]="getAvatarTone(user.id)">{{ getInitials(user.name) }}</span>
-      <div class="who">
-        <div class="nm">{{ user.name }}</div>
-        <div class="chips">
-          <span class="badge" [class]="'badge ' + roleTone[user.role]">{{ roleLabel[user.role] }}</span>
-        </div>
-      </div>
-    </div>
-
     <div class="section">
-      <h4 class="section-title">
-        Account details <span class="hint">The client has no self-service way to fix these</span>
-      </h4>
-      <div class="form-grid">
-        <label class="full">
+      <h4 class="section-title">Account</h4>
+      <div class="form-grid form-grid--3">
+        <label>
           Full name
           <input type="text" [(ngModel)]="name" name="detailName" />
         </label>
-        <label class="full">
+        <label>
           Email
           <input type="email" [(ngModel)]="email" name="detailEmail" />
         </label>
-        <label>
-          <span>Phone <span class="hint">Optional</span></span>
-          <input appPhone [(ngModel)]="phone" name="detailPhone" />
-        </label>
       </div>
-      <button type="button" class="btn btn--ghost" style="margin-top: 0.9rem;" [disabled]="savingProfile()" (click)="saveProfile()">
-        @if (savingProfile()) {
-          <span class="spinner"></span> Saving…
-        } @else {
-          <svg lucideSave></svg> Save details
-        }
-      </button>
     </div>
 
-    <div class="section">
-      <h4 class="section-title">Lead cost by plan <span class="hint">$</span></h4>
-      <div class="form-grid">
-        <label>
-          Level
-          <input type="number" min="0" [(ngModel)]="levelCost" name="detailLevelCost" placeholder="0" />
-        </label>
-        <label>
-          Graded
-          <input type="number" min="0" [(ngModel)]="gradedCost" name="detailGradedCost" placeholder="0" />
-        </label>
-        <label>
-          Modified
-          <input type="number" min="0" [(ngModel)]="modifiedCost" name="detailModifiedCost" placeholder="0" />
-        </label>
-        <label>
-          GI
-          <input type="number" min="0" [(ngModel)]="giCost" name="detailGiCost" placeholder="0" />
-        </label>
-        <label>
-          Minimum premium
-          <input type="number" min="0" [(ngModel)]="minimumPremium" name="detailMinimumPremium" placeholder="0" />
-        </label>
-        <label>
-          Max age
-          <input type="number" min="0" max="120" [(ngModel)]="maxAge" name="detailMaxAge" placeholder="0" />
-        </label>
-      </div>
-      <button type="button" class="btn btn--ghost" style="margin-top: 0.9rem;" [disabled]="savingPricing()" (click)="savePricing()">
-        @if (savingPricing()) {
-          <span class="spinner"></span> Saving…
-        } @else {
-          <svg lucideBanknote></svg> Save pricing
-        }
-      </button>
-    </div>
-
-    <div class="section">
-      <h4 class="section-title">
-        Licensed states <span class="hint">{{ selectedStates.length }} selected</span>
-      </h4>
-      <div class="pill-grid">
-        @for (state of usStates; track state) {
-          <button
-            type="button"
-            class="pill"
-            [class.active]="selectedStates.includes(state)"
-            (click)="toggleState(state)"
-          >
-            {{ state }}
-          </button>
-        }
-      </div>
-
-      <div class="pay-options">
-        <div class="pay-options__group">
-          <span class="pay-options__label">Online payments</span>
-          <div class="pay-options__row">
-            <button type="button" class="pay-opt" [class.active]="acceptsOnlineBankPayment" [attr.aria-pressed]="acceptsOnlineBankPayment" (click)="acceptsOnlineBankPayment = !acceptsOnlineBankPayment; queueCoverageAutoSave()">
-              <svg lucideBanknote></svg>Online bank
-            </button>
-          </div>
-        </div>
-        <div class="pay-options__group">
-          <span class="pay-options__label">Accepts cards</span>
-          <div class="pay-options__row">
-            @for (card of cardOptions; track card.value) {
-              <button type="button" class="pay-opt" [class.active]="acceptedCards.includes(card.value)" [attr.aria-pressed]="acceptedCards.includes(card.value)" (click)="toggleCard(card.value, true)">
-                <svg lucideCreditCard></svg>{{ card.label }}
-              </button>
-            }
-          </div>
-        </div>
-      </div>
-
-      <p class="save-status" [class.save-status--saving]="coverageStatus() === 'saving'">
-        @if (coverageStatus() === 'saving') {
-          <span class="spinner"></span> Saving…
-        } @else if (coverageStatus() === 'saved') {
-          <svg lucideCircleCheck></svg> Saved
-        }
-      </p>
-    </div>
-
-    @if (selectedStates.length) {
-      <div class="section">
-        <h4 class="section-title">Carriers by state</h4>
-        <p class="hint cbs-intro">
-          Check one or more states to view or add the carriers they write business through —
-          checking several at once adds the same carrier to all of them. This is just
-          navigation, it never changes which states are licensed. Use the <strong>×</strong> on a
-          row to stop covering that state entirely.
-        </p>
-        <div class="cbs-grid">
-          <div class="cbs-list" role="listbox" aria-label="Licensed states" aria-multiselectable="true">
-            @for (state of sortedSelectedStates; track state) {
-              <div
-                class="cbs-row"
-                [class.cbs-row--active]="carrierEditStates.includes(state)"
-                role="option"
-                [attr.aria-selected]="carrierEditStates.includes(state)"
-                tabindex="0"
-                (click)="toggleCarrierEditState(state)"
-                (keydown.enter)="toggleCarrierEditState(state)"
-                (keydown.space)="$event.preventDefault(); toggleCarrierEditState(state)"
-              >
-                <span class="cbs-row-main">
-                  <input
-                    type="checkbox"
-                    class="cbs-row-check"
-                    [checked]="carrierEditStates.includes(state)"
-                    (click)="$event.stopPropagation(); toggleCarrierEditState(state)"
-                    [attr.aria-label]="'Select ' + state"
-                    tabindex="-1"
-                  />
-                  <span class="cbs-row-labels">
-                    <span class="cbs-row-name">{{ state }}</span>
-                    <span class="cbs-row-count">{{ carrierCountLabel(state) }}</span>
-                  </span>
-                </span>
-                <button
-                  type="button"
-                  class="cbs-row-remove"
-                  [attr.aria-label]="'Stop covering ' + state"
-                  title="Stop covering this state"
-                  (click)="$event.stopPropagation(); toggleState(state)"
-                >
-                  <svg lucideX></svg>
-                </button>
-              </div>
-            }
-          </div>
-
-          <div class="cbs-detail">
-            @if (carrierEditStates.length === 1) {
-              <div class="cbs-detail-head">
-                <h5>Carriers in {{ carrierEditStates[0] }}</h5>
-                <span>{{ carrierCountLabel(carrierEditStates[0]) }}</span>
-              </div>
-              <div class="tag-input">
-                <input
-                  type="text"
-                  [ngModel]="carrierEditStateInput"
-                  (ngModelChange)="onCarrierEditStateInputChange($event)"
-                  name="detailCarrierEditStateInput"
-                  placeholder="Type a carrier — comma or Enter to add"
-                  (keydown.enter)="$event.preventDefault(); addStateCarrier()"
-                />
-                <button type="button" class="btn btn--ghost btn--sm" (click)="addStateCarrier()">Add</button>
-              </div>
-              @if ((stateCarriers[carrierEditStates[0]] ?? []).length) {
-                <div class="tag-list">
-                  @for (carrier of stateCarriers[carrierEditStates[0]] ?? []; track carrier) {
-                    <span class="chip">
-                      <svg lucideBuilding2></svg>{{ carrier }}
-                      <button type="button" (click)="removeStateCarrier(carrier)" [attr.aria-label]="'Remove ' + carrier">
-                        <svg lucideX></svg>
-                      </button>
-                    </span>
-                  }
-                </div>
-              } @else {
-                <p class="cbs-empty-inline">No carriers entered for {{ carrierEditStates[0] }} yet — add one above.</p>
-              }
-
-              <p class="save-status" [class.save-status--saving]="coverageStatus() === 'saving'">
-                @if (coverageStatus() === 'saving') {
-                  <span class="spinner"></span> Saving…
-                } @else if (coverageStatus() === 'saved') {
-                  <svg lucideCircleCheck></svg> Saved
-                }
-              </p>
-            } @else if (carrierEditStates.length > 1) {
-              <div class="cbs-detail-head">
-                <h5>Add carrier to {{ carrierEditStates.length }} states</h5>
-                <span>{{ carrierEditStates.join(', ') }}</span>
-              </div>
-              <div class="tag-input">
-                <input
-                  type="text"
-                  [ngModel]="carrierEditStateInput"
-                  (ngModelChange)="onCarrierEditStateInputChange($event)"
-                  name="detailCarrierEditStateInput"
-                  placeholder="Type a carrier — comma or Enter to add to all checked states"
-                  (keydown.enter)="$event.preventDefault(); addStateCarrier()"
-                />
-                <button type="button" class="btn btn--ghost btn--sm" (click)="addStateCarrier()">Add</button>
-              </div>
-              <p class="cbs-empty-inline">
-                Adds to every checked state above. Uncheck down to one state to view or remove its
-                existing carriers individually.
-              </p>
-
-              <p class="save-status" [class.save-status--saving]="coverageStatus() === 'saving'">
-                @if (coverageStatus() === 'saving') {
-                  <span class="spinner"></span> Saving…
-                } @else if (coverageStatus() === 'saved') {
-                  <svg lucideCircleCheck></svg> Saved
-                }
-              </p>
-            } @else {
-              <div class="cbs-empty-state">
-                <svg lucideMapPin></svg>
-                <p>Check one or more states on the left to view or add their carriers.</p>
-              </div>
-            }
-          </div>
-        </div>
-      </div>
-    }
+    <ng-container *ngTemplateOutlet="pricingBlock" />
+    <ng-container *ngTemplateOutlet="acceptsBlock" />
+    <ng-container *ngTemplateOutlet="coverageEditor" />
 
     <div class="section">
       <h4 class="section-title">Password</h4>
@@ -597,18 +190,28 @@
           <svg lucideKeyRound></svg> Reset password
         </button>
       } @else {
-        <p class="role-note">
-          This sets the password directly and signs them out everywhere.
-        </p>
         <label>
           New password
           <input type="password" [(ngModel)]="newPassword" name="newPassword" placeholder="At least 8 characters" />
-          <span class="hint">Minimum 8 characters.</span>
         </label>
       }
     </div>
 
     <div footer>
+      <span class="save-status" [class.save-status--saving]="coverageStatus() === 'saving'">
+        @if (coverageStatus() === 'saving') {
+          <span class="spinner"></span> Saving…
+        } @else if (coverageStatus() === 'saved') {
+          <svg lucideCircleCheck></svg> Coverage saved
+        }
+      </span>
+      <button type="button" class="btn" [disabled]="savingProfile() || savingPricing()" (click)="saveChanges()">
+        @if (savingProfile() || savingPricing()) {
+          <span class="spinner"></span> Saving…
+        } @else {
+          <svg lucideSave></svg> Save changes
+        }
+      </button>
       @if (showResetPassword()) {
         <button type="button" class="btn" [disabled]="newPassword.length < 8 || resettingPassword()" (click)="resetPassword()">
           @if (resettingPassword()) {
@@ -621,3 +224,180 @@
     </div>
   </app-modal>
 }
+
+<!-- Plan costs and buying limits — shared by the New client modal and the detail modal. -->
+<ng-template #pricingBlock>
+  <div class="section">
+    <h4 class="section-title">Pricing &amp; limits</h4>
+    <div class="pl-wrap">
+      <div class="pl-card pl-card--costs">
+        <label>
+          Level
+          <span class="money"><span class="money__sym">$</span><input type="number" min="0" [(ngModel)]="levelCost" name="plLevel" placeholder="0" /></span>
+        </label>
+        <label>
+          Graded
+          <span class="money"><span class="money__sym">$</span><input type="number" min="0" [(ngModel)]="gradedCost" name="plGraded" placeholder="0" /></span>
+        </label>
+        <label>
+          Modified
+          <span class="money"><span class="money__sym">$</span><input type="number" min="0" [(ngModel)]="modifiedCost" name="plModified" placeholder="0" /></span>
+        </label>
+        <label>
+          GI
+          <span class="money"><span class="money__sym">$</span><input type="number" min="0" [(ngModel)]="giCost" name="plGi" placeholder="0" /></span>
+        </label>
+      </div>
+      <div class="pl-card pl-card--limits">
+        <label>
+          Min premium
+          <span class="money"><span class="money__sym">$</span><input type="number" min="0" [(ngModel)]="minimumPremium" name="plMinPremium" placeholder="0" /></span>
+        </label>
+        <label>
+          Max age
+          <span class="money"><input type="number" min="0" max="120" [(ngModel)]="maxAge" name="plMaxAge" placeholder="0" /></span>
+        </label>
+      </div>
+    </div>
+  </div>
+</ng-template>
+
+<!-- Payment methods — one row of toggle chips. Auto-saves in the detail modal. -->
+<ng-template #acceptsBlock>
+  <div class="section">
+    <h4 class="section-title">Accepts</h4>
+    <div class="pay-options__row">
+      <button type="button" class="pay-opt" [class.active]="acceptsOnlineBankPayment" [attr.aria-pressed]="acceptsOnlineBankPayment" (click)="toggleOnlineBank()">
+        <svg lucideBanknote></svg>Online bank
+      </button>
+      @for (card of cardOptions; track card.value) {
+        <button type="button" class="pay-opt" [class.active]="acceptedCards.includes(card.value)" [attr.aria-pressed]="acceptedCards.includes(card.value)" (click)="toggleCard(card.value, true)">
+          <svg lucideCreditCard></svg>{{ card.label }}
+        </button>
+      }
+    </div>
+  </div>
+</ng-template>
+
+<!-- States, each with its own carriers, each carrier with its own plans — shared by the New
+     client modal and the detail modal. Edits auto-save in the detail modal (see clients.ts). -->
+<ng-template #coverageEditor>
+  <div class="section">
+    <h4 class="section-title">
+      Coverage <span class="hint">{{ selectedStates.length }} {{ selectedStates.length === 1 ? 'state' : 'states' }}</span>
+    </h4>
+    <div class="cp-add">
+      <app-select
+        [options]="stateAddOptions"
+        [searchable]="true"
+        [keepOpen]="true"
+        [menuMaxHeight]="420"
+        placeholder="Add states"
+        name="statePicker"
+        [ngModel]="statePicker()"
+        (ngModelChange)="pickState($event)"
+      />
+    </div>
+
+    @if (selectedStates.length === 0) {
+      <div class="cp-empty">No states added</div>
+    } @else {
+      @if (checkedStates.length) {
+        <div class="sp-bulk">
+          <span class="sp-bulk-label">{{ checkedStates.length }} {{ checkedStates.length === 1 ? 'state' : 'states' }} ticked</span>
+          <app-select
+            [options]="carrierOptionsFor(null)"
+            [searchable]="true"
+            [menuMaxHeight]="260"
+            placeholder="Add a carrier to all ticked"
+            name="bulkCarrierPicker"
+            [ngModel]="carrierPicker()"
+            (ngModelChange)="pickCarrier(null, $event)"
+          />
+          @if (creatingCarrierFor === '__bulk__') {
+            <div class="tag-input">
+              <input type="text" [(ngModel)]="newCarrierName" name="bulkNewCarrierName" placeholder="Carrier name" (keydown.enter)="$event.preventDefault(); createCarrier(null)" />
+              <button type="button" class="btn btn--ghost btn--sm" (click)="createCarrier(null)">Add</button>
+            </div>
+          }
+          <button type="button" class="btn btn--ghost btn--sm" (click)="checkedStates = []">Clear</button>
+        </div>
+      }
+
+      <div class="md">
+        <div class="md-list" role="listbox" aria-label="Licensed states">
+          @for (state of sortedSelectedStates; track state) {
+            <div class="md-item" [class.md-item--active]="currentState === state" [class.md-item--checked]="checkedStates.includes(state)">
+              <input type="checkbox" class="md-check" [checked]="checkedStates.includes(state)" (change)="toggleCheckedState(state)" [attr.aria-label]="'Tick ' + state" />
+              <button type="button" class="md-name" role="option" [attr.aria-selected]="currentState === state" (click)="activeState = state">
+                {{ state }}
+              </button>
+              <span class="md-count" [class.md-count--zero]="carriersFor(state).length === 0">{{ carriersFor(state).length }}</span>
+              <button type="button" class="cp-remove" [attr.aria-label]="'Remove ' + state" (click)="toggleState(state)">
+                <svg lucideX></svg>
+              </button>
+            </div>
+          }
+        </div>
+
+        <div class="md-detail">
+          @if (currentState; as state) {
+            <div class="md-detail-head">
+              <h5>{{ state }}</h5>
+              <span class="md-detail-actions">
+                @if (carriersFor(state).length) {
+                  <button type="button" class="sp-link" [class.sp-link--on]="stateFull(state)" (click)="toggleStateAllPlans(state)">All plans</button>
+                  @if (selectedStates.length > 1) {
+                    <button type="button" class="sp-link" (click)="copyStateToAll(state)">Copy to all states</button>
+                  }
+                }
+              </span>
+            </div>
+
+            @for (carrier of carriersFor(state); track carrier.name) {
+              <div class="sp-row">
+                <span class="sp-carrier"><svg lucideBuilding2></svg>{{ carrier.name }}</span>
+                <span class="sc-plans" [class.sc-plans--set]="carrier.plans.length">
+                  @for (plan of planOptions; track plan.value) {
+                    <button
+                      type="button"
+                      class="sc-plan"
+                      [class.sc-plan--on]="carrier.plans.includes(plan.value)"
+                      [attr.aria-label]="plan.label + ' · ' + carrier.name + ' in ' + state"
+                      [attr.aria-pressed]="carrier.plans.includes(plan.value)"
+                      (click)="togglePlan(state, carrier.name, plan.value)"
+                    >{{ planShort(plan.value) }}</button>
+                  }
+                </span>
+                <button type="button" class="sp-link" [class.sp-link--on]="hasAllPlans(state, carrier.name)" (click)="toggleCarrierAllPlans(state, carrier.name)">All</button>
+                <button type="button" class="cp-remove" [attr.aria-label]="'Remove ' + carrier.name + ' from ' + state" (click)="removeCarrier(state, carrier.name)">
+                  <svg lucideX></svg>
+                </button>
+              </div>
+            } @empty {
+              <div class="sp-empty">No carriers in {{ state }} yet</div>
+            }
+
+            <div class="sp-add">
+              <app-select
+                [options]="carrierOptionsFor(state)"
+                [searchable]="true"
+                [menuMaxHeight]="260"
+                placeholder="Add a carrier"
+                [name]="'carrierPicker-' + state"
+                [ngModel]="carrierPicker()"
+                (ngModelChange)="pickCarrier(state, $event)"
+              />
+              @if (creatingCarrierFor === state) {
+                <div class="tag-input">
+                  <input type="text" [(ngModel)]="newCarrierName" [name]="'newCarrier-' + state" placeholder="Carrier name" (keydown.enter)="$event.preventDefault(); createCarrier(state)" />
+                  <button type="button" class="btn btn--ghost btn--sm" (click)="createCarrier(state)">Add</button>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      </div>
+    }
+  </div>
+</ng-template>

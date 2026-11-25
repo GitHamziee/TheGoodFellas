@@ -232,6 +232,7 @@ model User {
   carriers String[] @default([])
 
   stateCarriers ClientStateCarrier[]
+  statePlans    ClientStateCarrierPlan[]
 
   submittedLeads       Lead[]        @relation("JuniorCloserLeads")
   closerLeads          Lead[]        @relation("CloserLeads")
@@ -267,6 +268,24 @@ model ClientStateCarrier {
   client User @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@unique([clientId, state])
+  @@index([clientId])
+}
+
+// Which plan types a CLIENT takes through one carrier in one licensed state — e.g. Sunrise
+// takes LEVEL + GRADED through Aetna in Texas but only GI through Aetna in Ohio. A carrier is
+// "available in a state" iff it has a row here (plans may still be empty); ClientStateCarrier is
+// kept in step with this table by user.service.ts / auth.service.ts, so existing readers of
+// the per-state carrier list keep working. Replaced wholesale on every coverage save.
+model ClientStateCarrierPlan {
+  id       String     @id @default(cuid())
+  clientId String
+  state    String
+  carrier  String
+  plans    PlanType[] @default([])
+
+  client User @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, state, carrier])
   @@index([clientId])
 }
 
