@@ -167,11 +167,11 @@
       <div class="form-grid form-grid--3">
         <label>
           Full name
-          <input type="text" [(ngModel)]="name" name="detailName" />
+          <input type="text" [(ngModel)]="name" (ngModelChange)="queueDetailSave()" name="detailName" />
         </label>
         <label>
           Email
-          <input type="email" [(ngModel)]="email" name="detailEmail" />
+          <input type="email" [(ngModel)]="email" (ngModelChange)="queueDetailSave()" name="detailEmail" />
         </label>
       </div>
     </div>
@@ -198,20 +198,13 @@
     </div>
 
     <div footer>
-      <span class="save-status" [class.save-status--saving]="coverageStatus() === 'saving'">
-        @if (coverageStatus() === 'saving') {
+      <span class="save-status" [class.save-status--saving]="saveStatus() === 'saving'">
+        @if (saveStatus() === 'saving') {
           <span class="spinner"></span> Saving…
-        } @else if (coverageStatus() === 'saved') {
-          <svg lucideCircleCheck></svg> Coverage saved
+        } @else if (saveStatus() === 'saved') {
+          <svg lucideCircleCheck></svg> Saved
         }
       </span>
-      <button type="button" class="btn" [disabled]="savingProfile() || savingPricing()" (click)="saveChanges()">
-        @if (savingProfile() || savingPricing()) {
-          <span class="spinner"></span> Saving…
-        } @else {
-          <svg lucideSave></svg> Save changes
-        }
-      </button>
       @if (showResetPassword()) {
         <button type="button" class="btn" [disabled]="newPassword.length < 8 || resettingPassword()" (click)="resetPassword()">
           @if (resettingPassword()) {
@@ -233,29 +226,29 @@
       <div class="pl-card pl-card--costs">
         <label>
           Level
-          <span class="money"><span class="money__sym">$</span><input type="number" min="0" [(ngModel)]="levelCost" name="plLevel" placeholder="0" /></span>
+          <span class="money"><span class="money__sym">$</span><input type="number" min="0" [(ngModel)]="levelCost" (ngModelChange)="queueDetailSave()" name="plLevel" placeholder="0" /></span>
         </label>
         <label>
           Graded
-          <span class="money"><span class="money__sym">$</span><input type="number" min="0" [(ngModel)]="gradedCost" name="plGraded" placeholder="0" /></span>
+          <span class="money"><span class="money__sym">$</span><input type="number" min="0" [(ngModel)]="gradedCost" (ngModelChange)="queueDetailSave()" name="plGraded" placeholder="0" /></span>
         </label>
         <label>
           Modified
-          <span class="money"><span class="money__sym">$</span><input type="number" min="0" [(ngModel)]="modifiedCost" name="plModified" placeholder="0" /></span>
+          <span class="money"><span class="money__sym">$</span><input type="number" min="0" [(ngModel)]="modifiedCost" (ngModelChange)="queueDetailSave()" name="plModified" placeholder="0" /></span>
         </label>
         <label>
           GI
-          <span class="money"><span class="money__sym">$</span><input type="number" min="0" [(ngModel)]="giCost" name="plGi" placeholder="0" /></span>
+          <span class="money"><span class="money__sym">$</span><input type="number" min="0" [(ngModel)]="giCost" (ngModelChange)="queueDetailSave()" name="plGi" placeholder="0" /></span>
         </label>
       </div>
       <div class="pl-card pl-card--limits">
         <label>
           Min premium
-          <span class="money"><span class="money__sym">$</span><input type="number" min="0" [(ngModel)]="minimumPremium" name="plMinPremium" placeholder="0" /></span>
+          <span class="money"><span class="money__sym">$</span><input type="number" min="0" [(ngModel)]="minimumPremium" (ngModelChange)="queueDetailSave()" name="plMinPremium" placeholder="0" /></span>
         </label>
         <label>
           Max age
-          <span class="money"><input type="number" min="0" max="120" [(ngModel)]="maxAge" name="plMaxAge" placeholder="0" /></span>
+          <span class="money"><input type="number" min="0" max="120" [(ngModel)]="maxAge" (ngModelChange)="queueDetailSave()" name="plMaxAge" placeholder="0" /></span>
         </label>
       </div>
     </div>
@@ -276,6 +269,33 @@
         </button>
       }
     </div>
+  </div>
+</ng-template>
+
+<!-- Type a carrier and press Enter or Add; carriers used before show up as suggestions. -->
+<ng-template #carrierAdder let-state>
+  <div class="ca">
+    <div class="ca-row">
+      <input
+        type="text"
+        class="ca-input"
+        autocomplete="off"
+        [ngModel]="draft(state)"
+        (ngModelChange)="setDraft(state, $event)"
+        [name]="'carrierDraft-' + (state ?? 'bulk')"
+        [placeholder]="state ? 'Add a carrier to ' + state : 'Add a carrier to all ticked'"
+        (keydown.enter)="$event.preventDefault(); addFromDraft(state)"
+      />
+      <button type="button" class="btn btn--ghost btn--sm" [disabled]="!draft(state).trim()" (click)="addFromDraft(state)">Add</button>
+    </div>
+    @let list = suggestionsFor(state);
+    @if (list.length) {
+      <div class="ca-suggest">
+        @for (name of list; track name) {
+          <button type="button" class="ca-chip" (click)="addSuggestion(state, name)">{{ name }}</button>
+        }
+      </div>
+    }
   </div>
 </ng-template>
 
@@ -305,21 +325,7 @@
       @if (checkedStates.length) {
         <div class="sp-bulk">
           <span class="sp-bulk-label">{{ checkedStates.length }} {{ checkedStates.length === 1 ? 'state' : 'states' }} ticked</span>
-          <app-select
-            [options]="carrierOptionsFor(null)"
-            [searchable]="true"
-            [menuMaxHeight]="260"
-            placeholder="Add a carrier to all ticked"
-            name="bulkCarrierPicker"
-            [ngModel]="carrierPicker()"
-            (ngModelChange)="pickCarrier(null, $event)"
-          />
-          @if (creatingCarrierFor === '__bulk__') {
-            <div class="tag-input">
-              <input type="text" [(ngModel)]="newCarrierName" name="bulkNewCarrierName" placeholder="Carrier name" (keydown.enter)="$event.preventDefault(); createCarrier(null)" />
-              <button type="button" class="btn btn--ghost btn--sm" (click)="createCarrier(null)">Add</button>
-            </div>
-          }
+          <ng-container *ngTemplateOutlet="carrierAdder; context: { $implicit: null }" />
           <button type="button" class="btn btn--ghost btn--sm" (click)="checkedStates = []">Clear</button>
         </div>
       }
@@ -378,23 +384,7 @@
               <div class="sp-empty">No carriers in {{ state }} yet</div>
             }
 
-            <div class="sp-add">
-              <app-select
-                [options]="carrierOptionsFor(state)"
-                [searchable]="true"
-                [menuMaxHeight]="260"
-                placeholder="Add a carrier"
-                [name]="'carrierPicker-' + state"
-                [ngModel]="carrierPicker()"
-                (ngModelChange)="pickCarrier(state, $event)"
-              />
-              @if (creatingCarrierFor === state) {
-                <div class="tag-input">
-                  <input type="text" [(ngModel)]="newCarrierName" [name]="'newCarrier-' + state" placeholder="Carrier name" (keydown.enter)="$event.preventDefault(); createCarrier(state)" />
-                  <button type="button" class="btn btn--ghost btn--sm" (click)="createCarrier(state)">Add</button>
-                </div>
-              }
-            </div>
+            <ng-container *ngTemplateOutlet="carrierAdder; context: { $implicit: state }" />
           }
         </div>
       </div>

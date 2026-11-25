@@ -8,7 +8,6 @@ import {
   LucideBuilding2,
   LucideCircleCheck,
   LucideKeyRound,
-  LucideSave,
   LucideUserPlus,
   LucideX,
 } from '@lucide/angular';
@@ -58,7 +57,6 @@ const ROLE_TONE: Record<Role, string> = {
     LucideUserPlus,
     LucideBanknote,
     LucideCreditCard,
-    LucideSave,
     LucideCircleCheck,
     LucideKeyRound,
     LucideBuilding2,
@@ -77,12 +75,14 @@ export class AdminClients implements OnInit, OnDestroy {
   readonly notice = toastNotice();
   readonly creating = signal(false);
   readonly resettingPassword = signal(false);
-  readonly savingPricing = signal(false);
-  readonly savingProfile = signal(false);
   /** Licensed states + carriers auto-save on every change while the detail modal is open
    * (see toggleState/addCarrier/removeCarrier) — no separate "Save coverage" button to
    * remember to click. This just reflects that in-flight/settled state near the fields. */
-  readonly coverageStatus = signal<'idle' | 'saving' | 'saved'>('idle');
+  /** One indicator for every auto-save in the detail modal (details, pricing, coverage). */
+  readonly saveStatus = signal<'idle' | 'saving' | 'saved'>('idle');
+  private inFlight = 0;
+  private saveFailed = false;
+  private detailSaveTimer: ReturnType<typeof setTimeout> | null = null;
   private coverageSaveTimer: ReturnType<typeof setTimeout> | null = null;
 
   readonly showCreate = signal(false);
@@ -146,17 +146,8 @@ export class AdminClients implements OnInit, OnDestroy {
   private plansDirty = false;
 
   readonly planOptions = PLAN_TYPE_OPTIONS;
-  private readonly baseCarrierCatalog = [
-    'TransAmerica', 'Aetna', 'AHL', 'UHL', 'CICA', 'AIG', 'RNA', 'Combined',
-    'Securico', 'MOO', 'Ethos', 'InstaBrain', 'Gerber', 'GTL', 'AMAM',
-  ];
-  /** Carriers typed in for one client become pickable on the next. */
-  private readonly extraCarriers = signal<string[]>([]);
-  /** Which state card ("__bulk__" = the multi-state bar) has its "new carrier" name box open. */
-  creatingCarrierFor: string | null = null;
-  newCarrierName = '';
-  /** Always null at rest so the dropdowns show their placeholder; set briefly on pick. */
-  readonly carrierPicker = signal<string | null>(null);
+  /** What's typed in each "add a carrier" box, keyed by state (`__bulk__` = the multi-state bar). */
+  private carrierDrafts: Record<string, string> = {};
   readonly statePicker = signal<string | null>(null);
   /** States ticked for adding one carrier to several at once. */
   checkedStates: string[] = [];
@@ -246,8 +237,7 @@ export class AdminClients implements OnInit, OnDestroy {
     this.cellPlans = {};
     this.checkedStates = [];
     this.activeState = null;
-    this.creatingCarrierFor = null;
-    this.newCarrierName = '';
+    this.carrierDrafts = {};
     this.showCreate.set(true);
   }
 
@@ -292,18 +282,81 @@ export class AdminClients implements OnInit, OnDestroy {
       .sort((x, y) => x.name.localeCompare(y.name));
   }
 
-  /** Dropdown source for one state (or, with `null`, the multi-state bar): the preset list plus
-   * carriers already used on any client, minus what's already in that state. */
-  carrierOptionsFor(state: string | null): SelectOption[] {
-    const taken = new Set(state ? this.carriersFor(state).map((c) => c.name.toLowerCase()) : []);
-    const catalog = new Map<string, string>();
-    for (const n of [...this.baseCarrierCatalog, ...this.extraCarriers(), ...this.clients().flatMap((u) => u.carriers ?? []), ...this.carriers]) {
-      if (!catalog.has(n.toLowerCase())) catalog.set(n.toLowerCase(), n);
+  private draftKey(state: string | null): string {
+    return state ?? '__bulk__';
+  }
+
+  draft(state: string | null): string {
+    return this.carrierDrafts[this.draftKey(state)] ?? '';
+  }
+
+  /** A comma ends an entry, so several carriers can be typed in one go. */
+  setDraft(state: string | null, value: string): void {
+    if (!value.includes(',')) {
+      this.carrierDrafts = { ...this.carrierDrafts, [this.draftKey(state)]: value };
+      return;
     }
-    return [
-      ...[...catalog.values()].filter((n) => !taken.has(n.toLowerCase())).sort((x, y) => x.localeCompare(y)).map((n) => ({ value: n, label: n })),
-      { value: '__new__', label: '+ New carrier…' },
-    ];
+    const parts = value.split(',');
+    const rest = parts.pop() ?? '';
+    for (const part of parts) this.addCarrier(this.targetStates(state), this.canonicalCarrier(part));
+    this.carrierDrafts = { ...this.carrierDrafts, [this.draftKey(state)]: rest };
+  }
+
+  addFromDraft(state: string | null): void {
+    for (const part of this.draft(state).split(',')) {
+      this.addCarrier(this.targetStates(state), this.canonicalCarrier(part));
+    }
+    this.carrierDrafts = { ...this.carrierDrafts, [this.draftKey(state)]: '' };
+  }
+
+  addSuggestion(state: string | null, name: string): void {
+    this.addCarrier(this.targetStates(state), name);
+    this.carrierDrafts = { ...this.carrierDrafts, [this.draftKey(state)]: '' };
+  }
+
+  private targetStates(state: string | null): string[] {
+    return state ? [state] : this.checkedStates;
+  }
+
+  /** Carriers already entered on any client (plus any typed into this form), with how many
+   * clients use each — the source for suggestions. Nothing is stored separately. */
+  private get knownCarriers(): { name: string; uses: number }[] {
+    const byKey = new Map<string, { name: string; uses: number }>();
+    for (const u of this.clients()) {
+      const own = new Map<string, string>();
+      for (const n of [...(u.carriers ?? []), ...(u.stateCarriers ?? []).flatMap((sc) => sc.carriers)]) {
+        const name = n.trim();
+        if (name) own.set(name.toLowerCase(), name);
+      }
+      for (const [key, name] of own) {
+        const hit = byKey.get(key);
+        if (hit) hit.uses += 1;
+        else byKey.set(key, { name, uses: 1 });
+      }
+    }
+    for (const name of this.carriers) {
+      if (!byKey.has(name.toLowerCase())) byKey.set(name.toLowerCase(), { name, uses: 0 });
+    }
+    return [...byKey.values()];
+  }
+
+  /** Typed text matched, ignoring case, to a carrier spelled that way before — so "aig" becomes "AIG". */
+  private canonicalCarrier(typed: string): string {
+    const name = typed.trim();
+    return this.knownCarriers.find((k) => k.name.toLowerCase() === name.toLowerCase())?.name ?? name;
+  }
+
+  /** Up to eight previously used carriers matching what's typed, most used first, skipping the
+   * ones already in the state (for the multi-state bar: already in every ticked state). */
+  suggestionsFor(state: string | null): string[] {
+    const inState = (name: string, st: string) => this.carriersFor(st).some((c) => c.name.toLowerCase() === name.toLowerCase());
+    const q = this.draft(state).split(',').pop()!.trim().toLowerCase();
+    return this.knownCarriers
+      .filter((k) => !(state ? inState(k.name, state) : this.checkedStates.length > 0 && this.checkedStates.every((st) => inState(k.name, st))))
+      .filter((k) => !q || k.name.toLowerCase().includes(q))
+      .sort((x, y) => y.uses - x.uses || x.name.localeCompare(y.name))
+      .slice(0, 8)
+      .map((k) => k.name);
   }
 
   get stateAddOptions(): SelectOption[] {
@@ -323,27 +376,6 @@ export class AdminClients implements OnInit, OnDestroy {
     this.checkedStates = this.checkedStates.includes(state)
       ? this.checkedStates.filter((s) => s !== state)
       : [...this.checkedStates, state];
-  }
-
-  /** Picks a carrier for one state, or for every ticked state when `state` is null. */
-  pickCarrier(state: string | null, name: string): void {
-    this.carrierPicker.set(name);
-    setTimeout(() => this.carrierPicker.set(null));
-    if (name === '__new__') {
-      this.creatingCarrierFor = state ?? '__bulk__';
-      this.newCarrierName = '';
-      return;
-    }
-    this.addCarrier(state ? [state] : this.checkedStates, name);
-  }
-
-  createCarrier(state: string | null): void {
-    const name = this.newCarrierName.trim();
-    if (!name) return;
-    this.extraCarriers.update((list) => [...list, name]);
-    this.addCarrier(state ? [state] : this.checkedStates, name);
-    this.newCarrierName = '';
-    this.creatingCarrierFor = null;
   }
 
   private addCarrier(states: string[], name: string): void {
@@ -433,7 +465,7 @@ export class AdminClients implements OnInit, OnDestroy {
 
   queueCoverageAutoSave(): void {
     if (!this.selected()) return;
-    this.coverageStatus.set('idle');
+    this.saveStatus.set('saving');
     if (this.coverageSaveTimer) clearTimeout(this.coverageSaveTimer);
     this.coverageSaveTimer = setTimeout(() => this.autoSaveCoverage(), 700);
   }
@@ -496,69 +528,107 @@ export class AdminClients implements OnInit, OnDestroy {
     this.plansDirty = false;
     this.checkedStates = [];
     this.activeState = null;
-    this.creatingCarrierFor = null;
-    this.newCarrierName = '';
+    this.carrierDrafts = {};
     if (this.coverageSaveTimer) clearTimeout(this.coverageSaveTimer);
     this.coverageSaveTimer = null;
-    this.coverageStatus.set('idle');
+    if (this.detailSaveTimer) clearTimeout(this.detailSaveTimer);
+    this.detailSaveTimer = null;
+    this.inFlight = 0;
+    this.saveStatus.set('idle');
     this.selected.set(user);
   }
 
-  /** Saves name/email from the detail modal — the client has no self-service way to
-   * fix these (Settings is password-change only), so this is the only edit path. */
-  async saveProfile(): Promise<void> {
-    const user = this.selected();
-    if (!user) return;
-
+  private beginSave(): void {
+    if (this.inFlight++ === 0) this.saveFailed = false;
     this.error.set(null);
-    this.savingProfile.set(true);
-    try {
-      const updated = await this.userService.updateProfile(user.id, {
-        name: this.name.trim(),
-        email: this.email.trim(),
-      });
-      this.clients.update((rows) => rows.map((u) => (u.id === user.id ? updated : u)));
-      this.selected.set(updated);
-      this.notice.set(`Updated details for ${updated.name}.`);
-    } catch (err) {
-      this.error.set(apiErrorMessage(err, 'Could not update account details.'));
-    } finally {
-      this.savingProfile.set(false);
+    this.saveStatus.set('saving');
+  }
+
+  private endSave(ok: boolean): void {
+    if (!ok) this.saveFailed = true;
+    if (--this.inFlight > 0) return;
+    if (this.saveFailed) {
+      this.saveStatus.set('idle');
+      return;
     }
+    this.saveStatus.set('saved');
+    setTimeout(() => {
+      if (this.saveStatus() === 'saved' && this.inFlight === 0) this.saveStatus.set('idle');
+    }, 2500);
   }
 
-  /** The detail modal's single Save button: account details, then pricing + max age. Stops
-   * after the first failure so its error isn't overwritten by the second request. */
-  async saveChanges(): Promise<void> {
-    await this.saveProfile();
-    if (this.error()) return;
-    await this.savePricing();
-    if (!this.error()) this.notice.set(`Saved changes for ${this.selected()?.name ?? 'client'}.`);
+  private applyUpdated(updated: AppUser): void {
+    this.clients.update((rows) => rows.map((u) => (u.id === updated.id ? updated : u)));
+    this.selected.set(updated);
   }
 
-  /** Saves the per-plan lead cost + minimum premium + max age from the detail modal. */
-  async savePricing(): Promise<void> {
+  /** Debounced auto-save for the account details, pricing and limits in the detail modal. */
+  queueDetailSave(): void {
+    if (!this.selected()) return;
+    this.saveStatus.set('saving');
+    if (this.detailSaveTimer) clearTimeout(this.detailSaveTimer);
+    this.detailSaveTimer = setTimeout(() => void this.autoSaveDetails(), 800);
+  }
+
+  private profileChanged(user: AppUser): boolean {
+    return this.name.trim() !== user.name || this.email.trim() !== user.email;
+  }
+
+  /** A half-typed name or email isn't sent — it saves once it is valid. */
+  private profileValid(): boolean {
+    return this.name.trim().length > 0 && /^\S+@\S+\.\S+$/.test(this.email.trim());
+  }
+
+  private pricingChanged(user: AppUser): boolean {
+    const pairs: [number | null, number | null | undefined][] = [
+      [this.levelCost, user.levelCost],
+      [this.gradedCost, user.gradedCost],
+      [this.modifiedCost, user.modifiedCost],
+      [this.giCost, user.giCost],
+      [this.minimumPremium, user.minimumPremium],
+      [this.maxAge, user.maxAge],
+    ];
+    return pairs.some(([now, saved]) => (now ?? null) !== (saved ?? null));
+  }
+
+  /** Sends only the groups that actually differ from what's saved. */
+  private async autoSaveDetails(): Promise<void> {
+    this.detailSaveTimer = null;
     const user = this.selected();
     if (!user) return;
 
-    this.error.set(null);
-    this.savingPricing.set(true);
+    const sendProfile = this.profileChanged(user) && this.profileValid();
+    const sendPricing = this.pricingChanged(user);
+    if (!sendProfile && !sendPricing) {
+      // Nothing differs from what's saved (or the email isn't valid yet): drop the spinner
+      // unless another save is still pending.
+      if (this.inFlight === 0 && !this.coverageSaveTimer) this.saveStatus.set('idle');
+      return;
+    }
+
+    this.beginSave();
     try {
-      const updated = await this.userService.updatePricing(user.id, {
-        levelCost: this.levelCost,
-        gradedCost: this.gradedCost,
-        modifiedCost: this.modifiedCost,
-        giCost: this.giCost,
-        minimumPremium: this.minimumPremium,
-        maxAge: this.maxAge,
-      });
-      this.clients.update((rows) => rows.map((u) => (u.id === user.id ? updated : u)));
-      this.selected.set(updated);
-      this.notice.set(`Updated plan pricing for ${updated.name}.`);
+      if (sendProfile) {
+        this.applyUpdated(
+          await this.userService.updateProfile(user.id, { name: this.name.trim(), email: this.email.trim() }),
+        );
+      }
+      if (sendPricing) {
+        this.applyUpdated(
+          await this.userService.updatePricing(user.id, {
+            levelCost: this.levelCost,
+            gradedCost: this.gradedCost,
+            modifiedCost: this.modifiedCost,
+            giCost: this.giCost,
+            minimumPremium: this.minimumPremium,
+            maxAge: this.maxAge,
+          }),
+        );
+      }
+      this.endSave(true);
     } catch (err) {
-      this.error.set(apiErrorMessage(err, 'Could not update plan pricing.'));
-    } finally {
-      this.savingPricing.set(false);
+      this.error.set(apiErrorMessage(err, 'Could not save changes.'));
+      this.endSave(false);
     }
   }
 
@@ -569,8 +639,7 @@ export class AdminClients implements OnInit, OnDestroy {
     const user = this.selected();
     if (!user) return;
 
-    this.error.set(null);
-    this.coverageStatus.set('saving');
+    this.beginSave();
     const sendPlans = this.plansDirty;
     this.plansDirty = false;
     try {
@@ -581,16 +650,12 @@ export class AdminClients implements OnInit, OnDestroy {
         acceptsOnlineBankPayment: this.acceptsOnlineBankPayment,
         acceptedCards: this.acceptedCards,
       });
-      this.clients.update((rows) => rows.map((u) => (u.id === user.id ? updated : u)));
-      this.selected.set(updated);
-      this.coverageStatus.set('saved');
-      setTimeout(() => {
-        if (this.coverageStatus() === 'saved') this.coverageStatus.set('idle');
-      }, 2500);
+      this.applyUpdated(updated);
+      this.endSave(true);
     } catch (err) {
       if (sendPlans) this.plansDirty = true;
       this.error.set(apiErrorMessage(err, 'Could not update coverage.'));
-      this.coverageStatus.set('idle');
+      this.endSave(false);
     }
   }
 
@@ -598,6 +663,11 @@ export class AdminClients implements OnInit, OnDestroy {
    * modal closes, so a quick edit-then-close doesn't get dropped by the 700ms debounce
    * window. */
   async closeDetail(): Promise<void> {
+    if (this.detailSaveTimer) {
+      clearTimeout(this.detailSaveTimer);
+      this.detailSaveTimer = null;
+      await this.autoSaveDetails();
+    }
     if (this.coverageSaveTimer) {
       clearTimeout(this.coverageSaveTimer);
       this.coverageSaveTimer = null;

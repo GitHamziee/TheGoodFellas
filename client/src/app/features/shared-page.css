@@ -3885,3 +3885,49 @@ tr.row-highlight td {
   background: transparent;
   box-shadow: none;
 }
+
+/* ---------- carrier entry: typed name + suggestions from carriers used before ---------- */
+.ca {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  flex: 1 1 18rem;
+  min-width: 0;
+  margin-top: 0.8rem;
+}
+.ca-row {
+  display: flex;
+  gap: 0.5rem;
+}
+.ca-input {
+  flex: 1;
+  min-width: 0;
+}
+.ca-suggest {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.ca-chip {
+  padding: 0.25rem 0.65rem;
+  border: 1px dashed var(--border);
+  border-radius: 999px;
+  background: transparent;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ink-700);
+  cursor: pointer;
+}
+.ca-chip::before {
+  content: '+ ';
+  color: var(--ink-500);
+}
+.ca-chip:hover {
+  border-style: solid;
+  border-color: var(--gold-500);
+  background: rgba(212, 175, 55, 0.12);
+}
+.sp-bulk .ca {
+  margin-top: 0;
+}
