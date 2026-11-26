@@ -126,15 +126,24 @@
       <div class="form-grid form-grid--3">
         <label>
           Full name
-          <input type="text" [(ngModel)]="name" name="name" placeholder="Jane Doe" />
+          <input type="text" [(ngModel)]="name" name="name" placeholder="Jane Doe" [class.invalid]="createAttempted() && nameError()" />
+          @if (createAttempted() && nameError(); as msg) {
+            <span class="field-error">{{ msg }}</span>
+          }
         </label>
         <label>
           Email
-          <input type="email" [(ngModel)]="email" name="email" placeholder="jane@thegoodfellas.dev" />
+          <input type="email" [(ngModel)]="email" name="email" placeholder="jane@thegoodfellas.dev" [class.invalid]="createAttempted() && emailError()" />
+          @if (createAttempted() && emailError(); as msg) {
+            <span class="field-error">{{ msg }}</span>
+          }
         </label>
         <label>
           Password
-          <input type="password" [(ngModel)]="password" name="password" placeholder="At least 8 characters" />
+          <input type="password" [(ngModel)]="password" name="password" placeholder="At least 8 characters" [class.invalid]="createAttempted() && passwordError()" />
+          @if (createAttempted() && passwordError(); as msg) {
+            <span class="field-error">{{ msg }}</span>
+          }
         </label>
       </div>
     </div>
@@ -144,7 +153,7 @@
     <ng-container *ngTemplateOutlet="coverageEditor" />
 
     <div footer>
-      <button type="button" class="btn" [disabled]="!canSubmitCreate() || creating()" (click)="createUser()">
+      <button type="button" class="btn" [disabled]="creating()" (click)="createUser()">
         @if (creating()) {
           <span class="spinner"></span> Creating…
         } @else {

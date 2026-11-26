@@ -196,8 +196,24 @@ export class AdminClients implements OnInit, OnDestroy {
     };
   });
 
+  /** Set on the first Create click so missing account fields light up red. */
+  readonly createAttempted = signal(false);
+
+  nameError(): string | null {
+    return this.name.trim() === '' ? 'Required' : null;
+  }
+
+  emailError(): string | null {
+    return this.email.trim() === '' ? 'Required' : null;
+  }
+
+  passwordError(): string | null {
+    if (this.password === '') return 'Required';
+    return this.password.length < 8 ? 'At least 8 characters' : null;
+  }
+
   canSubmitCreate(): boolean {
-    return this.name.trim() !== '' && this.email.trim() !== '' && this.password.length >= 8;
+    return !this.nameError() && !this.emailError() && !this.passwordError();
   }
 
   async ngOnInit(): Promise<void> {
@@ -222,6 +238,7 @@ export class AdminClients implements OnInit, OnDestroy {
 
   openCreate(): void {
     this.error.set(null);
+    this.createAttempted.set(false);
     this.name = '';
     this.email = '';
     this.password = '';
@@ -472,6 +489,8 @@ export class AdminClients implements OnInit, OnDestroy {
 
   async createUser(): Promise<void> {
     this.error.set(null);
+    this.createAttempted.set(true);
+    if (!this.canSubmitCreate()) return;
     this.creating.set(true);
     try {
       const created = await this.userService.createUser({
